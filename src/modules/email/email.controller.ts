@@ -9,66 +9,80 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { EmailUsecase } from './email.usecase.js';
-import type { EmailCreate, ID } from '../jmap/jmap.types.js';
+import { EmailService } from './email.service.js';
+import type {
+  DraftEmailDto,
+  MailboxType,
+  SendEmailDto,
+} from './email.types.js';
 
 // TODO: Replace with actual authenticated user from AuthGuard
-const STUB_USER = 'jose@codekishi.com';
+const STUB_USER = 'test-andres';
 
 @ApiTags('Email')
 @Controller('email')
 export class EmailController {
-  constructor(private readonly emailUsecase: EmailUsecase) {}
+  constructor(private readonly emailService: EmailService) {}
 
   @Get('mailboxes')
   getMailboxes() {
-    return this.emailUsecase.getMailboxes(STUB_USER);
-  }
-
-  @Get('identities')
-  getIdentities() {
-    return this.emailUsecase.getIdentities(STUB_USER);
+    return this.emailService.getMailboxes(STUB_USER);
   }
 
   @Get()
   list(
-    @Query('mailboxId') mailboxId: string,
+    @Query('mailbox') mailbox: MailboxType = 'inbox',
     @Query('limit') limit?: string,
     @Query('position') position?: string,
   ) {
-    return this.emailUsecase.listEmails(
+    return this.emailService.listEmails(
       STUB_USER,
-      mailboxId,
-      limit ? Number(limit) || undefined : undefined,
-      position ? Number(position) || undefined : undefined,
+      mailbox,
+      limit ? Number(limit) || 20 : 20,
+      position ? Number(position) || 0 : 0,
     );
   }
 
   @Get(':id')
   get(@Param('id') id: string) {
-    return this.emailUsecase.getEmailById(STUB_USER, id);
-  }
-
-  @Patch(':id/keywords')
-  setKeywords(
-    @Param('id') id: string,
-    @Body() keywords: Record<string, boolean>,
-  ) {
-    return this.emailUsecase.setEmailKeywords(STUB_USER, id, keywords);
-  }
-
-  @Patch(':id/move')
-  move(@Param('id') id: string, @Body() mailboxIds: Record<ID, boolean>) {
-    return this.emailUsecase.moveEmail(STUB_USER, id, mailboxIds);
-  }
-
-  @Delete()
-  destroy(@Body() body: { ids: string[] }) {
-    return this.emailUsecase.destroyEmails(STUB_USER, body.ids);
+    return this.emailService.getEmail(STUB_USER, id);
   }
 
   @Post('send')
-  send(@Body() body: { email: EmailCreate; identityId: string }) {
-    return this.emailUsecase.sendEmail(STUB_USER, body.email, body.identityId);
+  send(@Body() dto: SendEmailDto) {
+    return this.emailService.sendEmail(STUB_USER, dto);
+  }
+
+  @Post('drafts')
+  saveDraft(@Body() dto: DraftEmailDto) {
+    return this.emailService.saveDraft(STUB_USER, dto);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      mailbox?: MailboxType;
+      isRead?: boolean;
+      isFlagged?: boolean;
+    },
+  ) {
+    const ops: Promise<void>[] = [];
+    if (body.mailbox !== undefined) {
+      ops.push(this.emailService.moveEmail(STUB_USER, id, body.mailbox));
+    }
+    if (body.isRead !== undefined) {
+      ops.push(this.emailService.markAsRead(STUB_USER, id, body.isRead));
+    }
+    if (body.isFlagged !== undefined) {
+      ops.push(this.emailService.markAsFlagged(STUB_USER, id, body.isFlagged));
+    }
+    await Promise.all(ops);
+  }
+
+  @Delete(':id')
+  delete(@Param('id') id: string) {
+    return this.emailService.deleteEmail(STUB_USER, id);
   }
 }
