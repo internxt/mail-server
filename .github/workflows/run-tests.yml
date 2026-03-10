@@ -9,14 +9,9 @@ on:
 jobs:
   run-tests:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-    environment:
-      name: development
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -27,17 +22,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
           registry-url: 'https://npm.pkg.github.com'
 
-      - run: echo "registry=https://registry.yarnpkg.com/" > .npmrc
-      - run: echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
-
-      - name: Configure NPM authentication
-        run: echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc
+      - name: Configure @internxt registry
+        run: |
+          echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc
         env:
           NPM_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-      - run: echo "always-auth=true" >> .npmrc
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Run unit tests
-        run: yarn test
+        run: npm test

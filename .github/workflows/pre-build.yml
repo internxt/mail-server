@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -22,17 +22,15 @@ jobs:
           node-version: ${{ matrix.node-version }}
           registry-url: 'https://npm.pkg.github.com'
 
-      - name: Setup npm
+      - name: Configure @internxt registry
         run: |
-          echo "registry=https://registry.yarnpkg.com/" > .npmrc
           echo "@internxt:registry=https://npm.pkg.github.com" >> .npmrc
           echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> .npmrc
-          echo "always-auth=true" >> .npmrc
         env:
           NPM_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Build
-        run: yarn build
+        run: npm run build
