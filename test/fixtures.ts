@@ -14,7 +14,7 @@ import type {
   EmailAddress as JmapEmailAddress,
   MailboxRole,
   Identity,
-} from '../src/modules/jmap/jmap.types.js';
+} from '../src/modules/infrastructure/jmap/jmap.types.js';
 
 const random = new Chance();
 

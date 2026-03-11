@@ -9,7 +9,7 @@ import {
   mapDraftDtoToJmapCreate,
 } from './jmap-mail.mapper.js';
 import type { MailboxRole } from './jmap.types.js';
-import type { DraftEmailDto, MailboxType } from '../email/email.types.js';
+import type { DraftEmailDto, MailboxType } from '../../email/email.types.js';
 import {
   newJmapMailbox,
   newJmapEmail,
@@ -17,7 +17,7 @@ import {
   newSendEmailDto,
   newDraftEmailDto,
   newEmailAddress,
-} from '../../../test/fixtures.js';
+} from '../../../../test/fixtures.js';
 
 describe('jmap-mail.mapper', () => {
   describe('mapJmapRoleToMailboxType', () => {

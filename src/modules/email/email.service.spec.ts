@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { EmailService } from './email.service.js';
-import type { MailProvider } from './mail-provider.port.js';
+import { type MailProvider } from './mail-provider.port.js';
 import {
   newMailbox,
   newEmail,

@@ -5,7 +5,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { nanoid } from 'nanoid';
 import configuration from './config/configuration';
 import { HealthModule } from './modules/health/health.module';
-import { JmapModule } from './modules/jmap/jmap.module';
+import { JmapModule } from './modules/infrastructure/jmap/jmap.module';
 import { EmailModule } from './modules/email/email.module';
 import { AuthModule } from './modules/auth/auth.module';
 

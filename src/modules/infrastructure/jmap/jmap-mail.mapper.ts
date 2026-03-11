@@ -5,7 +5,7 @@ import type {
   MailboxType,
   SendEmailDto,
   DraftEmailDto,
-} from '../email/email.types.js';
+} from '../../email/email.types.js';
 import type {
   Email as JmapEmail,
   EmailCreate as JmapEmailCreate,
