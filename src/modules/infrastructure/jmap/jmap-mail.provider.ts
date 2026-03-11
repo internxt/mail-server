@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { MailProvider } from '../email/mail-provider.port.js';
+import { MailProvider } from '../../email/mail-provider.port.js';
 import type {
   DraftEmailDto,
   Email,
@@ -7,7 +7,7 @@ import type {
   Mailbox,
   MailboxType,
   SendEmailDto,
-} from '../email/email.types.js';
+} from '../../email/email.types.js';
 import { JmapService } from './jmap.service.js';
 import type {
   Email as JmapEmail,
@@ -59,7 +59,7 @@ interface TimedCache<T> {
 const CACHE_TTL_MS = 60_000;
 
 @Injectable()
-export class JmapMailProvider implements MailProvider {
+export class JmapMailProvider extends MailProvider {
   private readonly logger = new Logger(JmapMailProvider.name);
   private readonly mailboxCache = new Map<
     string,
@@ -67,7 +67,9 @@ export class JmapMailProvider implements MailProvider {
   >();
   private readonly identityCache = new Map<string, TimedCache<string>>();
 
-  constructor(private readonly jmap: JmapService) {}
+  constructor(private readonly jmap: JmapService) {
+    super();
+  }
 
   async getMailboxes(userEmail: string): Promise<Mailbox[]> {
     const accountId = await this.jmap.getPrimaryAccountId(userEmail);

@@ -1,10 +1,9 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { MAIL_PROVIDER, type MailProvider } from './mail-provider.port.js';
+import { MailProvider } from './mail-provider.port.js';
 import type {
   DraftEmailDto,
   Email,
@@ -16,7 +15,7 @@ import type {
 
 @Injectable()
 export class EmailService {
-  constructor(@Inject(MAIL_PROVIDER) private readonly mail: MailProvider) {}
+  constructor(private readonly mail: MailProvider) {}
 
   getMailboxes(userEmail: string): Promise<Mailbox[]> {
     return this.mail.getMailboxes(userEmail);
