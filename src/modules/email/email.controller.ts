@@ -34,7 +34,7 @@ import {
 import type { MailboxType } from './email.types.js';
 
 // TODO: Replace with actual authenticated user from AuthGuard
-const STUB_USER = 'test-andres';
+export const STUB_USER = 'jose@codekishi.com';
 
 @ApiBearerAuth()
 @ApiTags('Email')
