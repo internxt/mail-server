@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['src/**/*.spec.ts'],
+    coverage: {
+      reporter: ['text', 'lcov'],
+    },
   },
   plugins: [swc.vite()],
 });
