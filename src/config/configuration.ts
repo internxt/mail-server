@@ -15,7 +15,8 @@ export default () => ({
   stalwart: {
     url: process.env.STALWART_JMAP_URL ?? 'http://localhost:8085',
     adminUrl: process.env.STALWART_ADMIN_URL ?? 'http://localhost:8085',
-    adminToken: process.env.STALWART_ADMIN_TOKEN ?? '',
+    adminUser: process.env.STALWART_ADMIN_USER ?? 'mail-api',
+    adminSecret: process.env.STALWART_ADMIN_SECRET ?? '',
     masterUser: process.env.STALWART_MASTER_USER ?? 'master',
     masterPassword: process.env.STALWART_MASTER_PASSWORD ?? '',
   },
