@@ -33,13 +33,16 @@ interface PatchOperation {
 export class StalwartService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StalwartService.name);
   private readonly adminUrl: string;
-  private readonly adminToken: string;
+  private readonly adminUser: string;
+  private readonly adminSecret: string;
   private httpClient!: Client;
 
   constructor(private readonly configService: ConfigService) {
     this.adminUrl = this.configService.getOrThrow<string>('stalwart.adminUrl');
-    this.adminToken = this.configService.getOrThrow<string>(
-      'stalwart.adminToken',
+    this.adminUser =
+      this.configService.getOrThrow<string>('stalwart.adminUser');
+    this.adminSecret = this.configService.getOrThrow<string>(
+      'stalwart.adminSecret',
     );
   }
 
@@ -143,8 +146,11 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
   }
 
   private headers(): Record<string, string> {
+    const credentials = Buffer.from(
+      `${this.adminUser}:${this.adminSecret}`,
+    ).toString('base64');
     return {
-      authorization: `Bearer ${this.adminToken}`,
+      authorization: `Basic ${credentials}`,
       'content-type': 'application/json',
       accept: 'application/json',
     };
