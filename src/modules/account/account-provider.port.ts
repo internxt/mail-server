@@ -10,7 +10,4 @@ export abstract class AccountProvider {
     currentName: string,
     newPrimaryAddress: string,
   ): Promise<void>;
-  abstract updateQuota(name: string, bytes: number): Promise<void>;
-  abstract createDomain(domain: string): Promise<void>;
-  abstract deleteDomain(domain: string): Promise<void>;
 }
