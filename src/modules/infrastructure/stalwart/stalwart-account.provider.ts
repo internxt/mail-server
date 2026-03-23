@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AccountProvider } from '../../email/account-provider.port.js';
+import { AccountProvider } from '../../account/account-provider.port.js';
 import type {
   AccountInfo,
   CreateAccountParams,
-} from '../../email/account.types.js';
+} from '../../account/account.types.js';
 import { StalwartService } from './stalwart.service.js';
 
 @Injectable()
@@ -87,27 +87,5 @@ export class StalwartAccountProvider extends AccountProvider {
     this.logger.warn(
       `Renamed account '${currentName}' → '${newPrimaryAddress}' (delete + recreate)`,
     );
-  }
-
-  async updateQuota(name: string, bytes: number): Promise<void> {
-    await this.stalwart.patchPrincipal(name, [
-      { action: 'set', field: 'quota', value: bytes },
-    ]);
-
-    this.logger.log(`Updated quota for '${name}' to ${bytes} bytes`);
-  }
-
-  async createDomain(domain: string): Promise<void> {
-    await this.stalwart.createPrincipal({
-      type: 'domain',
-      name: domain,
-    });
-
-    this.logger.log(`Created domain '${domain}'`);
-  }
-
-  async deleteDomain(domain: string): Promise<void> {
-    await this.stalwart.deletePrincipal(domain);
-    this.logger.log(`Deleted domain '${domain}'`);
   }
 }

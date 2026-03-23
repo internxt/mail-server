@@ -25,14 +25,12 @@ function randomId(): string {
 }
 
 function randomISODate(): string {
-  return random.date({ year: 2025 }).toISOString();
+  return random.date({ year: 2025 }).toString();
 }
 
 // ── Domain Fixtures ────────────────────────────────────────────────
 
-export function newEmailAddress(
-  attrs?: Partial<EmailAddress>,
-): EmailAddress {
+export function newEmailAddress(attrs?: Partial<EmailAddress>): EmailAddress {
   return {
     name: random.name(),
     email: random.email(),
@@ -40,9 +38,7 @@ export function newEmailAddress(
   };
 }
 
-export function newMailbox(
-  attrs?: Partial<Mailbox>,
-): Mailbox {
+export function newMailbox(attrs?: Partial<Mailbox>): Mailbox {
   return {
     id: randomId(),
     name: random.word(),
@@ -61,9 +57,7 @@ export function newMailbox(
   };
 }
 
-export function newEmailSummary(
-  attrs?: Partial<EmailSummary>,
-): EmailSummary {
+export function newEmailSummary(attrs?: Partial<EmailSummary>): EmailSummary {
   return {
     id: randomId(),
     threadId: randomId(),
@@ -80,9 +74,7 @@ export function newEmailSummary(
   };
 }
 
-export function newEmail(
-  attrs?: Partial<Email>,
-): Email {
+export function newEmail(attrs?: Partial<Email>): Email {
   const summary = newEmailSummary(attrs);
   return {
     ...summary,
@@ -96,9 +88,7 @@ export function newEmail(
   };
 }
 
-export function newSendEmailDto(
-  attrs?: Partial<SendEmailDto>,
-): SendEmailDto {
+export function newSendEmailDto(attrs?: Partial<SendEmailDto>): SendEmailDto {
   return {
     to: [newEmailAddress()],
     subject: random.sentence({ words: 5 }),
@@ -125,9 +115,7 @@ export const newJmapEmailAddress = newEmailAddress as (
   attrs?: Partial<JmapEmailAddress>,
 ) => JmapEmailAddress;
 
-export function newJmapMailbox(
-  attrs?: Partial<JmapMailbox>,
-): JmapMailbox {
+export function newJmapMailbox(attrs?: Partial<JmapMailbox>): JmapMailbox {
   return {
     id: randomId(),
     name: random.word(),
@@ -150,9 +138,7 @@ export function newJmapMailbox(
   };
 }
 
-export function newJmapEmail(
-  attrs?: Partial<JmapEmail>,
-): JmapEmail {
+export function newJmapEmail(attrs?: Partial<JmapEmail>): JmapEmail {
   const textPartId = randomId();
   const htmlPartId = randomId();
 
@@ -194,9 +180,7 @@ export function newJmapEmail(
   };
 }
 
-export function newJmapIdentity(
-  attrs?: Partial<Identity>,
-): Identity {
+export function newJmapIdentity(attrs?: Partial<Identity>): Identity {
   return {
     id: randomId(),
     name: random.name(),
