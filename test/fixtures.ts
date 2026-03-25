@@ -8,6 +8,7 @@ import type {
   DraftEmailDto,
   MailboxType,
 } from '../src/modules/email/email.types.js';
+import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import type {
   Mailbox as JmapMailbox,
   Email as JmapEmail,
@@ -41,6 +42,20 @@ function randomUuid(): string {
 
 function randomISODate(): string {
   return random.date({ year: 2025 }).toString();
+}
+
+export function newUserPayload(attrs?: Partial<UserPayload>): UserPayload {
+  return {
+    uuid: random.guid(),
+    email: random.email(),
+    name: random.first(),
+    lastname: random.last(),
+    username: random.email(),
+    sharedWorkspace: false,
+    networkCredentials: { user: random.hash({ length: 24 }) },
+    workspaces: { owners: [] },
+    ...attrs,
+  };
 }
 
 // ── Domain Fixtures ────────────────────────────────────────────────
