@@ -29,8 +29,8 @@ export class AccountService {
   async deleteAccount(driveUserUuid: string): Promise<void> {
     const account = await this.getAccountOrFail(driveUserUuid);
 
-    if (account.principalName) {
-      await this.provider.deleteAccount(account.principalName);
+    if (account.providerAccountId) {
+      await this.provider.deleteAccount(account.providerAccountId);
     }
 
     await this.accounts.delete(account.id);
@@ -53,7 +53,7 @@ export class AccountService {
         `No mail account for drive user '${driveUserUuid}'`,
       );
     }
-    const principalName = this.requirePrincipalName(account);
+    const providerAccountId = this.requireProviderAccountId(account);
 
     if (!domain) {
       throw new NotFoundException(`Domain '${domainName}' not found`);
@@ -70,7 +70,7 @@ export class AccountService {
     });
 
     try {
-      await this.provider.addAddress(principalName, address);
+      await this.provider.addAddress(providerAccountId, address);
     } catch (error) {
       await this.addresses.delete(newAddress.id);
       throw error;
@@ -79,7 +79,7 @@ export class AccountService {
     await this.addresses.createProviderLink({
       mailAddressId: newAddress.id,
       provider: 'stalwart',
-      externalId: principalName,
+      externalId: providerAccountId,
     });
 
     this.logger.log(`Added address '${address}' to account '${driveUserUuid}'`);
@@ -101,9 +101,9 @@ export class AccountService {
       );
     }
 
-    const principalName = this.requirePrincipalName(account);
+    const providerAccountId = this.requireProviderAccountId(account);
 
-    await this.provider.removeAddress(principalName, address);
+    await this.provider.removeAddress(providerAccountId, address);
     await Promise.all([
       this.addresses.deleteProviderLink(addressRecord.id),
       this.addresses.delete(addressRecord.id),
@@ -131,9 +131,9 @@ export class AccountService {
 
     if (addressRecord.isDefault) return;
 
-    const oldPrincipalName = this.requirePrincipalName(account);
+    const providerAccountId = this.requireProviderAccountId(account);
 
-    await this.provider.setPrimaryAddress(oldPrincipalName, newAddress);
+    await this.provider.setPrimaryAddress(providerAccountId, newAddress);
 
     await Promise.all([
       this.addresses.setDefault(addressRecord.id, account.id),
@@ -155,13 +155,13 @@ export class AccountService {
     return account;
   }
 
-  private requirePrincipalName(account: MailAccount): string {
-    const name = account.principalName;
-    if (!name) {
+  private requireProviderAccountId(account: MailAccount): string {
+    const id = account.providerAccountId;
+    if (!id) {
       throw new UnprocessableEntityException(
         'Account has no primary address with a provider link',
       );
     }
-    return name;
+    return id;
   }
 }

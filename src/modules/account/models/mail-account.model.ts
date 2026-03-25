@@ -14,6 +14,7 @@ import { MailAddressModel } from './mail-address.model.js';
 @Table({
   underscored: true,
   timestamps: true,
+  paranoid: true,
   tableName: 'mail_accounts',
 })
 export class MailAccountModel extends Model {
@@ -26,6 +27,9 @@ export class MailAccountModel extends Model {
   @Unique
   @Column(DataType.UUID)
   declare driveUserUuid: string;
+
+  @Column(DataType.DATE)
+  declare deletedAt: Date | null;
 
   @HasMany(() => MailAddressModel)
   declare addresses: MailAddressModel[];

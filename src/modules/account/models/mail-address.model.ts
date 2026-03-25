@@ -19,6 +19,7 @@ import { MailProviderAccountModel } from './mail-provider-account.model.js';
 @Table({
   underscored: true,
   timestamps: true,
+  paranoid: true,
   tableName: 'mail_addresses',
 })
 export class MailAddressModel extends Model {
@@ -48,6 +49,9 @@ export class MailAddressModel extends Model {
   @Default(false)
   @Column(DataType.BOOLEAN)
   declare isDefault: boolean;
+
+  @Column(DataType.DATE)
+  declare deletedAt: Date | null;
 
   @BelongsTo(() => MailAccountModel)
   declare account: MailAccountModel;
