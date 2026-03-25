@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   ConflictException,
   Injectable,
@@ -26,8 +27,80 @@ export class AccountService {
     return this.getAccountOrFail(userId);
   }
 
-  async deleteAccount(userId: string): Promise<void> {
-    const account = await this.getAccountOrFail(userId);
+  async provisionAccount(params: {
+    driveUserUuid: string;
+    address: string;
+    domain: string;
+    displayName: string;
+  }): Promise<MailAccount> {
+    const [domainRecord, existingAddress] = await Promise.all([
+      this.domains.findByDomain(params.domain),
+      this.addresses.findByAddress(params.address),
+    ]);
+
+    if (!domainRecord) {
+      throw new NotFoundException(`Domain '${params.domain}' not found`);
+    }
+    if (existingAddress) {
+      throw new ConflictException(
+        `Address '${params.address}' is already in use`,
+      );
+    }
+
+    let account: MailAccount;
+    try {
+      account = await this.accounts.create({
+        driveUserUuid: params.driveUserUuid,
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === 'SequelizeUniqueConstraintError'
+      ) {
+        this.logger.warn(
+          `Concurrent provisioning for '${params.driveUserUuid}', returning existing`,
+        );
+        return this.getAccountOrFail(params.driveUserUuid);
+      }
+      throw error;
+    }
+
+    const address = await this.addresses.create({
+      mailAccountId: account.id,
+      address: params.address,
+      domainId: domainRecord.id,
+      isDefault: true,
+    });
+
+    await this.addresses.createProviderLink({
+      mailAddressId: address,
+      provider: 'stalwart',
+      externalId: params.address,
+    });
+
+    const password = randomBytes(32).toString('base64url');
+
+    try {
+      await this.provider.createAccount({
+        accountId: account.id,
+        primaryAddress: params.address,
+        displayName: params.displayName,
+        password,
+      });
+    } catch (error) {
+      await this.accounts.delete(account.id);
+      throw error;
+    }
+
+    this.logger.log(
+      `Provisioned account '${params.address}' for drive user '${params.driveUserUuid}'`,
+    );
+
+    return this.getAccountOrFail(params.driveUserUuid);
+  }
+
+  async deleteAccount(driveUserUuid: string): Promise<void> {
+    const account = await this.getAccountOrFail(driveUserUuid);
 
     await Promise.all(
       account.addresses.map(async (a) => {
@@ -37,7 +110,7 @@ export class AccountService {
     );
 
     await this.accounts.delete(account.id);
-    this.logger.log(`Deleted account for user '${userId}'`);
+    this.logger.log(`Deleted account for user '${driveUserUuid}'`);
   }
 
   async addAddress(

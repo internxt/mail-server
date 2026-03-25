@@ -9,14 +9,6 @@ import type {
   MailboxType,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
-import type {
-  Mailbox as JmapMailbox,
-  Email as JmapEmail,
-  EmailAddress as JmapEmailAddress,
-  MailboxRole,
-  Identity,
-} from '../src/modules/infrastructure/jmap/jmap.types.js';
-
 import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
 import type { MailAddressAttributes } from '../src/modules/account/domain/mail-address.domain.js';
 import {
@@ -24,9 +16,16 @@ import {
   MailDomainStatus,
 } from '../src/modules/account/domain/mail-domain.domain.js';
 import type {
-  AccountInfo,
   CreateAccountParams,
+  AccountInfo,
 } from '../src/modules/account/account.types.js';
+import type {
+  Mailbox as JmapMailbox,
+  Email as JmapEmail,
+  EmailAddress as JmapEmailAddress,
+  MailboxRole,
+  Identity,
+} from '../src/modules/infrastructure/jmap/jmap.types.js';
 
 const random = new Chance();
 
@@ -138,41 +137,6 @@ export function newDraftEmailDto(
   };
 }
 
-export function newMailAddressAttributes(
-  attrs?: Partial<MailAddressAttributes>,
-): MailAddressAttributes {
-  return {
-    id: randomUuid(),
-    mailAccountId: randomUuid(),
-    address: random.email(),
-    domainId: randomUuid(),
-    isDefault: false,
-    providerExternalId: random.email(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...attrs,
-  };
-}
-
-export function newMailAccountAttributes(
-  attrs?: Partial<MailAccountAttributes>,
-): MailAccountAttributes {
-  const accountId = attrs?.id ?? randomUuid();
-  return {
-    id: accountId,
-    userId: randomUuid(),
-    addresses: [
-      newMailAddressAttributes({
-        mailAccountId: accountId,
-        isDefault: true,
-      }),
-    ],
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...attrs,
-  };
-}
-
 export function newMailDomainAttributes(
   attrs?: Partial<MailDomainAttributes>,
 ): MailDomainAttributes {
@@ -186,6 +150,41 @@ export function newMailDomainAttributes(
   };
 }
 
+export function newMailAddressAttributes(
+  attrs?: Partial<MailAddressAttributes>,
+): MailAddressAttributes {
+  return {
+    id: randomUuid(),
+    mailAccountId: randomUuid(),
+    address: random.email(),
+    domainId: randomUuid(),
+    isDefault: true,
+    providerExternalId: random.email(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...attrs,
+  };
+}
+
+export function newMailAccountAttributes(
+  attrs?: Partial<MailAccountAttributes>,
+): MailAccountAttributes {
+  const accountId = attrs?.id ?? randomUuid();
+  const address = newMailAddressAttributes({
+    mailAccountId: accountId,
+    ...attrs?.addresses?.[0],
+    isDefault: true,
+  });
+  return {
+    id: accountId,
+    userId: randomUuid(),
+    addresses: [address],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...attrs,
+  };
+}
+
 export function newCreateAccountParams(
   attrs?: Partial<CreateAccountParams>,
 ): CreateAccountParams {
@@ -193,18 +192,18 @@ export function newCreateAccountParams(
     accountId: randomUuid(),
     primaryAddress: random.email(),
     displayName: random.name(),
-    password: random.hash({ length: 16 }),
-    quota: random.natural({ min: 1_000_000, max: 10_000_000 }),
+    password: random.hash({ length: 32 }),
     ...attrs,
   };
 }
 
 export function newAccountInfo(attrs?: Partial<AccountInfo>): AccountInfo {
+  const email = random.email();
   return {
-    name: random.email(),
+    name: email,
     displayName: random.name(),
-    emails: [random.email(), random.email()],
-    quota: random.natural({ min: 1_000_000, max: 10_000_000 }),
+    emails: [email],
+    quota: 0,
     ...attrs,
   };
 }
