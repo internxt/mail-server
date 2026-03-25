@@ -31,7 +31,7 @@ export class MailAccount {
     return this.addresses.find((a) => a.isDefault);
   }
 
-  get principalName(): string | null {
+  get providerAccountId(): string | null {
     return this.defaultAddress?.providerExternalId ?? null;
   }
 }

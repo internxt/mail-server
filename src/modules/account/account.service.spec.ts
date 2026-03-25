@@ -73,7 +73,7 @@ describe('AccountService', () => {
       await service.deleteAccount(attrs.driveUserUuid);
 
       expect(provider.deleteAccount).toHaveBeenCalledWith(
-        account.principalName,
+        account.providerAccountId,
       );
       expect(accounts.delete).toHaveBeenCalledWith(account.id);
     });
@@ -134,13 +134,13 @@ describe('AccountService', () => {
         isDefault: false,
       });
       expect(provider.addAddress).toHaveBeenCalledWith(
-        account.principalName,
+        account.providerAccountId,
         newAddr,
       );
       expect(addresses.createProviderLink).toHaveBeenCalledWith({
         mailAddressId: createdAddress.id,
         provider: 'stalwart',
-        externalId: account.principalName,
+        externalId: account.providerAccountId,
       });
     });
 
@@ -256,7 +256,7 @@ describe('AccountService', () => {
       );
 
       expect(provider.removeAddress).toHaveBeenCalledWith(
-        account.principalName,
+        account.providerAccountId,
         nonDefaultAddr.address,
       );
       expect(addresses.deleteProviderLink).toHaveBeenCalledWith(
@@ -309,7 +309,7 @@ describe('AccountService', () => {
       await service.setPrimaryAddress(account.driveUserUuid, otherAddr.address);
 
       expect(provider.setPrimaryAddress).toHaveBeenCalledWith(
-        account.principalName,
+        account.providerAccountId,
         otherAddr.address,
       );
       expect(addresses.setDefault).toHaveBeenCalledWith(
