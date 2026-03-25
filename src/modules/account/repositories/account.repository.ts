@@ -27,6 +27,18 @@ export class AccountRepository {
     return model ? this.toDomain(model) : null;
   }
 
+  async create(params: { driveUserUuid: string }): Promise<MailAccount> {
+    const model = await this.accountModel.create(
+      { driveUserUuid: params.driveUserUuid },
+      {
+        include: [
+          { model: MailAddressModel, include: [MailProviderAccountModel] },
+        ],
+      },
+    );
+    return this.toDomain(model);
+  }
+
   async delete(id: string): Promise<void> {
     await this.accountModel.destroy({ where: { id } });
   }

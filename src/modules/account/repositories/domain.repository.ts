@@ -15,6 +15,13 @@ export class DomainRepository {
     return model ? this.toDomain(model) : null;
   }
 
+  async findAllActive(): Promise<MailDomain[]> {
+    const models = await this.domainModel.findAll({
+      where: { status: 'active' },
+    });
+    return models.map((m) => this.toDomain(m));
+  }
+
   private toDomain(model: MailDomainModel): MailDomain {
     return MailDomain.build({
       id: model.id,
