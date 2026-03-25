@@ -21,6 +21,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { User } from '../auth/decorators/user.decorator.js';
 import { EmailService } from './email.service.js';
 import {
   DraftEmailRequestDto,
@@ -32,9 +33,6 @@ import {
   UpdateEmailRequestDto,
 } from './email.dto.js';
 import type { MailboxType } from './email.types.js';
-
-// TODO: Replace with actual authenticated user from AuthGuard
-export const STUB_USER = 'jose@codekishi.com';
 
 @ApiBearerAuth()
 @ApiTags('Email')
@@ -49,8 +47,8 @@ export class EmailController {
       'Returns every mailbox for the authenticated user, including folder counts.',
   })
   @ApiOkResponse({ type: [MailboxResponseDto] })
-  getMailboxes() {
-    return this.emailService.getMailboxes(STUB_USER);
+  getMailboxes(@User('email') email: string) {
+    return this.emailService.getMailboxes(email);
   }
 
   @Get()
@@ -81,12 +79,13 @@ export class EmailController {
   })
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
+    @User('email') email: string,
     @Query('mailbox') mailbox: MailboxType = 'inbox',
     @Query('limit') limit?: string,
     @Query('position') position?: string,
   ) {
     return this.emailService.listEmails(
-      STUB_USER,
+      email,
       mailbox,
       limit ? Number(limit) || 20 : 20,
       position ? Number(position) || 0 : 0,
@@ -102,8 +101,8 @@ export class EmailController {
   @ApiParam({ name: 'id', description: 'Email ID' })
   @ApiOkResponse({ type: EmailResponseDto })
   @ApiNotFoundResponse({ description: 'Email not found' })
-  get(@Param('id') id: string) {
-    return this.emailService.getEmail(STUB_USER, id);
+  get(@User('email') email: string, @Param('id') id: string) {
+    return this.emailService.getEmail(email, id);
   }
 
   @Post('send')
@@ -118,8 +117,8 @@ export class EmailController {
     type: EmailCreatedResponseDto,
     description: 'Email sent successfully',
   })
-  send(@Body() dto: SendEmailRequestDto) {
-    return this.emailService.sendEmail(STUB_USER, dto);
+  send(@User('email') email: string, @Body() dto: SendEmailRequestDto) {
+    return this.emailService.sendEmail(email, dto);
   }
 
   @Post('drafts')
@@ -133,8 +132,8 @@ export class EmailController {
     type: EmailCreatedResponseDto,
     description: 'Draft saved successfully',
   })
-  saveDraft(@Body() dto: DraftEmailRequestDto) {
-    return this.emailService.saveDraft(STUB_USER, dto);
+  saveDraft(@User('email') email: string, @Body() dto: DraftEmailRequestDto) {
+    return this.emailService.saveDraft(email, dto);
   }
 
   @Patch(':id')
@@ -149,16 +148,20 @@ export class EmailController {
   @ApiBody({ type: UpdateEmailRequestDto })
   @ApiNoContentResponse({ description: 'Email updated successfully' })
   @ApiNotFoundResponse({ description: 'Email not found' })
-  async update(@Param('id') id: string, @Body() body: UpdateEmailRequestDto) {
+  async update(
+    @User('email') email: string,
+    @Param('id') id: string,
+    @Body() body: UpdateEmailRequestDto,
+  ) {
     const ops: Promise<void>[] = [];
     if (body.mailbox !== undefined) {
-      ops.push(this.emailService.moveEmail(STUB_USER, id, body.mailbox));
+      ops.push(this.emailService.moveEmail(email, id, body.mailbox));
     }
     if (body.isRead !== undefined) {
-      ops.push(this.emailService.markAsRead(STUB_USER, id, body.isRead));
+      ops.push(this.emailService.markAsRead(email, id, body.isRead));
     }
     if (body.isFlagged !== undefined) {
-      ops.push(this.emailService.markAsFlagged(STUB_USER, id, body.isFlagged));
+      ops.push(this.emailService.markAsFlagged(email, id, body.isFlagged));
     }
     await Promise.all(ops);
   }
@@ -172,7 +175,7 @@ export class EmailController {
   @ApiParam({ name: 'id', description: 'Email ID' })
   @ApiNoContentResponse({ description: 'Email deleted successfully' })
   @ApiNotFoundResponse({ description: 'Email not found' })
-  delete(@Param('id') id: string) {
-    return this.emailService.deleteEmail(STUB_USER, id);
+  delete(@User('email') email: string, @Param('id') id: string) {
+    return this.emailService.deleteEmail(email, id);
   }
 }
