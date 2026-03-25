@@ -16,12 +16,24 @@ import type {
   Identity,
 } from '../src/modules/infrastructure/jmap/jmap.types.js';
 
+import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
+import type { MailAddressAttributes } from '../src/modules/account/domain/mail-address.domain.js';
+import type { MailDomainAttributes } from '../src/modules/account/domain/mail-domain.domain.js';
+import type {
+  AccountInfo,
+  CreateAccountParams,
+} from '../src/modules/account/account.types.js';
+
 const random = new Chance();
 
 // ── Helpers ────────────────────────────────────────────────────────
 
 function randomId(): string {
   return random.hash({ length: 24 });
+}
+
+function randomUuid(): string {
+  return random.guid({ version: 4 });
 }
 
 function randomISODate(): string {
@@ -104,6 +116,77 @@ export function newDraftEmailDto(
     to: [newEmailAddress()],
     subject: random.sentence({ words: 3 }),
     textBody: random.paragraph(),
+    ...attrs,
+  };
+}
+
+export function newMailAddressAttributes(
+  attrs?: Partial<MailAddressAttributes>,
+): MailAddressAttributes {
+  return {
+    id: randomUuid(),
+    mailAccountId: randomUuid(),
+    address: random.email(),
+    domainId: randomUuid(),
+    isDefault: false,
+    providerExternalId: random.email(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...attrs,
+  };
+}
+
+export function newMailAccountAttributes(
+  attrs?: Partial<MailAccountAttributes>,
+): MailAccountAttributes {
+  const accountId = attrs?.id ?? randomUuid();
+  return {
+    id: accountId,
+    driveUserUuid: randomUuid(),
+    addresses: [
+      newMailAddressAttributes({
+        mailAccountId: accountId,
+        isDefault: true,
+      }),
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...attrs,
+  };
+}
+
+export function newMailDomainAttributes(
+  attrs?: Partial<MailDomainAttributes>,
+): MailDomainAttributes {
+  return {
+    id: randomUuid(),
+    domain: random.domain(),
+    status: 'active',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...attrs,
+  };
+}
+
+export function newCreateAccountParams(
+  attrs?: Partial<CreateAccountParams>,
+): CreateAccountParams {
+  return {
+    accountId: randomUuid(),
+    primaryAddress: random.email(),
+    displayName: random.name(),
+    password: random.hash({ length: 16 }),
+    quota: random.natural({ min: 1_000_000, max: 10_000_000 }),
+    ...attrs,
+  };
+}
+
+export function newAccountInfo(attrs?: Partial<AccountInfo>): AccountInfo {
+  return {
+    name: random.email(),
+    displayName: random.name(),
+    emails: [random.email(), random.email()],
+    quota: random.natural({ min: 1_000_000, max: 10_000_000 }),
     ...attrs,
   };
 }
