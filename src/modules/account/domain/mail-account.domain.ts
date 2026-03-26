@@ -30,8 +30,4 @@ export class MailAccount {
   get defaultAddress(): MailAddress | undefined {
     return this.addresses.find((a) => a.isDefault);
   }
-
-  get providerAccountId(): string | undefined {
-    return this.defaultAddress?.providerExternalId;
-  }
 }

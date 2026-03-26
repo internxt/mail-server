@@ -11,13 +11,18 @@ import { MailProviderAccountModel } from '../models/mail-provider-account.model.
 export function toAddressAttributes(
   model: MailAddressModel,
 ): MailAddressAttributes {
+  const providerExternalId = model.providerAccount?.externalId;
+  if (!providerExternalId) {
+    throw new Error(`Address '${model.id}' has no provider link`);
+  }
+
   return {
     id: model.id,
     mailAccountId: model.mailAccountId,
     address: model.address,
     domainId: model.domainId,
     isDefault: model.isDefault,
-    providerExternalId: model.providerAccount?.externalId ?? null,
+    providerExternalId,
     createdAt: model.createdAt as Date,
     updatedAt: model.updatedAt as Date,
   };
@@ -67,9 +72,9 @@ export class AddressRepository {
     address: string;
     domainId: string;
     isDefault: boolean;
-  }): Promise<MailAddress> {
+  }): Promise<string> {
     const model = await this.addressModel.create(params);
-    return MailAddress.build(toAddressAttributes(model));
+    return model.id;
   }
 
   async delete(id: string): Promise<void> {
@@ -93,16 +98,5 @@ export class AddressRepository {
 
   async deleteProviderLink(mailAddressId: string): Promise<void> {
     await this.providerAccountModel.destroy({ where: { mailAddressId } });
-  }
-
-  async updateAllProviderExternalIds(
-    mailAccountId: string,
-    newExternalId: string,
-  ): Promise<void> {
-    await this.sequelize.query(
-      `UPDATE mail_provider_accounts SET external_id = :newExternalId
-       WHERE mail_address_id IN (SELECT id FROM mail_addresses WHERE mail_account_id = :mailAccountId)`,
-      { replacements: { newExternalId, mailAccountId } },
-    );
   }
 }

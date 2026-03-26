@@ -15,6 +15,7 @@ import { MailAddressModel } from './mail-address.model.js';
 @Table({
   underscored: true,
   timestamps: true,
+  paranoid: true,
   tableName: 'mail_provider_accounts',
   indexes: [{ unique: true, fields: ['provider', 'external_id'] }],
 })
@@ -37,6 +38,9 @@ export class MailProviderAccountModel extends Model {
   @AllowNull(false)
   @Column(DataType.STRING(255))
   declare externalId: string;
+
+  @Column(DataType.DATE)
+  declare deletedAt: Date | null;
 
   @BelongsTo(() => MailAddressModel)
   declare address: MailAddressModel;

@@ -4,7 +4,7 @@ export interface MailAddressAttributes {
   address: string;
   domainId: string;
   isDefault: boolean;
-  providerExternalId: string | null;
+  providerExternalId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -15,7 +15,7 @@ export class MailAddress {
   readonly address!: string;
   readonly domainId!: string;
   readonly isDefault!: boolean;
-  readonly providerExternalId!: string | null;
+  readonly providerExternalId!: string;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
 
