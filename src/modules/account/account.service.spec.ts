@@ -63,16 +63,24 @@ describe('AccountService', () => {
   });
 
   describe('deleteAccount', () => {
-    it('when account has a principal name, then deletes from provider and DB', async () => {
-      const attrs = newMailAccountAttributes();
-      const account = MailAccount.build(attrs);
+    it('when account has addresses, then deletes all principals and account', async () => {
+      const addr1 = newMailAddressAttributes({ isDefault: true });
+      const addr2 = newMailAddressAttributes({ isDefault: false });
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [addr1, addr2] }),
+      );
       accounts.findByUserId.mockResolvedValue(account);
 
-      await service.deleteAccount(attrs.userId);
+      await service.deleteAccount(account.userId);
 
       expect(provider.deleteAccount).toHaveBeenCalledWith(
-        account.providerAccountId,
+        addr1.providerExternalId,
       );
+      expect(provider.deleteAccount).toHaveBeenCalledWith(
+        addr2.providerExternalId,
+      );
+      expect(addresses.deleteProviderLink).toHaveBeenCalledWith(addr1.id);
+      expect(addresses.deleteProviderLink).toHaveBeenCalledWith(addr2.id);
       expect(accounts.delete).toHaveBeenCalledWith(account.id);
     });
 
@@ -86,7 +94,7 @@ describe('AccountService', () => {
   });
 
   describe('addAddress', () => {
-    it('when all conditions met, then creates address and links provider', async () => {
+    it('when all conditions met, then creates principal and links provider', async () => {
       const accountAttrs = newMailAccountAttributes();
       const account = MailAccount.build(accountAttrs);
       const domainAttrs = newMailDomainAttributes();
@@ -103,6 +111,8 @@ describe('AccountService', () => {
         accountAttrs.userId,
         newAddr,
         domainAttrs.domain,
+        'password123',
+        'Display Name',
       );
 
       expect(addresses.create).toHaveBeenCalledWith({
@@ -111,14 +121,16 @@ describe('AccountService', () => {
         domainId: domain.id,
         isDefault: false,
       });
-      expect(provider.addAddress).toHaveBeenCalledWith(
-        account.providerAccountId,
-        newAddr,
-      );
+      expect(provider.createAccount).toHaveBeenCalledWith({
+        accountId: newAddressId,
+        primaryAddress: newAddr,
+        displayName: 'Display Name',
+        password: 'password123',
+      });
       expect(addresses.createProviderLink).toHaveBeenCalledWith({
         mailAddressId: newAddressId,
         provider: 'stalwart',
-        externalId: account.providerAccountId,
+        externalId: newAddr,
       });
     });
 
@@ -130,7 +142,7 @@ describe('AccountService', () => {
       addresses.findByAddress.mockResolvedValue(null);
 
       await expect(
-        service.addAddress('unknown', 'a@b.com', 'b.com'),
+        service.addAddress('unknown', 'a@b.com', 'b.com', 'pass'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -141,7 +153,7 @@ describe('AccountService', () => {
       addresses.findByAddress.mockResolvedValue(null);
 
       await expect(
-        service.addAddress(account.userId, 'a@b.com', 'unknown.com'),
+        service.addAddress(account.userId, 'a@b.com', 'unknown.com', 'pass'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -155,7 +167,12 @@ describe('AccountService', () => {
       addresses.findByAddress.mockResolvedValue(existing);
 
       await expect(
-        service.addAddress(account.userId, existing.address, domain.domain),
+        service.addAddress(
+          account.userId,
+          existing.address,
+          domain.domain,
+          'pass',
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -168,10 +185,15 @@ describe('AccountService', () => {
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       addresses.create.mockResolvedValue(newAddressId);
-      provider.addAddress.mockRejectedValue(new Error('provider down'));
+      provider.createAccount.mockRejectedValue(new Error('provider down'));
 
       await expect(
-        service.addAddress(account.userId, 'new@example.com', domain.domain),
+        service.addAddress(
+          account.userId,
+          'new@example.com',
+          domain.domain,
+          'pass',
+        ),
       ).rejects.toThrow('provider down');
 
       expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
@@ -180,7 +202,7 @@ describe('AccountService', () => {
   });
 
   describe('removeAddress', () => {
-    it('when address exists and is not default, then removes it', async () => {
+    it('when address exists and is not default, then deletes principal and address', async () => {
       const nonDefaultAddr = newMailAddressAttributes({ isDefault: false });
       const account = MailAccount.build(
         newMailAccountAttributes({
@@ -194,9 +216,8 @@ describe('AccountService', () => {
 
       await service.removeAddress(account.userId, nonDefaultAddr.address);
 
-      expect(provider.removeAddress).toHaveBeenCalledWith(
-        account.providerAccountId,
-        nonDefaultAddr.address,
+      expect(provider.deleteAccount).toHaveBeenCalledWith(
+        nonDefaultAddr.providerExternalId,
       );
       expect(addresses.deleteProviderLink).toHaveBeenCalledWith(
         nonDefaultAddr.id,

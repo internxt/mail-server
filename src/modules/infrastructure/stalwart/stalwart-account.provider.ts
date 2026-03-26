@@ -43,49 +43,4 @@ export class StalwartAccountProvider extends AccountProvider {
       quota: principal.quota ?? 0,
     };
   }
-
-  async addAddress(name: string, address: string): Promise<void> {
-    await this.stalwart.patchPrincipal(name, [
-      { action: 'addItem', field: 'emails', value: address },
-    ]);
-
-    this.logger.log(`Added address '${address}' to '${name}'`);
-  }
-
-  async removeAddress(name: string, address: string): Promise<void> {
-    await this.stalwart.patchPrincipal(name, [
-      { action: 'removeItem', field: 'emails', value: address },
-    ]);
-
-    this.logger.log(`Removed address '${address}' from '${name}'`);
-  }
-
-  async setPrimaryAddress(
-    currentName: string,
-    newPrimaryAddress: string,
-  ): Promise<void> {
-    // Stalwart uses the principal name as the login.
-    // Changing the primary address means renaming the principal.
-    // Current REST API does not support rename — we must recreate.
-    const existing = await this.stalwart.getPrincipal(currentName);
-    if (!existing) {
-      throw new Error(`Account '${currentName}' not found`);
-    }
-
-    const updatedEmails = [
-      newPrimaryAddress,
-      ...(existing.emails ?? []).filter((e) => e !== newPrimaryAddress),
-    ];
-
-    await this.stalwart.deletePrincipal(currentName);
-    await this.stalwart.createPrincipal({
-      ...existing,
-      name: newPrimaryAddress,
-      emails: updatedEmails,
-    });
-
-    this.logger.warn(
-      `Renamed account '${currentName}' → '${newPrimaryAddress}' (delete + recreate)`,
-    );
-  }
 }

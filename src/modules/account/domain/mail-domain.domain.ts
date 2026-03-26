@@ -1,7 +1,12 @@
+export enum MailDomainStatus {
+  Active = 'active',
+  Inactive = 'inactive',
+}
+
 export interface MailDomainAttributes {
   id: string;
   domain: string;
-  status: string;
+  status: MailDomainStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -9,7 +14,7 @@ export interface MailDomainAttributes {
 export class MailDomain {
   readonly id!: string;
   readonly domain!: string;
-  readonly status!: string;
+  readonly status!: MailDomainStatus;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
 

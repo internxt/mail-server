@@ -29,9 +29,12 @@ export class AccountService {
   async deleteAccount(userId: string): Promise<void> {
     const account = await this.getAccountOrFail(userId);
 
-    if (account.providerAccountId) {
-      await this.provider.deleteAccount(account.providerAccountId);
-    }
+    await Promise.all(
+      account.addresses.map(async (a) => {
+        await this.provider.deleteAccount(a.providerExternalId);
+        await this.addresses.deleteProviderLink(a.id);
+      }),
+    );
 
     await this.accounts.delete(account.id);
     this.logger.log(`Deleted account for user '${userId}'`);
@@ -41,6 +44,8 @@ export class AccountService {
     userId: string,
     address: string,
     domainName: string,
+    password: string,
+    displayName?: string,
   ): Promise<void> {
     const [account, domain, existing] = await Promise.all([
       this.accounts.findByUserId(userId),
@@ -51,8 +56,6 @@ export class AccountService {
     if (!account) {
       throw new NotFoundException(`No mail account for user '${userId}'`);
     }
-    const providerAccountId = this.requireProviderAccountId(account);
-
     if (!domain) {
       throw new NotFoundException(`Domain '${domainName}' not found`);
     }
@@ -68,7 +71,12 @@ export class AccountService {
     });
 
     try {
-      await this.provider.addAddress(providerAccountId, address);
+      await this.provider.createAccount({
+        accountId: newAddressId,
+        primaryAddress: address,
+        displayName: displayName ?? '',
+        password,
+      });
     } catch (error) {
       await this.addresses.delete(newAddressId);
       throw error;
@@ -77,7 +85,7 @@ export class AccountService {
     await this.addresses.createProviderLink({
       mailAddressId: newAddressId,
       provider: 'stalwart',
-      externalId: providerAccountId,
+      externalId: address,
     });
 
     this.logger.log(`Added address '${address}' to account '${userId}'`);
@@ -99,9 +107,7 @@ export class AccountService {
       );
     }
 
-    const providerAccountId = this.requireProviderAccountId(account);
-
-    await this.provider.removeAddress(providerAccountId, address);
+    await this.provider.deleteAccount(addressRecord.providerExternalId);
     await Promise.all([
       this.addresses.deleteProviderLink(addressRecord.id),
       this.addresses.delete(addressRecord.id),
@@ -137,13 +143,5 @@ export class AccountService {
       throw new NotFoundException(`No mail account for user '${userId}'`);
     }
     return account;
-  }
-
-  private requireProviderAccountId(account: MailAccount): string {
-    const id = account.providerAccountId;
-    if (!id) {
-      throw new UnprocessableEntityException('Account has no primary address');
-    }
-    return id;
   }
 }

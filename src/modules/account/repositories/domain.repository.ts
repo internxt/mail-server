@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { MailDomain } from '../domain/mail-domain.domain.js';
+import { MailDomain, MailDomainStatus } from '../domain/mail-domain.domain.js';
 import { MailDomainModel } from '../models/mail-domain.model.js';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class DomainRepository {
     return MailDomain.build({
       id: model.id,
       domain: model.domain,
-      status: model.status,
+      status: model.status as MailDomainStatus,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,
     });
