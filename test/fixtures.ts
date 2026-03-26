@@ -18,7 +18,10 @@ import type {
 
 import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
 import type { MailAddressAttributes } from '../src/modules/account/domain/mail-address.domain.js';
-import type { MailDomainAttributes } from '../src/modules/account/domain/mail-domain.domain.js';
+import {
+  type MailDomainAttributes,
+  MailDomainStatus,
+} from '../src/modules/account/domain/mail-domain.domain.js';
 import type {
   AccountInfo,
   CreateAccountParams,
@@ -142,7 +145,7 @@ export function newMailAccountAttributes(
   const accountId = attrs?.id ?? randomUuid();
   return {
     id: accountId,
-    driveUserUuid: randomUuid(),
+    userId: randomUuid(),
     addresses: [
       newMailAddressAttributes({
         mailAccountId: accountId,
@@ -161,7 +164,7 @@ export function newMailDomainAttributes(
   return {
     id: randomUuid(),
     domain: random.domain(),
-    status: 'active',
+    status: MailDomainStatus.Active,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...attrs,

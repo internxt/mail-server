@@ -26,7 +26,7 @@ export class MailAccountModel extends Model {
   @AllowNull(false)
   @Unique
   @Column(DataType.UUID)
-  declare driveUserUuid: string;
+  declare userId: string;
 
   @Column(DataType.DATE)
   declare deletedAt: Date | null;
