@@ -13,9 +13,9 @@ export class AccountRepository {
     private readonly accountModel: typeof MailAccountModel,
   ) {}
 
-  async findByDriveUserUuid(uuid: string): Promise<MailAccount | null> {
+  async findByUserId(userId: string): Promise<MailAccount | null> {
     const model = await this.accountModel.findOne({
-      where: { driveUserUuid: uuid },
+      where: { userId },
       include: [
         {
           model: MailAddressModel,
@@ -34,7 +34,7 @@ export class AccountRepository {
   private toDomain(model: MailAccountModel): MailAccount {
     return MailAccount.build({
       id: model.id,
-      driveUserUuid: model.driveUserUuid,
+      userId: model.userId,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,
       addresses: (model.addresses ?? []).map(toAddressAttributes),

@@ -14,7 +14,7 @@ const domain = {
 const account = {
   id: 'a1b2c3d4-0000-0000-0000-000000000002',
   // Matches the uuid of the test user in drive-server-wip seeders
-  drive_user_uuid: '87204d6b-c4a7-4f38-bd99-f7f47964a643',
+  user_id: '87204d6b-c4a7-4f38-bd99-f7f47964a643',
   created_at: new Date(),
   updated_at: new Date(),
 };
@@ -49,8 +49,8 @@ module.exports = {
     }
 
     const [existingAccount] = await queryInterface.sequelize.query(
-      'SELECT id FROM mail_accounts WHERE drive_user_uuid = :uuid',
-      { replacements: { uuid: account.drive_user_uuid }, type: queryInterface.sequelize.QueryTypes.SELECT },
+      'SELECT id FROM mail_accounts WHERE user_id = :uuid',
+      { replacements: { uuid: account.user_id }, type: queryInterface.sequelize.QueryTypes.SELECT },
     );
     if (!existingAccount) {
       await queryInterface.bulkInsert('mail_accounts', [account]);

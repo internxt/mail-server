@@ -5,7 +5,7 @@ import {
 
 export interface MailAccountAttributes {
   id: string;
-  driveUserUuid: string;
+  userId: string;
   addresses: MailAddressAttributes[];
   createdAt: Date;
   updatedAt: Date;
@@ -13,7 +13,7 @@ export interface MailAccountAttributes {
 
 export class MailAccount {
   readonly id!: string;
-  readonly driveUserUuid!: string;
+  readonly userId!: string;
   readonly addresses!: MailAddress[];
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
@@ -31,7 +31,7 @@ export class MailAccount {
     return this.addresses.find((a) => a.isDefault);
   }
 
-  get providerAccountId(): string | null {
-    return this.defaultAddress?.providerExternalId ?? null;
+  get providerAccountId(): string | undefined {
+    return this.defaultAddress?.providerExternalId;
   }
 }
