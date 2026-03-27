@@ -10,6 +10,7 @@ import { JmapModule } from './modules/infrastructure/jmap/jmap.module';
 import { EmailModule } from './modules/email/email.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AccountModule } from './modules/account/account.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { AccountModule } from './modules/account/account.module';
     EmailModule,
     AuthModule,
     AccountModule,
+    GatewayModule,
   ],
   controllers: [],
   providers: [],

@@ -27,9 +27,9 @@ export class AccountRepository {
     return model ? this.toDomain(model) : null;
   }
 
-  async create(params: { driveUserUuid: string }): Promise<MailAccount> {
+  async create(params: { userId: string }): Promise<MailAccount> {
     const model = await this.accountModel.create(
-      { driveUserUuid: params.driveUserUuid },
+      { userId: params.userId },
       {
         include: [
           { model: MailAddressModel, include: [MailProviderAccountModel] },

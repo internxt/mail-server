@@ -39,7 +39,7 @@ describe('GatewayController', () => {
       };
       const account = MailAccount.build(
         newMailAccountAttributes({
-          driveUserUuid: dto.driveUserUuid,
+          userId: dto.driveUserUuid,
           addresses: [
             newMailAddressAttributes({
               address: dto.address,
@@ -54,14 +54,14 @@ describe('GatewayController', () => {
       const result = await controller.provisionAccount(dto);
 
       expect(accountService.provisionAccount).toHaveBeenCalledWith({
-        driveUserUuid: dto.driveUserUuid,
+        userId: dto.driveUserUuid,
         address: dto.address,
         domain: dto.domain,
         displayName: dto.displayName,
       });
       expect(result).toEqual({
         id: account.id,
-        driveUserUuid: account.driveUserUuid,
+        userId: account.userId,
         address: dto.address,
       });
     });
