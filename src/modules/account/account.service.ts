@@ -27,8 +27,12 @@ export class AccountService {
     return this.getAccountOrFail(userId);
   }
 
+  async findAccount(userId: string): Promise<MailAccount | null> {
+    return this.accounts.findByUserId(userId);
+  }
+
   async provisionAccount(params: {
-    driveUserUuid: string;
+    userId: string;
     address: string;
     domain: string;
     displayName: string;
@@ -50,7 +54,7 @@ export class AccountService {
     let account: MailAccount;
     try {
       account = await this.accounts.create({
-        driveUserUuid: params.driveUserUuid,
+        userId: params.userId,
       });
     } catch (error) {
       if (
@@ -58,9 +62,9 @@ export class AccountService {
         error.name === 'SequelizeUniqueConstraintError'
       ) {
         this.logger.warn(
-          `Concurrent provisioning for '${params.driveUserUuid}', returning existing`,
+          `Concurrent provisioning for '${params.userId}', returning existing`,
         );
-        return this.getAccountOrFail(params.driveUserUuid);
+        return this.getAccountOrFail(params.userId);
       }
       throw error;
     }
@@ -93,10 +97,10 @@ export class AccountService {
     }
 
     this.logger.log(
-      `Provisioned account '${params.address}' for drive user '${params.driveUserUuid}'`,
+      `Provisioned account '${params.address}' for user '${params.userId}'`,
     );
 
-    return this.getAccountOrFail(params.driveUserUuid);
+    return this.getAccountOrFail(params.userId);
   }
 
   async deleteAccount(driveUserUuid: string): Promise<void> {

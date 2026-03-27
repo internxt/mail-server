@@ -62,6 +62,154 @@ describe('AccountService', () => {
     });
   });
 
+  describe('findAccount', () => {
+    it('when account exists, then returns it', async () => {
+      const account = MailAccount.build(newMailAccountAttributes());
+      accounts.findByUserId.mockResolvedValue(account);
+
+      const result = await service.findAccount(account.userId);
+
+      expect(result).toBe(account);
+    });
+
+    it('when account does not exist, then returns null', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      const result = await service.findAccount('nonexistent');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('provisionAccount', () => {
+    const domainAttrs = newMailDomainAttributes({ domain: 'internxt.com' });
+    const domain = MailDomain.build(domainAttrs);
+    const params = {
+      userId: 'user-uuid-1',
+      address: 'alice@internxt.com',
+      domain: 'internxt.com',
+      displayName: 'Alice Smith',
+    };
+
+    it('when all inputs are valid, then creates account, address, provider link, and stalwart principal', async () => {
+      const createdAccount = MailAccount.build(
+        newMailAccountAttributes({
+          userId: params.userId,
+          addresses: [],
+        }),
+      );
+      const createdAddressId = 'new-address-id';
+      const provisionedAccount = MailAccount.build(
+        newMailAccountAttributes({
+          id: createdAccount.id,
+          userId: params.userId,
+          addresses: [
+            newMailAddressAttributes({
+              mailAccountId: createdAccount.id,
+              address: params.address,
+              domainId: domain.id,
+              isDefault: true,
+              providerExternalId: params.address,
+            }),
+          ],
+        }),
+      );
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.create.mockResolvedValue(createdAccount);
+      addresses.create.mockResolvedValue(createdAddressId);
+      accounts.findByUserId.mockResolvedValue(provisionedAccount);
+
+      const result = await service.provisionAccount(params);
+
+      expect(result.userId).toBe(params.userId);
+      expect(accounts.create).toHaveBeenCalledWith({
+        userId: params.userId,
+      });
+      expect(addresses.create).toHaveBeenCalledWith({
+        mailAccountId: createdAccount.id,
+        address: params.address,
+        domainId: domain.id,
+        isDefault: true,
+      });
+      expect(addresses.createProviderLink).toHaveBeenCalledWith({
+        mailAddressId: createdAddressId,
+        provider: 'stalwart',
+        externalId: params.address,
+      });
+      expect(provider.createAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountId: createdAccount.id,
+          primaryAddress: params.address,
+          displayName: params.displayName,
+        }),
+      );
+    });
+
+    it('when domain does not exist, then throws NotFoundException', async () => {
+      domains.findByDomain.mockResolvedValue(null);
+      addresses.findByAddress.mockResolvedValue(null);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+    });
+
+    it('when address is already taken, then throws ConflictException', async () => {
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(
+        MailAddress.build(
+          newMailAddressAttributes({ address: params.address }),
+        ),
+      );
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+    });
+
+    it('when stalwart provider fails, then deletes the account (undo) and rethrows', async () => {
+      const createdAccount = MailAccount.build(
+        newMailAccountAttributes({
+          userId: params.userId,
+          addresses: [],
+        }),
+      );
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.create.mockResolvedValue(createdAccount);
+      addresses.create.mockResolvedValue('addr-id');
+      provider.createAccount.mockRejectedValue(new Error('Stalwart down'));
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        'Stalwart down',
+      );
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+    });
+
+    it('when concurrent provisioning race occurs, then returns the existing account', async () => {
+      const existingAccount = MailAccount.build(
+        newMailAccountAttributes({ userId: params.userId }),
+      );
+      const uniqueError = new Error('Unique constraint violated');
+      uniqueError.name = 'SequelizeUniqueConstraintError';
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.create.mockRejectedValue(uniqueError);
+      accounts.findByUserId.mockResolvedValue(existingAccount);
+
+      const result = await service.provisionAccount(params);
+
+      expect(result).toBe(existingAccount);
+      expect(provider.createAccount).not.toHaveBeenCalled();
+    });
+  });
+
   describe('deleteAccount', () => {
     it('when account has addresses, then deletes all principals and account', async () => {
       const addr1 = newMailAddressAttributes({ isDefault: true });

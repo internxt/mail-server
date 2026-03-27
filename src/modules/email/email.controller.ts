@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -22,6 +23,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { User } from '../auth/decorators/user.decorator.js';
+import { MailAccountGuard } from '../provisioning/provisioning.guard.js';
 import { EmailService } from './email.service.js';
 import {
   DraftEmailRequestDto,
@@ -36,6 +38,7 @@ import type { MailboxType } from './email.types.js';
 
 @ApiBearerAuth()
 @ApiTags('Email')
+@UseGuards(MailAccountGuard)
 @Controller('email')
 export class EmailController {
   constructor(private readonly emailService: EmailService) {}
