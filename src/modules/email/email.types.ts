@@ -64,4 +64,6 @@ export interface DraftEmailDto {
 export interface EmailListResponse {
   emails: EmailSummary[];
   total: number;
+  hasMoreMails: boolean;
+  nextAnchor?: string;
 }

@@ -26,8 +26,9 @@ export class EmailService {
     mailbox: MailboxType,
     limit: number,
     position: number,
+    anchorId?: string,
   ): Promise<EmailListResponse> {
-    return this.mail.listEmails(userEmail, mailbox, limit, position);
+    return this.mail.listEmails(userEmail, mailbox, limit, position, anchorId);
   }
 
   async getEmail(userEmail: string, id: string): Promise<Email> {

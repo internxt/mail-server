@@ -14,6 +14,7 @@ export abstract class MailProvider {
     mailbox: MailboxType,
     limit: number,
     position: number,
+    anchorId?: string,
   ): Promise<EmailListResponse>;
   abstract getEmail(userEmail: string, id: string): Promise<Email | null>;
   abstract sendEmail(

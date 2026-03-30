@@ -148,15 +148,24 @@ export class EmailResponseDto extends EmailSummaryResponseDto {
   @ApiProperty({ type: [EmailAddressDto] })
   replyTo!: EmailAddressDto[];
 
-  @ApiProperty({ nullable: true, example: '2025-06-15T10:29:55Z' })
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    example: '2025-06-15T10:29:55Z',
+  })
   sentAt!: string | null;
 
-  @ApiProperty({ nullable: true, example: 'Hi team, here are the notes…' })
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    example: 'Hi team, here are the notes…',
+  })
   textBody!: string | null;
 
   @ApiProperty({
     nullable: true,
     example: '<p>Hi team, here are the notes…</p>',
+    type: String,
   })
   htmlBody!: string | null;
 }
@@ -167,6 +176,15 @@ export class EmailListResponseDto {
 
   @ApiProperty({ example: 142, description: 'Total emails in the mailbox' })
   total!: number;
+
+  @ApiProperty({
+    example: true,
+    description: 'Whether there are more emails to fetch',
+  })
+  hasMoreMails!: boolean;
+
+  @ApiPropertyOptional({ example: 'Ma1f09b…' })
+  nextAnchor?: string;
 }
 
 export class EmailCreatedResponseDto {
