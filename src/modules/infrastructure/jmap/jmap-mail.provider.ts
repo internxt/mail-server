@@ -105,6 +105,7 @@ export class JmapMailProvider extends MailProvider {
           sort: [{ property: 'receivedAt', isAscending: false }],
           limit,
           position,
+          calculateTotal: true,
         },
         'r0',
       ],

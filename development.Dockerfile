@@ -4,7 +4,6 @@ WORKDIR /usr/app
 
 COPY package.json ./
 COPY package-lock.json ./
-COPY .npmrc ./
 RUN npm ci
 
 CMD ["npm", "run", "start:dev"]
