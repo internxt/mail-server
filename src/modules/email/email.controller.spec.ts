@@ -49,7 +49,7 @@ describe('EmailController', () => {
       const result = await controller.list(userEmail, 'inbox');
 
       expect(emailService.listEmails).toHaveBeenCalledWith(
-        STUB_USER,
+        userEmail,
         'inbox',
         20,
         0,
