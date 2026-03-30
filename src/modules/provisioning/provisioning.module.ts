@@ -5,6 +5,6 @@ import { MailAccountGuard } from './provisioning.guard.js';
 @Module({
   imports: [AccountModule],
   providers: [MailAccountGuard],
-  exports: [MailAccountGuard],
+  exports: [MailAccountGuard, AccountModule],
 })
 export class ProvisioningModule {}
