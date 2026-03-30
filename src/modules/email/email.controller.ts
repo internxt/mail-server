@@ -77,18 +77,27 @@ export class EmailController {
     description: 'Zero-based offset for pagination. Defaults to `0`.',
     example: 0,
   })
+  @ApiQuery({
+    name: 'anchorId',
+    required: false,
+    type: String,
+    description: 'Anchor ID for pagination.',
+    example: 'Ma1f09b…',
+  })
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
     @User('email') email: string,
     @Query('mailbox') mailbox: MailboxType = 'inbox',
     @Query('limit') limit?: string,
     @Query('position') position?: string,
+    @Query('anchorId') anchorId?: string,
   ) {
     return this.emailService.listEmails(
       email,
       mailbox,
       limit ? Number(limit) || 20 : 20,
       position ? Number(position) || 0 : 0,
+      anchorId,
     );
   }
 
