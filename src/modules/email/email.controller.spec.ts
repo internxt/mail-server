@@ -39,22 +39,31 @@ describe('EmailController', () => {
 
   describe('list', () => {
     it('When list is called with no query params, then it uses defaults', async () => {
-      const response = { emails: [newEmailSummary()], total: 1 };
+      const response = {
+        emails: [newEmailSummary()],
+        total: 1,
+        hasMoreMails: false,
+      };
       emailService.listEmails.mockResolvedValue(response);
 
       const result = await controller.list(userEmail, 'inbox');
 
       expect(emailService.listEmails).toHaveBeenCalledWith(
-        userEmail,
+        STUB_USER,
         'inbox',
         20,
         0,
+        undefined,
       );
       expect(result).toBe(response);
     });
 
     it('When list is called with limit and position, then it parses them', async () => {
-      emailService.listEmails.mockResolvedValue({ emails: [], total: 0 });
+      emailService.listEmails.mockResolvedValue({
+        emails: [],
+        total: 0,
+        hasMoreMails: false,
+      });
 
       await controller.list(userEmail, 'sent', '10', '5');
 
@@ -63,11 +72,16 @@ describe('EmailController', () => {
         'sent',
         10,
         5,
+        undefined,
       );
     });
 
     it('When list is called with non-numeric strings, then it falls back to defaults', async () => {
-      emailService.listEmails.mockResolvedValue({ emails: [], total: 0 });
+      emailService.listEmails.mockResolvedValue({
+        emails: [],
+        total: 0,
+        hasMoreMails: false,
+      });
 
       await controller.list(userEmail, 'inbox', 'abc', 'xyz');
 
@@ -76,6 +90,7 @@ describe('EmailController', () => {
         'inbox',
         20,
         0,
+        undefined,
       );
     });
   });

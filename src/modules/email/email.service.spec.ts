@@ -65,6 +65,7 @@ describe('EmailService', () => {
         'inbox',
         20,
         0,
+        undefined,
       );
       expect(result).toBe(response);
     });
