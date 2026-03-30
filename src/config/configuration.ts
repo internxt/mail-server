@@ -22,8 +22,8 @@ export default () => ({
   },
 
   secrets: {
-    jwt: process.env.JWT_SECRET ?? '',
-    gateway: process.env.GATEWAY_SECRET ?? '',
+    jwt: process.env.JWT_SECRET,
+    gateway: process.env.GATEWAY_PUBLIC_SECRET,
   },
 
   apis: {
