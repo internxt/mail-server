@@ -2,7 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
 export class ProvisionAccountRequestDto {
-  @ApiProperty({ description: 'Drive user UUID', example: 'uuid-1234' })
+  @ApiProperty({
+    description: 'User id',
+    example: 'd7ffe6b1-434d-4eae-86a5-029f76d1aa80',
+  })
   @IsUUID()
   @IsNotEmpty()
   userId!: string;
