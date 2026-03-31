@@ -31,7 +31,9 @@ export class GatewayController {
 
   @Post('accounts')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Provision a new mail account (called by Drive)' })
+  @ApiOperation({
+    summary: 'Provision a new mail account (called by the auth service)',
+  })
   async provisionAccount(@Body() dto: ProvisionAccountRequestDto) {
     const account = await this.accountService.provisionAccount({
       userId: dto.userId,
@@ -52,7 +54,9 @@ export class GatewayController {
   }
 
   @Get('domains')
-  @ApiOperation({ summary: 'List available mail domains (called by Drive)' })
+  @ApiOperation({
+    summary: 'List available mail domains (called by the auth service)',
+  })
   async listDomains() {
     const activeDomains = await this.domains.findAllActive();
     return activeDomains.map((d) => ({ domain: d.domain }));
