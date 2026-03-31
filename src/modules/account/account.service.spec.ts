@@ -117,9 +117,11 @@ describe('AccountService', () => {
 
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(provisionedAccount);
       accounts.create.mockResolvedValue(createdAccount);
       addresses.create.mockResolvedValue(createdAddressId);
-      accounts.findByUserId.mockResolvedValue(provisionedAccount);
 
       const result = await service.provisionAccount(params);
 
@@ -150,9 +152,24 @@ describe('AccountService', () => {
     it('when domain does not exist, then throws NotFoundException', async () => {
       domains.findByDomain.mockResolvedValue(null);
       addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
 
       await expect(service.provisionAccount(params)).rejects.toThrow(
         NotFoundException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+    });
+
+    it('when user already has a mail account, then throws ConflictException', async () => {
+      const existingAccount = MailAccount.build(
+        newMailAccountAttributes({ userId: params.userId }),
+      );
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(existingAccount);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        ConflictException,
       );
       expect(accounts.create).not.toHaveBeenCalled();
     });
@@ -164,6 +181,7 @@ describe('AccountService', () => {
           newMailAddressAttributes({ address: params.address }),
         ),
       );
+      accounts.findByUserId.mockResolvedValue(null);
 
       await expect(service.provisionAccount(params)).rejects.toThrow(
         ConflictException,
@@ -181,6 +199,7 @@ describe('AccountService', () => {
 
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
       accounts.create.mockResolvedValue(createdAccount);
       addresses.create.mockResolvedValue('addr-id');
       provider.createAccount.mockRejectedValue(new Error('Stalwart down'));
@@ -200,8 +219,10 @@ describe('AccountService', () => {
 
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingAccount);
       accounts.create.mockRejectedValue(uniqueError);
-      accounts.findByUserId.mockResolvedValue(existingAccount);
 
       const result = await service.provisionAccount(params);
 

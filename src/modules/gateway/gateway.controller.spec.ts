@@ -11,6 +11,7 @@ import {
   newMailAddressAttributes,
   newMailDomainAttributes,
 } from '../../../test/fixtures.js';
+import { v4 } from 'uuid';
 
 describe('GatewayController', () => {
   let controller: GatewayController;
@@ -32,14 +33,14 @@ describe('GatewayController', () => {
   describe('provisionAccount', () => {
     it('when valid request, then provisions account and returns id and address', async () => {
       const dto = {
-        driveUserUuid: 'uuid-1',
+        userId: v4(),
         address: 'alice@internxt.com',
         domain: 'internxt.com',
         displayName: 'Alice Smith',
       };
       const account = MailAccount.build(
         newMailAccountAttributes({
-          userId: dto.driveUserUuid,
+          userId: dto.userId,
           addresses: [
             newMailAddressAttributes({
               address: dto.address,
@@ -54,7 +55,7 @@ describe('GatewayController', () => {
       const result = await controller.provisionAccount(dto);
 
       expect(accountService.provisionAccount).toHaveBeenCalledWith({
-        userId: dto.driveUserUuid,
+        userId: dto.userId,
         address: dto.address,
         domain: dto.domain,
         displayName: dto.displayName,

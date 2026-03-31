@@ -34,14 +34,14 @@ export class GatewayController {
   @ApiOperation({ summary: 'Provision a new mail account (called by Drive)' })
   async provisionAccount(@Body() dto: ProvisionAccountRequestDto) {
     const account = await this.accountService.provisionAccount({
-      userId: dto.driveUserUuid,
+      userId: dto.userId,
       address: dto.address,
       domain: dto.domain,
       displayName: dto.displayName,
     });
 
     this.logger.log(
-      `Gateway: provisioned account '${dto.address}' for '${dto.driveUserUuid}'`,
+      `Gateway: provisioned account '${dto.address}' for '${dto.userId}'`,
     );
 
     return {

@@ -78,6 +78,12 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
         text,
       );
     }
+
+    this.assertNoBodyError(
+      statusCode,
+      text,
+      `Failed to create principal '${principal.name}'`,
+    );
   }
 
   async getPrincipal(name: string): Promise<StalwartPrincipal | null> {
@@ -100,6 +106,12 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
         text,
       );
     }
+
+    this.assertNoBodyError(
+      statusCode,
+      text,
+      `Failed to get principal '${name}'`,
+    );
 
     const response = JSON.parse(text) as { data: StalwartPrincipal };
     return response.data;
@@ -125,6 +137,12 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
         text,
       );
     }
+
+    this.assertNoBodyError(
+      statusCode,
+      text,
+      `Failed to patch principal '${name}'`,
+    );
   }
 
   async deletePrincipal(name: string): Promise<void> {
@@ -139,6 +157,34 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     if (statusCode !== 200 && statusCode !== 204) {
       throw new StalwartApiError(
         `Failed to delete principal '${name}': HTTP ${statusCode}`,
+        statusCode,
+        text,
+      );
+    }
+
+    this.assertNoBodyError(
+      statusCode,
+      text,
+      `Failed to delete principal '${name}'`,
+    );
+  }
+
+  private assertNoBodyError(
+    statusCode: number,
+    text: string,
+    context: string,
+  ): void {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return;
+    }
+
+    if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
+      const { error, details } = parsed as { error: string; details?: string };
+      throw new StalwartApiError(
+        `${context}: ${error}${details ? ` — ${details}` : ''}`,
         statusCode,
         text,
       );

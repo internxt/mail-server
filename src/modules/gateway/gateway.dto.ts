@@ -5,7 +5,7 @@ export class ProvisionAccountRequestDto {
   @ApiProperty({ description: 'Drive user UUID', example: 'uuid-1234' })
   @IsUUID()
   @IsNotEmpty()
-  driveUserUuid!: string;
+  userId!: string;
 
   @ApiProperty({
     description: 'Full email address',
