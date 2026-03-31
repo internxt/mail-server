@@ -33,6 +33,7 @@ describe('StalwartAccountProvider', () => {
         secrets: [params.password],
         emails: [params.primaryAddress],
         quota: 0,
+        roles: ['user'],
       });
     });
 

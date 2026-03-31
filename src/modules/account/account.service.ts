@@ -37,13 +37,17 @@ export class AccountService {
     domain: string;
     displayName: string;
   }): Promise<MailAccount> {
-    const [domainRecord, existingAddress] = await Promise.all([
+    const [domainRecord, existingAddress, existingAccount] = await Promise.all([
       this.domains.findByDomain(params.domain),
       this.addresses.findByAddress(params.address),
+      this.accounts.findByUserId(params.userId),
     ]);
 
     if (!domainRecord) {
       throw new NotFoundException(`Domain '${params.domain}' not found`);
+    }
+    if (existingAccount) {
+      throw new ConflictException('User already has a mail account');
     }
     if (existingAddress) {
       throw new ConflictException(

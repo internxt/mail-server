@@ -22,6 +22,7 @@ export class StalwartAccountProvider extends AccountProvider {
       secrets: [params.password],
       emails: [params.primaryAddress],
       quota: params.quota ?? 0,
+      roles: ['user'],
     });
 
     this.logger.log(`Created account '${params.primaryAddress}'`);
