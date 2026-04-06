@@ -100,10 +100,6 @@ export class AccountService {
       throw error;
     }
 
-    this.logger.log(
-      `Provisioned account '${params.address}' for user '${params.userId}'`,
-    );
-
     return this.getAccountOrFail(params.userId);
   }
 
