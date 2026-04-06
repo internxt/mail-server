@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SequelizeModule } from '@nestjs/sequelize';
@@ -11,6 +12,7 @@ import { EmailModule } from './modules/email/email.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AccountModule } from './modules/account/account.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { HttpGlobalExceptionFilter } from './common/filters/http-global-exception.filter';
 
 @Module({
   imports: [
@@ -85,6 +87,11 @@ import { GatewayModule } from './modules/gateway/gateway.module';
     GatewayModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: HttpGlobalExceptionFilter,
+    },
+  ],
 })
 export class AppModule {}
