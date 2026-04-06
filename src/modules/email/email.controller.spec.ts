@@ -37,6 +37,44 @@ describe('EmailController', () => {
     });
   });
 
+  describe('getAll', () => {
+    it('when called with no query params, then it uses defaults', async () => {
+      const response = {
+        emails: [newEmailSummary()],
+        total: 1,
+        hasMoreMails: false,
+      };
+      emailService.getAllEmails.mockResolvedValue(response);
+
+      const result = await controller.getAll(userEmail);
+
+      expect(emailService.getAllEmails).toHaveBeenCalledWith(
+        userEmail,
+        20,
+        0,
+        undefined,
+      );
+      expect(result).toBe(response);
+    });
+
+    it('when called with limit, position and anchorId, then it parses them', async () => {
+      emailService.getAllEmails.mockResolvedValue({
+        emails: [],
+        total: 0,
+        hasMoreMails: false,
+      });
+
+      await controller.getAll(userEmail, '10', '5', 'Ma1f09b');
+
+      expect(emailService.getAllEmails).toHaveBeenCalledWith(
+        userEmail,
+        10,
+        5,
+        'Ma1f09b',
+      );
+    });
+  });
+
   describe('list', () => {
     it('When list is called with no query params, then it uses defaults', async () => {
       const response = {

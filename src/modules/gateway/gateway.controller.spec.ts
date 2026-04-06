@@ -3,7 +3,6 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { GatewayController } from './gateway.controller.js';
 import { AccountService } from '../account/account.service.js';
-import { DomainRepository } from '../account/repositories/domain.repository.js';
 import { MailAccount } from '../account/domain/mail-account.domain.js';
 import { MailDomain } from '../account/domain/mail-domain.domain.js';
 import {
@@ -16,7 +15,6 @@ import { v4 } from 'uuid';
 describe('GatewayController', () => {
   let controller: GatewayController;
   let accountService: DeepMocked<AccountService>;
-  let domains: DeepMocked<DomainRepository>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -27,7 +25,6 @@ describe('GatewayController', () => {
 
     controller = module.get(GatewayController);
     accountService = module.get(AccountService);
-    domains = module.get(DomainRepository);
   });
 
   describe('provisionAccount', () => {
@@ -74,7 +71,7 @@ describe('GatewayController', () => {
         MailDomain.build(newMailDomainAttributes({ domain: 'internxt.com' })),
         MailDomain.build(newMailDomainAttributes({ domain: 'internxt.me' })),
       ];
-      domains.findAllActive.mockResolvedValue(domainList);
+      accountService.listActiveDomains.mockResolvedValue(domainList);
 
       const result = await controller.listDomains();
 
@@ -85,7 +82,7 @@ describe('GatewayController', () => {
     });
 
     it('when no active domains, then returns empty array', async () => {
-      domains.findAllActive.mockResolvedValue([]);
+      accountService.listActiveDomains.mockResolvedValue([]);
 
       const result = await controller.listDomains();
 

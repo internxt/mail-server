@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { AccountProvider } from './account-provider.port.js';
 import { MailAccount } from './domain/mail-account.domain.js';
+import { MailDomain } from './domain/mail-domain.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
@@ -25,6 +26,10 @@ export class AccountService {
 
   async getAccount(userId: string): Promise<MailAccount> {
     return this.getAccountOrFail(userId);
+  }
+
+  async listActiveDomains(): Promise<MailDomain[]> {
+    return this.domains.findAllActive();
   }
 
   async findAccount(userId: string): Promise<MailAccount | null> {

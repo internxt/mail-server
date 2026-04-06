@@ -50,8 +50,8 @@ export class EmailController {
       'Returns every mailbox for the authenticated user, including folder counts.',
   })
   @ApiOkResponse({ type: [MailboxResponseDto] })
-  getMailboxes() {
-    return this.emailService.getMailboxes(STUB_USER);
+  getMailboxes(@User('email') email: string) {
+    return this.emailService.getMailboxes(email);
   }
 
   @Get('/all')
@@ -130,6 +130,7 @@ export class EmailController {
   })
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
+    @User('email') email: string,
     @Query('mailbox') mailbox: MailboxType = 'inbox',
     @Query('limit') limit?: string,
     @Query('position') position?: string,
@@ -137,7 +138,6 @@ export class EmailController {
   ) {
     return this.emailService.listEmails(
       email,
-      STUB_USER,
       mailbox,
       limit ? Number(limit) || 20 : 20,
       position ? Number(position) || 0 : 0,
@@ -156,7 +156,6 @@ export class EmailController {
   @ApiNotFoundResponse({ description: 'Email not found' })
   get(@User('email') email: string, @Param('id') id: string) {
     return this.emailService.getEmail(email, id);
-    return this.emailService.getEmail(STUB_USER, id);
   }
 
   @Post('send')
@@ -173,7 +172,6 @@ export class EmailController {
   })
   send(@User('email') email: string, @Body() dto: SendEmailRequestDto) {
     return this.emailService.sendEmail(email, dto);
-    return this.emailService.sendEmail(STUB_USER, dto);
   }
 
   @Post('drafts')
@@ -189,7 +187,6 @@ export class EmailController {
   })
   saveDraft(@User('email') email: string, @Body() dto: DraftEmailRequestDto) {
     return this.emailService.saveDraft(email, dto);
-    return this.emailService.saveDraft(STUB_USER, dto);
   }
 
   @Patch(':id')
@@ -209,19 +206,15 @@ export class EmailController {
     @Param('id') id: string,
     @Body() body: UpdateEmailRequestDto,
   ) {
-  async update(@Param('id') id: string, @Body() body: UpdateEmailRequestDto) {
     const ops: Promise<void>[] = [];
     if (body.mailbox !== undefined) {
       ops.push(this.emailService.moveEmail(email, id, body.mailbox));
-      ops.push(this.emailService.moveEmail(STUB_USER, id, body.mailbox));
     }
     if (body.isRead !== undefined) {
       ops.push(this.emailService.markAsRead(email, id, body.isRead));
-      ops.push(this.emailService.markAsRead(STUB_USER, id, body.isRead));
     }
     if (body.isFlagged !== undefined) {
       ops.push(this.emailService.markAsFlagged(email, id, body.isFlagged));
-      ops.push(this.emailService.markAsFlagged(STUB_USER, id, body.isFlagged));
     }
     await Promise.all(ops);
   }
@@ -237,6 +230,5 @@ export class EmailController {
   @ApiNotFoundResponse({ description: 'Email not found' })
   delete(@User('email') email: string, @Param('id') id: string) {
     return this.emailService.deleteEmail(email, id);
-    return this.emailService.deleteEmail(STUB_USER, id);
   }
 }
