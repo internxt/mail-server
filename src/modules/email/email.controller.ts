@@ -54,58 +54,18 @@ export class EmailController {
     return this.emailService.getMailboxes(email);
   }
 
-  @Get('/all')
-  @ApiOperation({
-    summary: 'List emails',
-    description: 'Get all the emails no matter the mailbox.',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    type: Number,
-    description: 'Maximum number of emails to return. Defaults to `20`.',
-    example: 20,
-  })
-  @ApiQuery({
-    name: 'position',
-    required: false,
-    type: Number,
-    description: 'Zero-based offset for pagination. Defaults to `0`.',
-    example: 0,
-  })
-  @ApiQuery({
-    name: 'anchorId',
-    required: false,
-    type: String,
-    description: 'Anchor ID for pagination.',
-    example: 'Ma1f09b…',
-  })
-  @ApiOkResponse({ type: EmailListResponseDto })
-  getAll(
-    @User('email') email: string,
-    @Query('limit') limit?: string,
-    @Query('position') position?: string,
-    @Query('anchorId') anchorId?: string,
-  ) {
-    return this.emailService.getAllEmails(
-      email,
-      limit ? Number(limit) || 20 : 20,
-      position ? Number(position) || 0 : 0,
-      anchorId,
-    );
-  }
-
   @Get()
   @ApiOperation({
     summary: 'List emails',
     description:
-      'Paginated list of email summaries for a given mailbox. Defaults to the inbox.',
+      'Paginated list of email summaries. Filter by mailbox or omit to list all.',
   })
   @ApiQuery({
     name: 'mailbox',
     required: false,
     enum: ['inbox', 'drafts', 'sent', 'trash', 'spam', 'archive'],
-    description: 'Mailbox to list. Defaults to `inbox`.',
+    description:
+      'Mailbox to filter by. Omit to list emails from all mailboxes.',
   })
   @ApiQuery({
     name: 'limit',
@@ -131,14 +91,14 @@ export class EmailController {
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
     @User('email') email: string,
-    @Query('mailbox') mailbox: MailboxType = 'inbox',
+    @Query('mailbox') mailbox?: MailboxType,
     @Query('limit') limit?: string,
     @Query('position') position?: string,
     @Query('anchorId') anchorId?: string,
   ) {
     return this.emailService.listEmails(
       email,
-      mailbox,
+      mailbox ?? undefined,
       limit ? Number(limit) || 20 : 20,
       position ? Number(position) || 0 : 0,
       anchorId,

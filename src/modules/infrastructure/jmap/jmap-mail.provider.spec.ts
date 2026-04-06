@@ -68,8 +68,8 @@ describe('JmapMailProvider', () => {
     });
   });
 
-  describe('getAllEmails', () => {
-    it('when called with position, then returns email summaries with mailboxIds', async () => {
+  describe('listEmails', () => {
+    it('when called without mailbox, then returns all email summaries', async () => {
       const jmapEmails = [newJmapEmail(), newJmapEmail()];
 
       jmapService.request.mockResolvedValueOnce(
@@ -79,7 +79,12 @@ describe('JmapMailProvider', () => {
         ),
       );
 
-      const result = await provider.getAllEmails('user@test.com', 20, 0);
+      const result = await provider.listEmails(
+        'user@test.com',
+        undefined,
+        20,
+        0,
+      );
 
       expect(result.emails).toHaveLength(2);
       expect(result.total).toBe(42);
@@ -88,70 +93,7 @@ describe('JmapMailProvider', () => {
       );
     });
 
-    it('when called with anchorId, then uses anchor-based pagination', async () => {
-      const jmapEmails = [newJmapEmail()];
-
-      jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 10 },
-          { list: jmapEmails },
-        ),
-      );
-
-      await provider.getAllEmails('user@test.com', 20, 0, 'anchor-id');
-
-      const queryParams = jmapService.request.mock.calls[0]![1][0]![1];
-      expect(queryParams['anchor']).toBe('anchor-id');
-      expect(queryParams['anchorOffset']).toBe(1);
-      expect(queryParams['position']).toBeUndefined();
-    });
-
-    it('when result count equals limit, then hasMoreMails is true with nextAnchor', async () => {
-      const jmapEmails = [newJmapEmail(), newJmapEmail()];
-
-      jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 10 },
-          { list: jmapEmails },
-        ),
-      );
-
-      const result = await provider.getAllEmails('user@test.com', 2, 0);
-
-      expect(result.hasMoreMails).toBe(true);
-      expect(result.nextAnchor).toBe(jmapEmails[1]!.id);
-    });
-
-    it('when result count is less than limit, then hasMoreMails is false', async () => {
-      const jmapEmails = [newJmapEmail()];
-
-      jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 1 },
-          { list: jmapEmails },
-        ),
-      );
-
-      const result = await provider.getAllEmails('user@test.com', 20, 0);
-
-      expect(result.hasMoreMails).toBe(false);
-      expect(result.nextAnchor).toBeUndefined();
-    });
-
-    it('when no filter is applied, then query has no inMailbox filter', async () => {
-      jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse({ ids: [], total: 0 }, { list: [] }),
-      );
-
-      await provider.getAllEmails('user@test.com', 20, 0);
-
-      const queryParams = jmapService.request.mock.calls[0]![1][0]![1];
-      expect(queryParams['filter']).toBeUndefined();
-    });
-  });
-
-  describe('listEmails', () => {
-    it('When called, then it returns email summaries and total count', async () => {
+    it('when called with a mailbox, then filters by that mailbox', async () => {
       const inboxMailbox = newJmapMailbox({ role: 'inbox' });
       const jmapEmails = [newJmapEmail(), newJmapEmail()];
 
@@ -169,6 +111,48 @@ describe('JmapMailProvider', () => {
 
       expect(result.emails).toHaveLength(2);
       expect(result.total).toBe(42);
+    });
+
+    it('when result count equals limit, then hasMoreMails is true with nextAnchor', async () => {
+      const jmapEmails = [newJmapEmail(), newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 10 },
+          { list: jmapEmails },
+        ),
+      );
+
+      const result = await provider.listEmails(
+        'user@test.com',
+        undefined,
+        2,
+        0,
+      );
+
+      expect(result.hasMoreMails).toBe(true);
+      expect(result.nextAnchor).toBe(jmapEmails[1]!.id);
+    });
+
+    it('when result count is less than limit, then hasMoreMails is false', async () => {
+      const jmapEmails = [newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 1 },
+          { list: jmapEmails },
+        ),
+      );
+
+      const result = await provider.listEmails(
+        'user@test.com',
+        undefined,
+        20,
+        0,
+      );
+
+      expect(result.hasMoreMails).toBe(false);
+      expect(result.nextAnchor).toBeUndefined();
     });
   });
 

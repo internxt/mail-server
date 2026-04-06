@@ -9,15 +9,9 @@ import type {
 
 export abstract class MailProvider {
   abstract getMailboxes(userEmail: string): Promise<Mailbox[]>;
-  abstract getAllEmails(
-    userEmail: string,
-    limit: number,
-    position: number,
-    anchorId?: string,
-  ): Promise<EmailListResponse>;
   abstract listEmails(
     userEmail: string,
-    mailbox: MailboxType,
+    mailbox: MailboxType | undefined,
     limit: number,
     position: number,
     anchorId?: string,

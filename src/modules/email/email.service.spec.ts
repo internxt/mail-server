@@ -40,30 +40,8 @@ describe('EmailService', () => {
     });
   });
 
-  describe('getAllEmails', () => {
-    it('when called, then delegates with all parameters', async () => {
-      const response = {
-        emails: [newEmailSummary()],
-        total: 1,
-        hasMoreMails: false,
-        nextAnchor: undefined,
-      };
-      provider.getAllEmails.mockResolvedValue(response);
-
-      const result = await service.getAllEmails(userEmail, 20, 0);
-
-      expect(provider.getAllEmails).toHaveBeenCalledWith(
-        userEmail,
-        20,
-        0,
-        undefined,
-      );
-      expect(result).toBe(response);
-    });
-  });
-
   describe('listEmails', () => {
-    it('when called, then delegates with all parameters', async () => {
+    it('when called with a mailbox, then delegates with mailbox', async () => {
       const response = {
         emails: [newEmailSummary()],
         total: 1,
@@ -77,6 +55,27 @@ describe('EmailService', () => {
       expect(provider.listEmails).toHaveBeenCalledWith(
         userEmail,
         'inbox',
+        20,
+        0,
+        undefined,
+      );
+      expect(result).toBe(response);
+    });
+
+    it('when called without a mailbox, then delegates with undefined', async () => {
+      const response = {
+        emails: [newEmailSummary()],
+        total: 1,
+        hasMoreMails: false,
+        nextAnchor: undefined,
+      };
+      provider.listEmails.mockResolvedValue(response);
+
+      const result = await service.listEmails(userEmail, undefined, 20, 0);
+
+      expect(provider.listEmails).toHaveBeenCalledWith(
+        userEmail,
+        undefined,
         20,
         0,
         undefined,

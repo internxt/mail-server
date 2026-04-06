@@ -85,27 +85,20 @@ export class JmapMailProvider extends MailProvider {
     return jmapMailboxes.map(mapJmapMailbox);
   }
 
-  async getAllEmails(
+  async listEmails(
     userEmail: string,
+    mailbox: MailboxType | undefined,
     limit: number,
     position: number,
     anchorId?: string,
   ): Promise<EmailListResponse> {
     const accountId = await this.jmap.getPrimaryAccountId(userEmail);
-    return this.queryEmails(userEmail, accountId, limit, position, anchorId);
-  }
 
-  async listEmails(
-    userEmail: string,
-    mailbox: MailboxType,
-    limit: number,
-    position: number,
-    anchorId?: string,
-  ): Promise<EmailListResponse> {
-    const [accountId, mailboxId] = await Promise.all([
-      this.jmap.getPrimaryAccountId(userEmail),
-      this.resolveMailboxId(userEmail, mailbox),
-    ]);
+    if (!mailbox) {
+      return this.queryEmails(userEmail, accountId, limit, position, anchorId);
+    }
+
+    const mailboxId = await this.resolveMailboxId(userEmail, mailbox);
     return this.queryEmails(userEmail, accountId, limit, position, anchorId, {
       inMailbox: mailboxId,
     });

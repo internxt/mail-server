@@ -37,46 +37,8 @@ describe('EmailController', () => {
     });
   });
 
-  describe('getAll', () => {
-    it('when called with no query params, then it uses defaults', async () => {
-      const response = {
-        emails: [newEmailSummary()],
-        total: 1,
-        hasMoreMails: false,
-      };
-      emailService.getAllEmails.mockResolvedValue(response);
-
-      const result = await controller.getAll(userEmail);
-
-      expect(emailService.getAllEmails).toHaveBeenCalledWith(
-        userEmail,
-        20,
-        0,
-        undefined,
-      );
-      expect(result).toBe(response);
-    });
-
-    it('when called with limit, position and anchorId, then it parses them', async () => {
-      emailService.getAllEmails.mockResolvedValue({
-        emails: [],
-        total: 0,
-        hasMoreMails: false,
-      });
-
-      await controller.getAll(userEmail, '10', '5', 'Ma1f09b');
-
-      expect(emailService.getAllEmails).toHaveBeenCalledWith(
-        userEmail,
-        10,
-        5,
-        'Ma1f09b',
-      );
-    });
-  });
-
   describe('list', () => {
-    it('When list is called with no query params, then it uses defaults', async () => {
+    it('when called with no query params, then it lists all emails', async () => {
       const response = {
         emails: [newEmailSummary()],
         total: 1,
@@ -84,7 +46,26 @@ describe('EmailController', () => {
       };
       emailService.listEmails.mockResolvedValue(response);
 
-      const result = await controller.list(userEmail, 'inbox');
+      const result = await controller.list(userEmail);
+
+      expect(emailService.listEmails).toHaveBeenCalledWith(
+        userEmail,
+        undefined,
+        20,
+        0,
+        undefined,
+      );
+      expect(result).toBe(response);
+    });
+
+    it('when called with a mailbox filter, then it filters by mailbox', async () => {
+      emailService.listEmails.mockResolvedValue({
+        emails: [],
+        total: 0,
+        hasMoreMails: false,
+      });
+
+      await controller.list(userEmail, 'inbox');
 
       expect(emailService.listEmails).toHaveBeenCalledWith(
         userEmail,
@@ -93,28 +74,27 @@ describe('EmailController', () => {
         0,
         undefined,
       );
-      expect(result).toBe(response);
     });
 
-    it('When list is called with limit and position, then it parses them', async () => {
+    it('when called with limit, position and anchorId, then it parses them', async () => {
       emailService.listEmails.mockResolvedValue({
         emails: [],
         total: 0,
         hasMoreMails: false,
       });
 
-      await controller.list(userEmail, 'sent', '10', '5');
+      await controller.list(userEmail, 'sent', '10', '5', 'Ma1f09b');
 
       expect(emailService.listEmails).toHaveBeenCalledWith(
         userEmail,
         'sent',
         10,
         5,
-        undefined,
+        'Ma1f09b',
       );
     });
 
-    it('When list is called with non-numeric strings, then it falls back to defaults', async () => {
+    it('when called with non-numeric strings, then it falls back to defaults', async () => {
       emailService.listEmails.mockResolvedValue({
         emails: [],
         total: 0,
