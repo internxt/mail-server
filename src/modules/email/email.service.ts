@@ -21,6 +21,15 @@ export class EmailService {
     return this.mail.getMailboxes(userEmail);
   }
 
+  getAllEmails(
+    userEmail: string,
+    limit: number,
+    position: number,
+    anchorId?: string,
+  ): Promise<EmailListResponse> {
+    return this.mail.getAllEmails(userEmail, limit, position, anchorId);
+  }
+
   listEmails(
     userEmail: string,
     mailbox: MailboxType,

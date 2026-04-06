@@ -57,6 +57,7 @@ export function mapJmapEmailToSummary(e: JmapEmail): EmailSummary {
   return {
     id: e.id,
     threadId: e.threadId,
+    mailboxIds: Object.keys(e.mailboxIds),
     from: e.from ?? [],
     to: e.to ?? [],
     subject: e.subject ?? '',

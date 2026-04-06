@@ -85,6 +85,58 @@ export class JmapMailProvider extends MailProvider {
     return jmapMailboxes.map(mapJmapMailbox);
   }
 
+  async getAllEmails(
+    userEmail: string,
+    limit: number,
+    position: number,
+    anchorId?: string,
+  ): Promise<EmailListResponse> {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    const queryParams: Record<string, unknown> = {
+      accountId,
+      sort: [{ property: 'receivedAt', isAscending: false }],
+      limit,
+      calculateTotal: true,
+    };
+
+    if (anchorId) {
+      queryParams.anchor = anchorId;
+      queryParams.anchorOffset = 1;
+    } else {
+      queryParams.position = position;
+    }
+
+    const response = await this.jmap.request(userEmail, [
+      ['Email/query', queryParams, 'r0'],
+      [
+        'Email/get',
+        {
+          accountId,
+          '#ids': { resultOf: 'r0', name: 'Email/query', path: '/ids' },
+          properties: EMAIL_LIST_PROPERTIES,
+        },
+        'r1',
+      ],
+    ]);
+
+    const queryResult = response.methodResponses[0]![1] as JmapQueryResponse;
+    const getResult = response
+      .methodResponses[1]![1] as JmapGetResponse<JmapEmail>;
+
+    const emails = getResult.list.map(mapJmapEmailToSummary);
+
+    const nextAnchor = emails.length ? emails.at(-1)?.id : undefined;
+    const hasMoreEmails = emails.length >= limit;
+
+    return {
+      emails,
+      total: queryResult.total ?? 0,
+      hasMoreMails: hasMoreEmails,
+      nextAnchor: hasMoreEmails ? nextAnchor : undefined,
+    };
+  }
+
   async listEmails(
     userEmail: string,
     mailbox: MailboxType,
@@ -119,7 +171,7 @@ export class JmapMailProvider extends MailProvider {
         {
           accountId,
           '#ids': { resultOf: 'r0', name: 'Email/query', path: '/ids' },
-          properties: EMAIL_LIST_PROPERTIES,
+          properties: [...EMAIL_LIST_PROPERTIES, 'mailboxIds'],
         },
         'r1',
       ],
