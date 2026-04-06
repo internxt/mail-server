@@ -6,4 +6,4 @@ COPY package.json ./
 COPY package-lock.json ./
 RUN npm ci
 
-CMD ["npm", "run", "start:dev"]
+CMD ["sh", "-c", "npm run migrate && npm run start:dev"]
