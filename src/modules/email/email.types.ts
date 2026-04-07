@@ -23,6 +23,7 @@ export interface Mailbox {
 export interface EmailSummary {
   id: string;
   threadId: string;
+  mailboxIds: string[];
   from: EmailAddress[];
   to: EmailAddress[];
   subject: string;

@@ -12,7 +12,6 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AccountService } from '../account/account.service.js';
-import { DomainRepository } from '../account/repositories/domain.repository.js';
 import { GatewayAuthGuard } from './gateway.guard.js';
 import { ProvisionAccountRequestDto } from './gateway.dto.js';
 
@@ -24,10 +23,7 @@ import { ProvisionAccountRequestDto } from './gateway.dto.js';
 export class GatewayController {
   private readonly logger = new Logger(GatewayController.name);
 
-  constructor(
-    private readonly accountService: AccountService,
-    private readonly domains: DomainRepository,
-  ) {}
+  constructor(private readonly accountService: AccountService) {}
 
   @Post('accounts')
   @HttpCode(HttpStatus.CREATED)
@@ -58,7 +54,7 @@ export class GatewayController {
     summary: 'List available mail domains (called by the auth service)',
   })
   async listDomains() {
-    const activeDomains = await this.domains.findAllActive();
+    const activeDomains = await this.accountService.listActiveDomains();
     return activeDomains.map((d) => ({ domain: d.domain }));
   }
 

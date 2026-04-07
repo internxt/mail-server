@@ -90,6 +90,7 @@ export function newEmailSummary(attrs?: Partial<EmailSummary>): EmailSummary {
   return {
     id: randomId(),
     threadId: randomId(),
+    mailboxIds: [randomId()],
     from: [newEmailAddress()],
     to: [newEmailAddress()],
     subject: random.sentence({ words: 5 }),

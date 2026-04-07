@@ -107,6 +107,9 @@ export class EmailSummaryResponseDto {
   @ApiProperty({ example: 'Ma1f09b…' })
   id!: string;
 
+  @ApiProperty({ type: [String], example: ['d', 'a'] })
+  mailboxIds!: string[];
+
   @ApiProperty({ example: 'T1a2b3c…' })
   threadId!: string;
 

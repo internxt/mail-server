@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { Test } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { EmailService } from './email.service.js';
-import { type MailProvider } from './mail-provider.port.js';
+import { MailProvider } from './mail-provider.port.js';
 import {
   newMailbox,
   newEmail,
@@ -10,32 +12,20 @@ import {
   newDraftEmailDto,
 } from '../../../test/fixtures.js';
 
-type MockMailProvider = {
-  [K in keyof MailProvider]: ReturnType<typeof vi.fn>;
-};
-
-function createMockMailProvider(): MockMailProvider {
-  return {
-    getMailboxes: vi.fn(),
-    listEmails: vi.fn(),
-    getEmail: vi.fn(),
-    sendEmail: vi.fn(),
-    saveDraft: vi.fn(),
-    moveEmail: vi.fn(),
-    deleteEmail: vi.fn(),
-    markAsRead: vi.fn(),
-    markAsFlagged: vi.fn(),
-  };
-}
-
 describe('EmailService', () => {
   let service: EmailService;
-  let provider: MockMailProvider;
+  let provider: DeepMocked<MailProvider>;
   const userEmail = 'test@example.com';
 
-  beforeEach(() => {
-    provider = createMockMailProvider();
-    service = new EmailService(provider);
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [EmailService],
+    })
+      .useMocker(() => createMock<MailProvider>())
+      .compile();
+
+    service = module.get(EmailService);
+    provider = module.get<DeepMocked<MailProvider>>(MailProvider);
   });
 
   describe('getMailboxes', () => {
@@ -51,10 +41,12 @@ describe('EmailService', () => {
   });
 
   describe('listEmails', () => {
-    it('when called, then delegates with all parameters', async () => {
+    it('when called with a mailbox, then delegates with mailbox', async () => {
       const response = {
         emails: [newEmailSummary()],
         total: 1,
+        hasMoreMails: false,
+        nextAnchor: undefined,
       };
       provider.listEmails.mockResolvedValue(response);
 
@@ -63,6 +55,27 @@ describe('EmailService', () => {
       expect(provider.listEmails).toHaveBeenCalledWith(
         userEmail,
         'inbox',
+        20,
+        0,
+        undefined,
+      );
+      expect(result).toBe(response);
+    });
+
+    it('when called without a mailbox, then delegates with undefined', async () => {
+      const response = {
+        emails: [newEmailSummary()],
+        total: 1,
+        hasMoreMails: false,
+        nextAnchor: undefined,
+      };
+      provider.listEmails.mockResolvedValue(response);
+
+      const result = await service.listEmails(userEmail, undefined, 20, 0);
+
+      expect(provider.listEmails).toHaveBeenCalledWith(
+        userEmail,
+        undefined,
         20,
         0,
         undefined,

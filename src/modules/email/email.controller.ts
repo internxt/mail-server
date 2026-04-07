@@ -58,13 +58,14 @@ export class EmailController {
   @ApiOperation({
     summary: 'List emails',
     description:
-      'Paginated list of email summaries for a given mailbox. Defaults to the inbox.',
+      'Paginated list of email summaries. Filter by mailbox or omit to list all.',
   })
   @ApiQuery({
     name: 'mailbox',
     required: false,
     enum: ['inbox', 'drafts', 'sent', 'trash', 'spam', 'archive'],
-    description: 'Mailbox to list. Defaults to `inbox`.',
+    description:
+      'Mailbox to filter by. Omit to list emails from all mailboxes.',
   })
   @ApiQuery({
     name: 'limit',
@@ -90,14 +91,14 @@ export class EmailController {
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
     @User('email') email: string,
-    @Query('mailbox') mailbox: MailboxType = 'inbox',
+    @Query('mailbox') mailbox?: MailboxType,
     @Query('limit') limit?: string,
     @Query('position') position?: string,
     @Query('anchorId') anchorId?: string,
   ) {
     return this.emailService.listEmails(
       email,
-      mailbox,
+      mailbox ?? undefined,
       limit ? Number(limit) || 20 : 20,
       position ? Number(position) || 0 : 0,
       anchorId,

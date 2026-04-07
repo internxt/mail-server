@@ -11,7 +11,7 @@ export abstract class MailProvider {
   abstract getMailboxes(userEmail: string): Promise<Mailbox[]>;
   abstract listEmails(
     userEmail: string,
-    mailbox: MailboxType,
+    mailbox: MailboxType | undefined,
     limit: number,
     position: number,
     anchorId?: string,

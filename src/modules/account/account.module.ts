@@ -28,6 +28,6 @@ import { DomainRepository } from './repositories/domain.repository.js';
     DomainRepository,
     AccountService,
   ],
-  exports: [AccountService, DomainRepository],
+  exports: [AccountService],
 })
 export class AccountModule {}
