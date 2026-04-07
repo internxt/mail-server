@@ -9,6 +9,8 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,9 +21,11 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { User } from '../auth/decorators/user.decorator.js';
 import { MailAccountGuard } from '../provisioning/provisioning.guard.js';
 import { EmailService } from './email.service.js';
@@ -177,6 +181,32 @@ export class EmailController {
       ops.push(this.emailService.markAsFlagged(email, id, body.isFlagged));
     }
     await Promise.all(ops);
+  }
+
+  @Get(':id/attachments/:blobId')
+  @ApiOperation({
+    summary: 'Download an attachment',
+    description:
+      'Downloads a specific attachment blob. The response is the raw file content.',
+  })
+  @ApiParam({ name: 'id', description: 'Email ID (for context)' })
+  @ApiParam({ name: 'blobId', description: 'Blob ID of the attachment' })
+  @ApiProduces('application/octet-stream')
+  @ApiOkResponse({ description: 'Attachment file content' })
+  @ApiNotFoundResponse({ description: 'Attachment not found' })
+  async downloadAttachment(
+    @User('email') email: string,
+    @Param('blobId') blobId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const blob = await this.emailService.getAttachment(email, blobId);
+
+    res.set({
+      'Content-Type': blob.type,
+      'Content-Disposition': `attachment; filename="${blob.name}"`,
+    });
+
+    return new StreamableFile(blob.content);
   }
 
   @Delete(':id')

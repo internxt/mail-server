@@ -1,4 +1,5 @@
 import type {
+  AttachmentBlob,
   DraftEmailDto,
   Email,
   EmailListResponse,
@@ -41,4 +42,8 @@ export abstract class MailProvider {
     id: string,
     flagged: boolean,
   ): Promise<void>;
+  abstract getAttachment(
+    userEmail: string,
+    blobId: string,
+  ): Promise<AttachmentBlob | null>;
 }

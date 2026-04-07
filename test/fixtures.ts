@@ -1,5 +1,6 @@
 import Chance from 'chance';
 import type {
+  Attachment,
   Mailbox,
   EmailAddress,
   EmailSummary,
@@ -23,6 +24,7 @@ import type {
   Mailbox as JmapMailbox,
   Email as JmapEmail,
   EmailAddress as JmapEmailAddress,
+  EmailBodyPart,
   MailboxRole,
   Identity,
 } from '../src/modules/infrastructure/jmap/jmap.types.js';
@@ -104,6 +106,23 @@ export function newEmailSummary(attrs?: Partial<EmailSummary>): EmailSummary {
   };
 }
 
+export function newAttachment(attrs?: Partial<Attachment>): Attachment {
+  return {
+    blobId: randomId(),
+    name: `${random.word()}.${random.pickone(['pdf', 'png', 'jpg', 'docx', 'zip'])}`,
+    type: random.pickone([
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'application/zip',
+    ]),
+    size: random.natural({ min: 1024, max: 5_000_000 }),
+    disposition: 'attachment',
+    cid: null,
+    ...attrs,
+  };
+}
+
 export function newEmail(attrs?: Partial<Email>): Email {
   const summary = newEmailSummary(attrs);
   return {
@@ -114,6 +133,7 @@ export function newEmail(attrs?: Partial<Email>): Email {
     sentAt: randomISODate(),
     textBody: random.paragraph(),
     htmlBody: `<p>${random.paragraph()}</p>`,
+    attachments: [],
     ...attrs,
   };
 }
@@ -277,6 +297,19 @@ export function newJmapEmail(attrs?: Partial<JmapEmail>): JmapEmail {
         isTruncated: false,
       },
     },
+    ...attrs,
+  };
+}
+
+export function newJmapBodyPart(attrs?: Partial<EmailBodyPart>): EmailBodyPart {
+  return {
+    partId: randomId(),
+    blobId: randomId(),
+    size: random.natural({ min: 1024, max: 5_000_000 }),
+    name: `${random.word()}.pdf`,
+    type: 'application/pdf',
+    disposition: 'attachment',
+    cid: undefined,
     ...attrs,
   };
 }

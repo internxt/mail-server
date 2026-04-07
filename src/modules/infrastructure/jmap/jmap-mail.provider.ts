@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailProvider } from '../../email/mail-provider.port.js';
 import type {
+  AttachmentBlob,
   DraftEmailDto,
   Email,
   EmailListResponse,
@@ -49,6 +50,7 @@ const EMAIL_DETAIL_PROPERTIES = [
   'textBody',
   'htmlBody',
   'bodyValues',
+  'attachments',
 ] as const;
 
 interface TimedCache<T> {
@@ -338,6 +340,18 @@ export class JmapMailProvider extends MailProvider {
     flagged: boolean,
   ): Promise<void> {
     return this.setKeyword(userEmail, id, '$flagged', flagged);
+  }
+
+  async getAttachment(
+    userEmail: string,
+    blobId: string,
+  ): Promise<AttachmentBlob | null> {
+    return this.jmap.downloadBlob(
+      userEmail,
+      blobId,
+      'download',
+      'application/octet-stream',
+    );
   }
 
   private async setKeyword(

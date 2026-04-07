@@ -162,6 +162,51 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
 
     return accountId;
   }
+
+  async downloadBlob(
+    userEmail: string,
+    blobId: string,
+    name: string,
+    type: string,
+  ): Promise<{ content: Buffer; type: string; name: string } | null> {
+    const session = await this.getSession(userEmail);
+    const accountId = session.primaryAccounts?.[JMAP_CAPABILITY_MAIL];
+
+    if (!accountId) {
+      throw new JmapError('No primary mail account found', session);
+    }
+
+    const downloadPath = new URL(
+      session.downloadUrl
+        .replace('{accountId}', encodeURIComponent(accountId))
+        .replace('{blobId}', encodeURIComponent(blobId))
+        .replace('{name}', encodeURIComponent(name))
+        .replace('{type}', encodeURIComponent(type)),
+    ).pathname;
+
+    const { statusCode, body, headers } = await this.httpClient.request({
+      method: 'GET',
+      path: downloadPath,
+      headers: {
+        authorization: this.buildAuthHeader(userEmail),
+      },
+    });
+
+    if (statusCode === 404) {
+      await body.dump();
+      return null;
+    }
+
+    if (statusCode !== 200) {
+      const text = await body.text();
+      throw new JmapError(`Blob download failed: HTTP ${statusCode}`, text);
+    }
+
+    const buffer = Buffer.from(await body.arrayBuffer());
+    const contentType = (headers['content-type'] as string | undefined) ?? type;
+
+    return { content: buffer, type: contentType, name };
+  }
 }
 
 export class JmapError extends Error {

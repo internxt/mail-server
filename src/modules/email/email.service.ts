@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { MailProvider } from './mail-provider.port.js';
 import type {
+  AttachmentBlob,
   DraftEmailDto,
   Email,
   EmailListResponse,
@@ -71,5 +72,16 @@ export class EmailService {
     flagged: boolean,
   ): Promise<void> {
     return this.mail.markAsFlagged(userEmail, id, flagged);
+  }
+
+  async getAttachment(
+    userEmail: string,
+    blobId: string,
+  ): Promise<AttachmentBlob> {
+    const blob = await this.mail.getAttachment(userEmail, blobId);
+    if (!blob) {
+      throw new NotFoundException(`Attachment ${blobId} not found`);
+    }
+    return blob;
   }
 }

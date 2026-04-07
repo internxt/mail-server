@@ -141,6 +141,36 @@ export class EmailSummaryResponseDto {
   size!: number;
 }
 
+export class AttachmentResponseDto {
+  @ApiProperty({ example: 'Bf3a1b2c4…', description: 'Blob ID for download' })
+  blobId!: string;
+
+  @ApiProperty({ nullable: true, example: 'report.pdf' })
+  name!: string | null;
+
+  @ApiProperty({ example: 'application/pdf' })
+  type!: string;
+
+  @ApiProperty({ example: 102400, description: 'Size in bytes' })
+  size!: number;
+
+  @ApiProperty({
+    enum: ['inline', 'attachment'],
+    example: 'attachment',
+    description:
+      'Whether the attachment is inline (embedded in HTML body, e.g. images) or a regular attachment',
+  })
+  disposition!: 'inline' | 'attachment';
+
+  @ApiProperty({
+    nullable: true,
+    example: 'image001@example.com',
+    description:
+      'Content-ID for inline attachments, referenced in HTML as cid:<value>',
+  })
+  cid!: string | null;
+}
+
 export class EmailResponseDto extends EmailSummaryResponseDto {
   @ApiProperty({ type: [EmailAddressDto] })
   cc!: EmailAddressDto[];
@@ -171,6 +201,9 @@ export class EmailResponseDto extends EmailSummaryResponseDto {
     type: String,
   })
   htmlBody!: string | null;
+
+  @ApiProperty({ type: [AttachmentResponseDto] })
+  attachments!: AttachmentResponseDto[];
 }
 
 export class EmailListResponseDto {

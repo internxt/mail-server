@@ -35,6 +35,15 @@ export interface EmailSummary {
   size: number;
 }
 
+export interface Attachment {
+  blobId: string;
+  name: string | null;
+  type: string;
+  size: number;
+  disposition: 'inline' | 'attachment';
+  cid: string | null;
+}
+
 export interface Email extends EmailSummary {
   cc: EmailAddress[];
   bcc: EmailAddress[];
@@ -42,6 +51,13 @@ export interface Email extends EmailSummary {
   sentAt: string | null;
   textBody: string | null;
   htmlBody: string | null;
+  attachments: Attachment[];
+}
+
+export interface AttachmentBlob {
+  content: Buffer;
+  type: string;
+  name: string;
 }
 
 export interface SendEmailDto {
