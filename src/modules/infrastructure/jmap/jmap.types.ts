@@ -212,3 +212,17 @@ export interface DeliveryStatus {
   delivered: 'queued' | 'yes' | 'no' | 'unknown';
   displayed: 'yes' | 'unknown';
 }
+
+// ── Quota (RFC 9245) ───────────────────────────────────────────────
+
+export interface JmapQuota {
+  id: ID;
+  resourceType: string;
+  used: number;
+  hardLimit: number;
+  scope: string;
+  name: string;
+  description?: string;
+  warnLimit?: number;
+  softLimit?: number;
+}

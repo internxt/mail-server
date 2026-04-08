@@ -11,6 +11,7 @@ import type {
   EmailListResponse,
   EmailSummary,
   ListEmails,
+  MailQuota,
   Mailbox,
   MailboxType,
   SearchEmailDto,
@@ -131,5 +132,9 @@ export class EmailService {
     flagged: boolean,
   ): Promise<void> {
     return this.mail.markAsFlagged(userEmail, id, flagged);
+  }
+
+  getQuota(userEmail: string): Promise<MailQuota> {
+    return this.mail.getQuota(userEmail);
   }
 }

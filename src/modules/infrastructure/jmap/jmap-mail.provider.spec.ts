@@ -7,6 +7,7 @@ import {
   newJmapMailbox,
   newJmapEmail,
   newJmapIdentity,
+  newJmapQuota,
   newSendEmailDto,
   newDraftEmailDto,
 } from '../../../../test/fixtures.js';
@@ -534,6 +535,36 @@ describe('JmapMailProvider', () => {
       const methodArgs = lastCall[1][0]![1];
       const update = methodArgs['update'] as Record<string, unknown>;
       expect(update['email-1']).toEqual({ 'keywords/$flagged': true });
+    });
+  });
+
+  describe('getQuota', () => {
+    it('when quota exists, then returns used and limit from octets quota', async () => {
+      const quota = newJmapQuota({ used: 500_000, hardLimit: 1_000_000 });
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [quota] }));
+
+      const result = await provider.getQuota('user@test.com');
+
+      expect(result).toEqual({ used: 500_000, limit: 1_000_000 });
+    });
+
+    it('when no octets quota exists, then returns zeros', async () => {
+      const nonOctetsQuota = newJmapQuota({ resourceType: 'count' });
+      jmapService.request.mockResolvedValue(
+        jmapResponse({ list: [nonOctetsQuota] }),
+      );
+
+      const result = await provider.getQuota('user@test.com');
+
+      expect(result).toEqual({ used: 0, limit: 0 });
+    });
+
+    it('when quota list is empty, then returns zeros', async () => {
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [] }));
+
+      const result = await provider.getQuota('user@test.com');
+
+      expect(result).toEqual({ used: 0, limit: 0 });
     });
   });
 });

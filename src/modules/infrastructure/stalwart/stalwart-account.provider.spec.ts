@@ -125,4 +125,22 @@ describe('StalwartAccountProvider', () => {
       });
     });
   });
+
+  describe('updateQuota', () => {
+    it('when called, then patches principal quota field', async () => {
+      await provider.updateQuota('user@example.com', 5_000_000);
+
+      expect(stalwart.patchPrincipal).toHaveBeenCalledWith('user@example.com', [
+        { action: 'set', field: 'quota', value: 5_000_000 },
+      ]);
+    });
+
+    it('when called with zero, then sets unlimited quota', async () => {
+      await provider.updateQuota('user@example.com', 0);
+
+      expect(stalwart.patchPrincipal).toHaveBeenCalledWith('user@example.com', [
+        { action: 'set', field: 'quota', value: 0 },
+      ]);
+    });
+  });
 });

@@ -33,8 +33,10 @@ import type {
   EmailAddress as JmapEmailAddress,
   MailboxRole,
   Identity,
+  JmapQuota,
 } from '../src/modules/infrastructure/jmap/jmap.types.js';
 import type { DeepMocked } from '@golevelup/ts-vitest';
+import type { MailQuota } from '../src/modules/email/email.types.js';
 
 export type DeepPartial<T> =
   T extends Array<infer U>
@@ -375,6 +377,26 @@ export function newSearchEmailDto(
     filter: {
       text: 'hello world!',
     },
+    ...attrs,
+  };
+}
+
+export function newJmapQuota(attrs?: Partial<JmapQuota>): JmapQuota {
+  return {
+    id: randomId(),
+    resourceType: 'octets',
+    used: random.natural({ min: 0, max: 1_000_000_000 }),
+    hardLimit: random.natural({ min: 1_000_000_000, max: 10_000_000_000 }),
+    scope: 'account',
+    name: 'Mail storage',
+    ...attrs,
+  };
+}
+
+export function newMailQuota(attrs?: Partial<MailQuota>): MailQuota {
+  return {
+    used: random.natural({ min: 0, max: 1_000_000_000 }),
+    limit: random.natural({ min: 1_000_000_000, max: 10_000_000_000 }),
     ...attrs,
   };
 }

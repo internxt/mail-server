@@ -113,3 +113,8 @@ export interface SearchEmailFilter {
   unread?: boolean;
   hasAttachment?: boolean;
 }
+
+export interface MailQuota {
+  used: number;
+  limit: number;
+}

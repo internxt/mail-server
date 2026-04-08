@@ -3,6 +3,7 @@ import type {
   Email,
   EmailListResponse,
   ListEmails,
+  MailQuota,
   Mailbox,
   MailboxType,
   SearchEmailDto,
@@ -42,4 +43,5 @@ export abstract class MailProvider {
     id: string,
     flagged: boolean,
   ): Promise<void>;
+  abstract getQuota(userEmail: string): Promise<MailQuota>;
 }

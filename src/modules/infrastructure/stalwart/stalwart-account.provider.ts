@@ -55,4 +55,11 @@ export class StalwartAccountProvider extends AccountProvider {
       quota: account.quotas?.maxDiskQuota ?? 0,
     };
   }
+
+  async updateQuota(name: string, quotaBytes: number): Promise<void> {
+    await this.stalwart.patchPrincipal(name, [
+      { action: 'set', field: 'quota', value: quotaBytes },
+    ]);
+    this.logger.log(`Updated quota for '${name}' to ${quotaBytes} bytes`);
+  }
 }

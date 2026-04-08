@@ -4,4 +4,5 @@ export abstract class AccountProvider {
   abstract createAccount(params: CreateAccountParams): Promise<void>;
   abstract deleteAccount(name: string): Promise<void>;
   abstract getAccount(name: string): Promise<AccountInfo | null>;
+  abstract updateQuota(name: string, quotaBytes: number): Promise<void>;
 }
