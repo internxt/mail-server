@@ -425,7 +425,7 @@ describe('AccountService', () => {
     });
   });
 
-  describe.only('checkUsernameAvailability', () => {
+  describe('checkUsernameAvailability', () => {
     const taken = [
       'username@domain',
       'username@domain1',
