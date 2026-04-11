@@ -7,13 +7,19 @@ import {
   Logger,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AccountService } from '../account/account.service.js';
 import { GatewayAuthGuard } from './gateway.guard.js';
-import { ProvisionAccountRequestDto } from './gateway.dto.js';
+import {
+  CheckUsernameQueryDto,
+  CheckUsernameResponseDto,
+  ProvisionAccountRequestDto,
+} from './gateway.dto.js';
 
 @ApiTags('Gateway')
 @ApiBearerAuth('gateway')
@@ -47,6 +53,21 @@ export class GatewayController {
       userId: account.userId,
       address: account.defaultAddress?.address ?? dto.address,
     };
+  }
+
+  @Get('username/check')
+  @Throttle({ default: { limit: 5, ttl: 10_000 } })
+  @ApiOperation({
+    summary:
+      'Check username availability and get suggestions (called by the auth service)',
+  })
+  async checkUsernameAvailability(
+    @Query() query: CheckUsernameQueryDto,
+  ): Promise<CheckUsernameResponseDto> {
+    return this.accountService.checkUsernameAvailability(
+      query.username,
+      query.domain,
+    );
   }
 
   @Get('domains')

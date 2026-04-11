@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
+import { Op } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import {
   MailAddress,
@@ -45,6 +46,16 @@ export class AddressRepository {
     });
 
     return model ? MailAddress.build(toAddressAttributes(model)) : null;
+  }
+
+  async findByAddresses(addresses: string[]): Promise<Set<string>> {
+    if (addresses.length === 0) return new Set();
+
+    const models = await this.addressModel.findAll({
+      where: { address: { [Op.in]: addresses } },
+    });
+
+    return new Set(models.map((m) => m.address));
   }
 
   async findDefaultForAccount(

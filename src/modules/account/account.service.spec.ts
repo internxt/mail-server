@@ -424,6 +424,71 @@ describe('AccountService', () => {
     });
   });
 
+  describe.only('checkUsernameAvailability', () => {
+    const taken = [
+      'username@domain',
+      'username@domain1',
+      'username@domain2',
+      ...Array.from({ length: 20 }, (_, i) => `username${i + 1}@domain`),
+    ];
+
+    beforeEach(() => {
+      addresses.findByAddresses.mockResolvedValue(new Set([]));
+      domains.findAllActive.mockResolvedValue([
+        { domain: 'domain' },
+        { domain: 'domain1' },
+        { domain: 'domain2' },
+      ]);
+    });
+
+    it('should return that address is available if domain is available and address is not taken', async () => {
+      const res = await service.checkUsernameAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({ available: true, suggestion: null });
+
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
+    });
+
+    it('should return that address is not available if domain is not available', async () => {
+      domains.findAllActive.mockResolvedValue([
+        { domain: 'domain1' },
+        { domain: 'domain2' },
+      ]);
+
+      const res = await service.checkUsernameAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({
+        available: false,
+        suggestion: 'username@domain1',
+      });
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith([
+        'username@domain1',
+        'username@domain2',
+      ]);
+    });
+
+    it('should return that address is not available if address is taken', async () => {
+      addresses.findByAddresses.mockResolvedValue(new Set(['username@domain']));
+
+      const res = await service.checkUsernameAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({
+        available: false,
+        suggestion: 'username@domain1',
+      });
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
+    });
+
+    it('should return no suggestion if all suggestions are taken', async () => {
+      addresses.findByAddresses.mockResolvedValue(new Set(taken));
+
+      const res = await service.checkUsernameAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({ available: false, suggestion: null });
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
+    });
+  });
+
   describe('setPrimaryAddress', () => {
     it('when address exists and is not default, then sets it as primary', async () => {
       const defaultAddr = newMailAddressAttributes({ isDefault: true });

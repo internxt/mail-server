@@ -219,6 +219,48 @@ export class AccountService {
     );
   }
 
+  async checkUsernameAvailability(
+    username: string,
+    domain: string,
+  ): Promise<{ available: boolean; suggestion: string | null }> {
+    const activeMailDomains = await this.domains.findAllActive();
+    const activeDomains = activeMailDomains.map((m) => m.domain);
+    const isDomainAvailable = activeDomains.includes(domain);
+
+    const requestedAddress = `${username}@${domain}`;
+    const possibleAddresses: string[] = [];
+
+    if (isDomainAvailable) {
+      possibleAddresses.push(requestedAddress);
+    }
+
+    possibleAddresses.push(
+      ...activeDomains
+        .filter((d) => d !== domain)
+        .map((d) => `${username}@${d}`),
+    );
+
+    if (isDomainAvailable) {
+      possibleAddresses.push(
+        ...Array.from(
+          { length: 20 },
+          (_, i) => `${username}${i + 1}@${domain}`,
+        ),
+      );
+    }
+
+    const taken = await this.addresses.findByAddresses(possibleAddresses);
+    const suggestion = possibleAddresses.find((a) => !taken.has(a));
+
+    if (suggestion === requestedAddress) {
+      return { available: true, suggestion: null };
+    } else if (suggestion) {
+      return { available: false, suggestion };
+    } else {
+      return { available: false, suggestion: null };
+    }
+  }
+
   private async getAccountOrFail(userId: string): Promise<MailAccount> {
     const account = await this.accounts.findByUserId(userId);
     if (!account) {
