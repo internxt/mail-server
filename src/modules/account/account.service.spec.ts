@@ -15,6 +15,7 @@ import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import {
+  type DeepPartialMocked,
   newMailAccountAttributes,
   newMailAddressAttributes,
   newMailDomainAttributes,
@@ -25,7 +26,7 @@ describe('AccountService', () => {
   let provider: DeepMocked<AccountProvider>;
   let accounts: DeepMocked<AccountRepository>;
   let addresses: DeepMocked<AddressRepository>;
-  let domains: DeepMocked<DomainRepository>;
+  let domains: DeepPartialMocked<DomainRepository>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -441,7 +442,7 @@ describe('AccountService', () => {
       ]);
     });
 
-    it('should return that address is available if domain is available and address is not taken', async () => {
+    it('when domain is available and address is not taken, return is available', async () => {
       const res = await service.checkUsernameAvailability('username', 'domain');
 
       expect(res).toStrictEqual({ available: true, suggestion: null });
@@ -449,7 +450,7 @@ describe('AccountService', () => {
       expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
     });
 
-    it('should return that address is not available if domain is not available', async () => {
+    it('when domain is not available, return is not available and suggestion', async () => {
       domains.findAllActive.mockResolvedValue([
         { domain: 'domain1' },
         { domain: 'domain2' },
@@ -467,7 +468,7 @@ describe('AccountService', () => {
       ]);
     });
 
-    it('should return that address is not available if address is taken', async () => {
+    it('when address is taken, return is not available and suggestion', async () => {
       addresses.findByAddresses.mockResolvedValue(new Set(['username@domain']));
 
       const res = await service.checkUsernameAvailability('username', 'domain');
@@ -479,7 +480,7 @@ describe('AccountService', () => {
       expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
     });
 
-    it('should return no suggestion if all suggestions are taken', async () => {
+    it('when all suggestions are taken, return is not available and no suggestion', async () => {
       addresses.findByAddresses.mockResolvedValue(new Set(taken));
 
       const res = await service.checkUsernameAvailability('username', 'domain');
