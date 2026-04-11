@@ -26,7 +26,7 @@ export class CheckUsernameResponseDto {
   @ApiProperty({
     description:
       'Suggested address when username is taken, null when available',
-    example: 'alice@internxt.net',
+    example: 'alice@inxt.me',
     type: String,
     nullable: true,
   })
