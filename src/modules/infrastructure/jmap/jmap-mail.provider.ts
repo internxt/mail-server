@@ -104,6 +104,19 @@ export class JmapMailProvider extends MailProvider {
     });
   }
 
+  async getEncryptedEmails(
+    userEmail: string,
+    limit: number,
+    position: number,
+    anchorId?: string,
+  ): Promise<EmailListResponse> {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    return this.queryEmails(userEmail, accountId, limit, position, anchorId, {
+      hasKeyword: 'app:internxt',
+    });
+  }
+
   private async queryEmails(
     userEmail: string,
     accountId: string,
