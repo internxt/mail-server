@@ -1,0 +1,126 @@
+mailApiHost: mail-api
+
+replicaCount: 1
+
+image:
+  repository: stalwartlabs/mail-server
+  tag: v0.11.0
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  ports:
+    http: 8080
+    smtp: 25
+    submission: 587
+    imap: 143
+    submissions: 0
+    imaps: 0
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+env:
+  DB_HOST: postgres-postgresql
+  DB_PORT: "5432"
+  DB_NAME: stalwart
+  DB_USER: postgres
+
+  S3_BUCKET: stalwart-blobs
+  S3_REGION: us-east-1
+  S3_ENDPOINT: http://minio:9000
+
+  ADMIN_USER: mail-api
+  MASTER_USER: master
+  MTA_HOOKS_USERNAME: stalwart
+
+secretName: stalwart-secrets
+
+config: |
+  [server.listener."http"]
+  bind = ["[::]:8080"]
+  protocol = "http"
+
+  [server.listener."smtp"]
+  bind = ["[::]:25"]
+  protocol = "smtp"
+
+  [server.listener."submission"]
+  bind = ["[::]:587"]
+  protocol = "smtp"
+
+  [server.listener."imap"]
+  bind = ["[::]:143"]
+  protocol = "imap"
+
+  [store."postgres"]
+  type = "postgresql"
+  host = "%{env:DB_HOST}%"
+  port = "%{env:DB_PORT}%"
+  database = "%{env:DB_NAME}%"
+  user = "%{env:DB_USER}%"
+  password = "%{env:DB_PASSWORD}%"
+  timeout = "15s"
+
+  [store."postgres".tls]
+  enable = false
+
+  [store."postgres".pool]
+  max-connections = 10
+
+  [store."s3"]
+  type = "s3"
+  bucket = "%{env:S3_BUCKET}%"
+  region = "%{env:S3_REGION}%"
+  endpoint = "%{env:S3_ENDPOINT}%"
+  access-key = "%{env:S3_ACCESS_KEY}%"
+  secret-key = "%{env:S3_SECRET_KEY}%"
+  timeout = "30s"
+  key-prefix = "blobs/"
+
+  [storage]
+  data = "postgres"
+  fts = "postgres"
+  blob = "s3"
+  lookup = "postgres"
+  directory = "internal"
+
+  [directory."internal"]
+  type = "internal"
+  store = "postgres"
+
+  [authentication.fallback-admin]
+  user = "%{env:ADMIN_USER}%"
+  secret = "%{env:ADMIN_SECRET}%"
+
+  [authentication.master]
+  user = "%{env:MASTER_USER}%"
+  secret = "%{env:MASTER_SECRET}%"
+
+  [session.hook."quota-check"]
+  enable = true
+  url = "http://{{ .Values.mailApiHost }}:3100/api/mta-hooks"
+  stages = ["data"]
+
+  [session.hook."quota-check".auth]
+  username = "%{env:MTA_HOOKS_USERNAME}%"
+  secret = "%{env:MTA_HOOKS_SECRET}%"
+
+  [session.hook."quota-check".options]
+  tempfail-on-error = true
+
+  [tracer."stdout"]
+  type = "stdout"
+  level = "info"
+  ansi = false
+  enable = true
