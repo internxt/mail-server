@@ -6,6 +6,7 @@ import {
   MailAddress,
   type MailAddressAttributes,
 } from '../domain/mail-address.domain.js';
+import { MailAccountModel } from '../models/mail-account.model.js';
 import { MailAddressModel } from '../models/mail-address.model.js';
 import { MailProviderAccountModel } from '../models/mail-provider-account.model.js';
 
@@ -56,6 +57,15 @@ export class AddressRepository {
     });
 
     return new Set(models.map((m) => m.address));
+  }
+
+  async findUserIdByAddress(address: string): Promise<string | null> {
+    const model = await this.addressModel.findOne({
+      where: { address },
+      include: [{ model: MailAccountModel }],
+    });
+
+    return model?.account?.userId ?? null;
   }
 
   async findDefaultForAccount(
