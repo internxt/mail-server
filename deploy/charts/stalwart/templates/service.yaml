@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stalwart
+  labels:
+    app: stalwart
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: stalwart
+  ports:
+    - name: http
+      port: {{ .Values.service.ports.http }}
+      targetPort: http
+      protocol: TCP
+    - name: smtp
+      port: {{ .Values.service.ports.smtp }}
+      targetPort: smtp
+      protocol: TCP
+    - name: submission
+      port: {{ .Values.service.ports.submission }}
+      targetPort: submission
+      protocol: TCP
+    - name: imap
+      port: {{ .Values.service.ports.imap }}
+      targetPort: imap
+      protocol: TCP
+    {{- if gt (int .Values.service.ports.submissions) 0 }}
+    - name: submissions
+      port: {{ .Values.service.ports.submissions }}
+      targetPort: submissions
+      protocol: TCP
+    {{- end }}
+    {{- if gt (int .Values.service.ports.imaps) 0 }}
+    - name: imaps
+      port: {{ .Values.service.ports.imaps }}
+      targetPort: imaps
+      protocol: TCP
+    {{- end }}

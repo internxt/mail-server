@@ -1,0 +1,51 @@
+stalwartHost: stalwart
+
+replicaCount: 2
+
+image:
+  repository: internxt/mail-api
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: LoadBalancer
+  port: 3100
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+env:
+  NODE_ENV: production
+  PORT: "3100"
+
+  RDS_HOSTNAME: postgres-postgresql
+  RDS_PORT: "5432"
+  RDS_DBNAME: mail
+  RDS_USERNAME: postgres
+
+  STALWART_ADMIN_USER: mail-api
+  STALWART_MASTER_USER: master
+
+  MTA_HOOKS_USERNAME: stalwart
+
+  DRIVE_API_URL: ""
+  BRIDGE_API_URL: ""
+
+secretName: mail-api-secrets
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 20
+    periodSeconds: 10
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 5
