@@ -28,6 +28,8 @@ describe('MailAccountGuard', () => {
   function mockContext(user = newUserPayload()): ExecutionContext {
     const request = { user };
     return {
+      getHandler: () => () => {},
+      getClass: () => Object,
       switchToHttp: () => ({
         getRequest: () => request,
       }),
