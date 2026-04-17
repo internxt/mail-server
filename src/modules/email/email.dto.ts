@@ -1,6 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { MailboxType } from './email.types.js';
 
+export class MailDomainDto {
+  @ApiProperty({ example: 'alice@internxt.me' })
+  address!: string;
+
+  @ApiProperty({ example: 'internxt.me' })
+  domain!: string;
+
+  @ApiProperty({ example: 'Internxt' })
+  displayName!: string;
+
+  @ApiProperty({ example: '123456789' })
+  password!: string;
+}
+
 export class EmailAddressDto {
   @ApiPropertyOptional({ example: 'Alice Smith' })
   name?: string;
