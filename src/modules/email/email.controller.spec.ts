@@ -3,16 +3,20 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { EmailController } from './email.controller.js';
 import { EmailService } from './email.service.js';
+import { AccountService } from '../account/account.service.js';
 import {
   newMailbox,
   newEmailSummary,
+  newMailDomainAttributes,
   newUserPayload,
 } from '../../../test/fixtures.js';
 import type { EmailListResponse } from './email.types.js';
+import { MailDomain } from '../account/domain/mail-domain.domain.js';
 
 describe('EmailController', () => {
   let controller: EmailController;
   let emailService: DeepMocked<EmailService>;
+  let accountService: DeepMocked<AccountService>;
   const userEmail = newUserPayload().email;
 
   beforeEach(async () => {
@@ -24,6 +28,30 @@ describe('EmailController', () => {
 
     controller = module.get<EmailController>(EmailController);
     emailService = module.get(EmailService);
+    accountService = module.get(AccountService);
+  });
+
+  describe('getDomains', () => {
+    it('when getDomains is called, then it returns the active domains', async () => {
+      const domains = [
+        MailDomain.build(newMailDomainAttributes()),
+        MailDomain.build(newMailDomainAttributes()),
+      ];
+      accountService.listActiveDomains.mockResolvedValue(domains);
+
+      const result = await controller.getDomains();
+
+      expect(accountService.listActiveDomains).toHaveBeenCalled();
+      expect(result).toBe(domains);
+    });
+
+    it('when there are no active domains, then it returns an empty array', async () => {
+      accountService.listActiveDomains.mockResolvedValue([]);
+
+      const result = await controller.getDomains();
+
+      expect(result).toEqual([]);
+    });
   });
 
   describe('getMailboxes', () => {
