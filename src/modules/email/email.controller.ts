@@ -37,7 +37,7 @@ import {
 } from './email.dto.js';
 import type { MailboxType } from './email.types.js';
 import { AccountService } from '../account/account.service.js';
-import { Public } from '../auth/decorators/public.decorator.js';
+import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.decorator.js';
 
 @ApiBearerAuth()
 @ApiTags('Email')
@@ -50,7 +50,7 @@ export class EmailController {
   ) {}
 
   @Get('domains')
-  @Public()
+  @SkipMailAccountCheck()
   @ApiOperation({
     summary: 'List domains',
     description: 'Returns every domain for the authenticated user.',
