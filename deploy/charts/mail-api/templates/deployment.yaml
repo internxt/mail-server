@@ -26,14 +26,32 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
           env:
+            - name: NODE_ENV
+              value: {{ .Values.nodeEnv | quote }}
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            - name: RDS_HOSTNAME
+              value: {{ .Values.database.host | quote }}
+            - name: RDS_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: RDS_DBNAME
+              value: {{ .Values.database.name | quote }}
+            - name: RDS_USERNAME
+              value: {{ .Values.database.username | quote }}
             - name: STALWART_JMAP_URL
-              value: "http://{{ .Values.stalwartHost }}:8080"
+              value: {{ .Values.stalwart.jmapUrl | quote }}
             - name: STALWART_ADMIN_URL
-              value: "http://{{ .Values.stalwartHost }}:8080"
-            {{- range $key, $value := .Values.env }}
-            - name: {{ $key }}
-              value: {{ $value | quote }}
-            {{- end }}
+              value: {{ .Values.stalwart.adminUrl | quote }}
+            - name: STALWART_ADMIN_USER
+              value: {{ .Values.stalwart.adminUser | quote }}
+            - name: STALWART_MASTER_USER
+              value: {{ .Values.stalwart.masterUser | quote }}
+            - name: MTA_HOOKS_USERNAME
+              value: {{ .Values.mta.hooksUsername | quote }}
+            - name: DRIVE_API_URL
+              value: {{ .Values.driveApiUrl | quote }}
+            - name: BRIDGE_API_URL
+              value: {{ .Values.bridgeApiUrl | quote }}
           envFrom:
             - secretRef:
                 name: {{ .Values.secretName }}
