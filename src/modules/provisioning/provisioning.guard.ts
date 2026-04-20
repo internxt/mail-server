@@ -9,6 +9,7 @@ import { AccountService } from '../account/account.service.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../auth/decorators/public.decorator.js';
+import { SKIP_MAIL_ACCOUNT_CHECK_KEY } from './skip-mail-account-check.decorator.js';
 
 @Injectable()
 export class MailAccountGuard implements CanActivate {
@@ -18,12 +19,18 @@ export class MailAccountGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const targets = [context.getHandler(), context.getClass()];
 
-    if (isPublic) {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(
+      IS_PUBLIC_KEY,
+      targets,
+    );
+    const skipAccountCheck = this.reflector.getAllAndOverride<boolean>(
+      SKIP_MAIL_ACCOUNT_CHECK_KEY,
+      targets,
+    );
+
+    if (isPublic || skipAccountCheck) {
       return true;
     }
     const request = context
