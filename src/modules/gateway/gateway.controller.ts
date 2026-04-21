@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AccountService } from '../account/account.service.js';
 import { GatewayAuthGuard } from './gateway.guard.js';
@@ -56,7 +56,9 @@ export class GatewayController {
   }
 
   @Get('username/check')
+  @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 10_000 } })
+  @Public()
   @ApiOperation({
     summary:
       'Check username availability and get suggestions (called by the auth service)',
