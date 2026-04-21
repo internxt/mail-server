@@ -12,6 +12,13 @@ import { MailDomain } from './domain/mail-domain.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
+import { MailAccountKeysRepository } from './repositories/mail-account-keys.repository.js';
+
+export interface MailAccountKeyBundle {
+  publicKey: string;
+  encryptionPrivateKey: string;
+  recoveryPrivateKey: string;
+}
 
 @Injectable()
 export class AccountService {
@@ -22,6 +29,7 @@ export class AccountService {
     private readonly accounts: AccountRepository,
     private readonly addresses: AddressRepository,
     private readonly domains: DomainRepository,
+    private readonly keys: MailAccountKeysRepository,
   ) {}
 
   async getAccount(userId: string): Promise<MailAccount> {
@@ -45,6 +53,7 @@ export class AccountService {
     address: string;
     domain: string;
     displayName: string;
+    keys: MailAccountKeyBundle;
   }): Promise<MailAccount> {
     const [domainRecord, existingAddress, existingAccount] = await Promise.all([
       this.domains.findByDomain(params.domain),
@@ -93,6 +102,11 @@ export class AccountService {
       mailAddressId: address,
       provider: 'stalwart',
       externalId: params.address,
+    });
+
+    await this.keys.create({
+      mailAccountId: account.id,
+      ...params.keys,
     });
 
     const password = randomBytes(32).toString('base64url');
