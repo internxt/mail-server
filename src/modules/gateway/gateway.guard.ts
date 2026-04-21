@@ -19,4 +19,3 @@ export class GatewayAuthGuard extends AuthGuard(GatewayJwtStrategy.id) {
     return super.canActivate(context);
   }
 }
-
