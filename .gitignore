@@ -48,6 +48,14 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# Vitest config emit (sources are vitest*.config.ts; do not commit compiled sidecars)
+/vitest.config.js
+/vitest.config.js.map
+/vitest.config.d.ts
+/vitest.e2e.config.js
+/vitest.e2e.config.js.map
+/vitest.e2e.config.d.ts
+
 # Optional npm cache directory
 .npm
 
