@@ -12,7 +12,7 @@ import { GatewayController } from './gateway.controller.js';
     PassportModule,
     AccountModule,
     ThrottlerModule.forRoot({
-      // We are going to create a default throttler that can be override in any endpoint by doing
+      // We are going to create a default throttler that can be overrided in any endpoint by doing
       // @Throttle({ default: { limit: X, ttl: Y } })
       throttlers: [{ name: 'default', limit: 60, ttl: 60_000 }],
       storage: new ThrottlerStorageRedisService(process.env.REDIS_URL),

@@ -60,8 +60,7 @@ export class GatewayController {
   @Throttle({ default: { limit: 5, ttl: 10_000 } })
   @Public()
   @ApiOperation({
-    summary:
-      'Check username availability and get suggestions (called by the auth service)',
+    summary: 'Check username availability (called by the auth service)',
   })
   async checkUsernameAvailability(
     @Query() query: CheckUsernameQueryDto,
