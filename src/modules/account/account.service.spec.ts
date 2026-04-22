@@ -425,7 +425,7 @@ describe('AccountService', () => {
     });
   });
 
-  describe('checkUsernameAvailability', () => {
+  describe('checkAddressAvailability', () => {
     const taken = [
       'username@domain',
       'username@domain1',
@@ -443,7 +443,7 @@ describe('AccountService', () => {
     });
 
     it('when domain is available and address is not taken, return is available', async () => {
-      const res = await service.checkUsernameAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability('username', 'domain');
 
       expect(res).toStrictEqual({ available: true, suggestion: null });
 
@@ -456,7 +456,7 @@ describe('AccountService', () => {
         { domain: 'domain2' },
       ]);
 
-      const res = await service.checkUsernameAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability('username', 'domain');
 
       expect(res).toStrictEqual({
         available: false,
@@ -471,7 +471,7 @@ describe('AccountService', () => {
     it('when address is taken, return is not available and suggestion', async () => {
       addresses.findByAddresses.mockResolvedValue(new Set(['username@domain']));
 
-      const res = await service.checkUsernameAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability('username', 'domain');
 
       expect(res).toStrictEqual({
         available: false,
@@ -483,7 +483,7 @@ describe('AccountService', () => {
     it('when all suggestions are taken, return is not available and no suggestion', async () => {
       addresses.findByAddresses.mockResolvedValue(new Set(taken));
 
-      const res = await service.checkUsernameAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability('username', 'domain');
 
       expect(res).toStrictEqual({ available: false, suggestion: null });
       expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);

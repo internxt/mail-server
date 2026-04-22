@@ -10,7 +10,7 @@ import {
   newMailAddressAttributes,
   newMailDomainAttributes,
 } from '../../../test/fixtures.js';
-import { v4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 describe('GatewayController', () => {
   let controller: GatewayController;
@@ -30,7 +30,7 @@ describe('GatewayController', () => {
   describe('provisionAccount', () => {
     it('when valid request, then provisions account and returns id and address', async () => {
       const dto = {
-        userId: v4(),
+        userId: randomUUID(),
         address: 'alice@internxt.com',
         domain: 'internxt.com',
         displayName: 'Alice Smith',

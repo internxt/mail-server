@@ -219,7 +219,7 @@ export class AccountService {
     );
   }
 
-  async checkUsernameAvailability(
+  async checkAddressAvailability(
     username: string,
     domain: string,
   ): Promise<{ available: boolean; suggestion: string | null }> {
