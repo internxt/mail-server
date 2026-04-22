@@ -337,12 +337,12 @@ describe('jmap-mail.mapper', () => {
       expect(result.mailboxIds).toEqual({ [mailboxId]: true });
     });
 
-    it('when given a send DTO, then sets $seen keyword', () => {
+    it('when given a send DTO, then sets $seen and app:internxt keywords', () => {
       const dto = newSendEmailDto();
 
       const result = mapSendDtoToJmapCreate(dto, 'mid');
 
-      expect(result.keywords).toEqual({ $seen: true });
+      expect(result.keywords).toEqual({ $seen: true, 'app:internxt': true });
     });
 
     it('when DTO has to and subject, then maps them directly', () => {

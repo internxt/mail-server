@@ -10,6 +10,7 @@ import type {
   EmailListResponse,
   Mailbox,
   MailboxType,
+  SearchEmailFilter,
   SendEmailDto,
 } from './email.types.js';
 
@@ -37,6 +38,18 @@ export class EmailService {
       throw new NotFoundException(`Email ${id} not found`);
     }
     return email;
+  }
+
+  search(params: {
+    userEmail: string;
+    limit: number;
+    position: number;
+    filter: SearchEmailFilter;
+  }) {
+    if (params.filter.text === undefined) {
+      throw new BadRequestException('The text should be provided');
+    }
+    return this.mail.search(params);
   }
 
   async sendEmail(

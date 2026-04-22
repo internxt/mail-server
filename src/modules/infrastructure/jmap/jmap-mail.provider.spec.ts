@@ -358,6 +358,156 @@ describe('JmapMailProvider', () => {
     });
   });
 
+  describe('search', () => {
+    it('when called with text filter, then it passes it to jmap', async () => {
+      const jmapEmails = [newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 1 },
+          { list: jmapEmails },
+        ),
+      );
+
+      await provider.search({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello' },
+      });
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = lastCall[1][0]![1];
+      expect(queryArgs['filter']).toMatchObject({ text: 'hello*' });
+    });
+
+    it('when called with from and to filters, then the mails are filtered by from', async () => {
+      const jmapEmails = [newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 1 },
+          { list: jmapEmails },
+        ),
+      );
+
+      await provider.search({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+        filter: {
+          text: 'hello',
+          from: ['alice@example.com'],
+          to: ['bob@example.com'],
+        },
+      });
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = lastCall[1][0]![1];
+      expect(queryArgs['filter']).toMatchObject({
+        from: 'alice@example.com',
+        to: 'bob@example.com',
+      });
+    });
+
+    it('when called with after and before filters, then the mails are filtered by to', async () => {
+      const jmapEmails = [newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 1 },
+          { list: jmapEmails },
+        ),
+      );
+
+      await provider.search({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+        filter: {
+          text: 'hello',
+          after: '2024-01-01T00:00:00Z',
+          before: '2024-12-31T23:59:59Z',
+        },
+      });
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = lastCall[1][0]![1];
+      expect(queryArgs['filter']).toMatchObject({
+        after: '2024-01-01T00:00:00Z',
+        before: '2024-12-31T23:59:59Z',
+      });
+    });
+
+    it('when filtering by mails that has been read, then the mails are filtered by checking that are seen ($seen keyword)', async () => {
+      const jmapEmails = [newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 1 },
+          { list: jmapEmails },
+        ),
+      );
+
+      await provider.search({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', isRead: true },
+      });
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = lastCall[1][0]![1];
+      expect(queryArgs['filter']).toMatchObject({ hasKeyword: '$seen' });
+      expect(queryArgs['filter']).not.toHaveProperty('isRead');
+    });
+
+    it('when filtering by mails that has not been read, then the mails are filtered by checking that are not seen ($seen keyword)', async () => {
+      const jmapEmails = [newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 1 },
+          { list: jmapEmails },
+        ),
+      );
+
+      await provider.search({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', isRead: false },
+      });
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = lastCall[1][0]![1];
+      expect(queryArgs['filter']).toMatchObject({ notKeyword: '$seen' });
+      expect(queryArgs['filter']).not.toHaveProperty('isRead');
+    });
+
+    it('when filtering by emails that has attachments, then the mails are filtered by attachments', async () => {
+      const jmapEmails = [newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: jmapEmails.map((e) => e.id), total: 1 },
+          { list: jmapEmails },
+        ),
+      );
+
+      await provider.search({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', hasAttachment: true },
+      });
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = lastCall[1][0]![1];
+      expect(queryArgs['filter']).toMatchObject({ hasAttachment: true });
+    });
+  });
+
   describe('markAsFlagged', () => {
     it('When called with true, then it sets the $flagged keyword', async () => {
       jmapService.request.mockResolvedValue(jmapResponse({}));

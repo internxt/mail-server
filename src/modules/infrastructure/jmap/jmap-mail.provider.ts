@@ -6,6 +6,7 @@ import type {
   EmailListResponse,
   Mailbox,
   MailboxType,
+  SearchEmailFilter,
   SendEmailDto,
 } from '../../email/email.types.js';
 import { JmapService } from './jmap.service.js';
@@ -104,19 +105,6 @@ export class JmapMailProvider extends MailProvider {
     });
   }
 
-  async getEncryptedEmails(
-    userEmail: string,
-    limit: number,
-    position: number,
-    anchorId?: string,
-  ): Promise<EmailListResponse> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
-
-    return this.queryEmails(userEmail, accountId, limit, position, anchorId, {
-      hasKeyword: 'app:internxt',
-    });
-  }
-
   private async queryEmails(
     userEmail: string,
     accountId: string,
@@ -193,6 +181,48 @@ export class JmapMailProvider extends MailProvider {
 
     const email = response.methodResponses[0]![1].list[0];
     return email ? mapJmapEmailToDetail(email) : null;
+  }
+
+  async search({
+    userEmail,
+    limit,
+    position,
+    filter,
+  }: {
+    userEmail: string;
+    limit: number;
+    position: number;
+    filter: SearchEmailFilter;
+  }) {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    const { isRead, text, ...rest } = filter;
+
+    const { from, to, after, before, hasAttachment } = rest;
+
+    const jmapFilter: Record<string, unknown> = {};
+
+    if (text) jmapFilter.text = `${text.trim()}*`;
+    if (from?.length) jmapFilter.from = from.join(' ');
+    if (to?.length) jmapFilter.to = to.join(' ');
+    if (after) jmapFilter.after = after;
+    if (before) jmapFilter.before = before;
+    if (hasAttachment !== undefined) jmapFilter.hasAttachment = hasAttachment;
+
+    if (isRead === true) {
+      jmapFilter.hasKeyword = '$seen';
+    } else if (isRead === false) {
+      jmapFilter.notKeyword = '$seen';
+    }
+
+    return this.queryEmails(
+      userEmail,
+      accountId,
+      limit,
+      position,
+      undefined,
+      jmapFilter,
+    );
   }
 
   async sendEmail(

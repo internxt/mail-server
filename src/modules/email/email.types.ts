@@ -68,3 +68,13 @@ export interface EmailListResponse {
   hasMoreMails: boolean;
   nextAnchor?: string;
 }
+
+export interface SearchEmailFilter {
+  after?: string;
+  before?: string;
+  text: string;
+  from?: string[];
+  to?: string[];
+  isRead?: boolean;
+  hasAttachment?: boolean;
+}

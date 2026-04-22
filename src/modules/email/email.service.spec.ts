@@ -103,6 +103,41 @@ describe('EmailService', () => {
     });
   });
 
+  describe('search', () => {
+    it('when called with no filters, then an error indicating so is thrown', () => {
+      expect(() =>
+        service.search({
+          userEmail,
+          limit: 20,
+          position: 0,
+          filter: {} as never,
+        }),
+      ).toThrow(BadRequestException);
+      expect(provider.search).not.toHaveBeenCalled();
+    });
+
+    it('when called, then delegates to provider with the given params', async () => {
+      const response = {
+        emails: [newEmailSummary()],
+        total: 1,
+        hasMoreMails: false,
+        nextAnchor: undefined,
+      };
+      provider.search.mockResolvedValue(response);
+
+      const params = {
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', isRead: false },
+      };
+      const result = await service.search(params);
+
+      expect(provider.search).toHaveBeenCalledWith(params);
+      expect(result).toBe(response);
+    });
+  });
+
   describe('sendEmail', () => {
     it('when DTO has recipients, then delegates to provider', async () => {
       const dto = newSendEmailDto();

@@ -31,6 +31,7 @@ import {
   EmailListResponseDto,
   EmailResponseDto,
   MailboxResponseDto,
+  SearchEmailQueryDto,
   SendEmailRequestDto,
   UpdateEmailRequestDto,
 } from './email.dto.js';
@@ -103,6 +104,25 @@ export class EmailController {
       position ? Number(position) || 0 : 0,
       anchorId,
     );
+  }
+
+  @Post('search')
+  @ApiOperation({
+    summary: 'Search emails',
+    description:
+      'Search emails by text, sender, recipient, date range, read status or attachment.',
+  })
+  @ApiBody({ type: SearchEmailQueryDto })
+  @ApiOkResponse({ type: EmailListResponseDto })
+  search(@User('email') email: string, @Body() body: SearchEmailQueryDto) {
+    const { limit, position, ...filters } = body;
+
+    return this.emailService.search({
+      userEmail: email,
+      limit: limit ?? 20,
+      position: position ?? 0,
+      filter: filters,
+    });
   }
 
   @Get(':id')

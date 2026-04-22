@@ -190,6 +190,45 @@ export class EmailListResponseDto {
   nextAnchor?: string;
 }
 
+export class SearchEmailQueryDto {
+  @ApiProperty({ description: 'Full-text search' })
+  text!: string;
+
+  @ApiPropertyOptional({ example: 20 })
+  limit?: number;
+
+  @ApiPropertyOptional({ example: 0 })
+  position?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by sender',
+    example: ['a@inxt.eu', 'b@inxt.me'],
+  })
+  from?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Filter by recipient',
+    example: ['a@inxt.eu', 'b@inxt.me'],
+  })
+  to?: string[];
+
+  @ApiPropertyOptional({
+    description: 'ISO 8601 date — emails received after this date',
+  })
+  after?: string;
+
+  @ApiPropertyOptional({
+    description: 'ISO 8601 date — emails received before this date',
+  })
+  before?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by read status' })
+  isRead?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter by attachment presence' })
+  hasAttachment?: boolean;
+}
+
 export class EmailCreatedResponseDto {
   @ApiProperty({
     example: 'Ma1f09b…',
