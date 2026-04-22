@@ -137,9 +137,6 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     const text = await body.text();
 
     if (statusCode !== 200) {
-      this.logger.error(
-        `JMAP request failed: HTTP ${statusCode} — body: ${text} — request: ${JSON.stringify(requestBody)}`,
-      );
       throw new JmapError(`JMAP request failed: HTTP ${statusCode}`, text);
     }
 
