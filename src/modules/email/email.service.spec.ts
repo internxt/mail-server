@@ -104,18 +104,6 @@ describe('EmailService', () => {
   });
 
   describe('search', () => {
-    it('when called with no filters, then an error indicating so is thrown', () => {
-      expect(() =>
-        service.search({
-          userEmail,
-          limit: 20,
-          position: 0,
-          filter: {} as never,
-        }),
-      ).toThrow(BadRequestException);
-      expect(provider.search).not.toHaveBeenCalled();
-    });
-
     it('when called, then delegates to provider with the given params', async () => {
       const response = {
         emails: [newEmailSummary()],

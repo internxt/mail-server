@@ -46,9 +46,6 @@ export class EmailService {
     position: number;
     filter: SearchEmailFilter;
   }) {
-    if (params.filter.text === undefined) {
-      throw new BadRequestException('The text should be provided');
-    }
     return this.mail.search(params);
   }
 
