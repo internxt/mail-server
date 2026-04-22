@@ -153,7 +153,7 @@ export function mapSendDtoToJmapCreate(
     mailboxIds: { [mailboxId]: true },
     to: dto.to,
     subject: dto.subject,
-    keywords: { $seen: true, 'app:internxt': true },
+    keywords: { $seen: true },
   };
 
   if (dto.cc) email.cc = dto.cc;
