@@ -23,6 +23,7 @@ import {
   mapJmapEmailToSummary,
   mapJmapEmailToDetail,
   mapJmapRoleToMailboxType,
+  mapSearchFilterToJmap,
   mapSendDtoToJmapCreate,
   mapDraftDtoToJmapCreate,
 } from './jmap-mail.mapper.js';
@@ -196,32 +197,13 @@ export class JmapMailProvider extends MailProvider {
   }) {
     const accountId = await this.jmap.getPrimaryAccountId(userEmail);
 
-    const { isRead, text, ...rest } = filter;
-
-    const { from, to, after, before, hasAttachment } = rest;
-
-    const jmapFilter: Record<string, unknown> = {};
-
-    if (text) jmapFilter.text = `${text.trim()}*`;
-    if (from?.length) jmapFilter.from = from.join(' ');
-    if (to?.length) jmapFilter.to = to.join(' ');
-    if (after) jmapFilter.after = after;
-    if (before) jmapFilter.before = before;
-    if (hasAttachment !== undefined) jmapFilter.hasAttachment = hasAttachment;
-
-    if (isRead === true) {
-      jmapFilter.hasKeyword = '$seen';
-    } else if (isRead === false) {
-      jmapFilter.notKeyword = '$seen';
-    }
-
     return this.queryEmails(
       userEmail,
       accountId,
       limit,
       position,
       undefined,
-      jmapFilter,
+      mapSearchFilterToJmap(filter),
     );
   }
 

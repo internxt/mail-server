@@ -5,6 +5,7 @@ import {
   mapJmapMailbox,
   mapJmapEmailToSummary,
   mapJmapEmailToDetail,
+  mapSearchFilterToJmap,
   mapSendDtoToJmapCreate,
   mapDraftDtoToJmapCreate,
 } from './jmap-mail.mapper.js';
@@ -468,6 +469,83 @@ describe('jmap-mail.mapper', () => {
       expect(result.cc).toEqual(cc);
       expect(result.subject).toBe('Draft subject');
       expect(result.bodyValues?.['text']?.value).toBe('Draft text');
+    });
+  });
+
+  describe('mapSearchFilterToJmap', () => {
+    it('when text is provided, then appends wildcard', () => {
+      const result = mapSearchFilterToJmap({ text: 'hello' });
+      expect(result.text).toBe('hello*');
+    });
+
+    it('when text has leading/trailing spaces, then trims before appending wildcard', () => {
+      const result = mapSearchFilterToJmap({ text: '  hello  ' });
+      expect(result.text).toBe('hello*');
+    });
+
+    it('when from array is provided, then joins with space', () => {
+      const result = mapSearchFilterToJmap({
+        text: 'hello',
+        from: ['alice@example.com', 'bob@example.com'],
+      });
+      expect(result.from).toBe('alice@example.com bob@example.com');
+    });
+
+    it('when to array is provided, then joins with space', () => {
+      const result = mapSearchFilterToJmap({
+        text: 'hello',
+        to: ['alice@example.com', 'bob@example.com'],
+      });
+      expect(result.to).toBe('alice@example.com bob@example.com');
+    });
+
+    it('when after and before are provided, then passes them through', () => {
+      const result = mapSearchFilterToJmap({
+        text: 'hello',
+        after: '2024-01-01T00:00:00Z',
+        before: '2024-12-31T23:59:59Z',
+      });
+      expect(result.after).toBe('2024-01-01T00:00:00Z');
+      expect(result.before).toBe('2024-12-31T23:59:59Z');
+    });
+
+    it('when hasAttachment is true, then includes it', () => {
+      const result = mapSearchFilterToJmap({
+        text: 'hello',
+        hasAttachment: true,
+      });
+      expect(result.hasAttachment).toBe(true);
+    });
+
+    it('when hasAttachment is false, then includes it', () => {
+      const result = mapSearchFilterToJmap({
+        text: 'hello',
+        hasAttachment: false,
+      });
+      expect(result.hasAttachment).toBe(false);
+    });
+
+    it('when isRead is true, then sets hasKeyword to $seen', () => {
+      const result = mapSearchFilterToJmap({ text: 'hello', isRead: true });
+      expect(result.hasKeyword).toBe('$seen');
+      expect(result.notKeyword).toBeUndefined();
+    });
+
+    it('when isRead is false, then sets notKeyword to $seen', () => {
+      const result = mapSearchFilterToJmap({ text: 'hello', isRead: false });
+      expect(result.notKeyword).toBe('$seen');
+      expect(result.hasKeyword).toBeUndefined();
+    });
+
+    it('when isRead is undefined, then neither hasKeyword nor notKeyword is set', () => {
+      const result = mapSearchFilterToJmap({ text: 'hello' });
+      expect(result.hasKeyword).toBeUndefined();
+      expect(result.notKeyword).toBeUndefined();
+    });
+
+    it('when no optional fields are provided, then only text is set', () => {
+      const result = mapSearchFilterToJmap({ text: 'hello' });
+      expect(Object.keys(result)).toEqual(['text']);
     });
   });
 
