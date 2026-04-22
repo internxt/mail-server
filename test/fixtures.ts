@@ -26,6 +26,22 @@ import type {
   MailboxRole,
   Identity,
 } from '../src/modules/infrastructure/jmap/jmap.types.js';
+import type { DeepMocked } from '@golevelup/ts-vitest';
+
+export type DeepPartial<T> =
+  T extends Array<infer U>
+    ? DeepPartial<U>[]
+    : T extends object
+      ? { [K in keyof T]?: DeepPartial<T[K]> }
+      : T;
+
+export type DeepPartialMocked<T> = DeepMocked<{
+  [K in keyof T]: T[K] extends (...args: infer A) => Promise<infer R>
+    ? (...args: A) => Promise<DeepPartial<R>>
+    : T[K] extends (...args: infer A) => infer R
+      ? (...args: A) => DeepPartial<R>
+      : T[K];
+}>;
 
 const random = new Chance();
 

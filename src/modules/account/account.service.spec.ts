@@ -15,6 +15,7 @@ import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import {
+  type DeepPartialMocked,
   newMailAccountAttributes,
   newMailAddressAttributes,
   newMailDomainAttributes,
@@ -25,7 +26,7 @@ describe('AccountService', () => {
   let provider: DeepMocked<AccountProvider>;
   let accounts: DeepMocked<AccountRepository>;
   let addresses: DeepMocked<AddressRepository>;
-  let domains: DeepMocked<DomainRepository>;
+  let domains: DeepPartialMocked<DomainRepository>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -421,6 +422,71 @@ describe('AccountService', () => {
       await expect(service.removeAddress('unknown', 'a@b.com')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('checkAddressAvailability', () => {
+    const taken = [
+      'username@domain',
+      'username@domain1',
+      'username@domain2',
+      ...Array.from({ length: 20 }, (_, i) => `username${i + 1}@domain`),
+    ];
+
+    beforeEach(() => {
+      addresses.findByAddresses.mockResolvedValue(new Set([]));
+      domains.findAllActive.mockResolvedValue([
+        { domain: 'domain' },
+        { domain: 'domain1' },
+        { domain: 'domain2' },
+      ]);
+    });
+
+    it('when domain is available and address is not taken, return is available', async () => {
+      const res = await service.checkAddressAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({ available: true, suggestion: null });
+
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
+    });
+
+    it('when domain is not available, return is not available and suggestion', async () => {
+      domains.findAllActive.mockResolvedValue([
+        { domain: 'domain1' },
+        { domain: 'domain2' },
+      ]);
+
+      const res = await service.checkAddressAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({
+        available: false,
+        suggestion: 'username@domain1',
+      });
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith([
+        'username@domain1',
+        'username@domain2',
+      ]);
+    });
+
+    it('when address is taken, return is not available and suggestion', async () => {
+      addresses.findByAddresses.mockResolvedValue(new Set(['username@domain']));
+
+      const res = await service.checkAddressAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({
+        available: false,
+        suggestion: 'username@domain1',
+      });
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
+    });
+
+    it('when all suggestions are taken, return is not available and no suggestion', async () => {
+      addresses.findByAddresses.mockResolvedValue(new Set(taken));
+
+      const res = await service.checkAddressAvailability('username', 'domain');
+
+      expect(res).toStrictEqual({ available: false, suggestion: null });
+      expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
     });
   });
 

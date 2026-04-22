@@ -13,6 +13,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AccountModule } from './modules/account/account.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { HttpGlobalExceptionFilter } from './common/filters/http-global-exception.filter';
+import { AddressesModule } from './modules/addresses/addresses.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { HttpGlobalExceptionFilter } from './common/filters/http-global-exceptio
     EmailModule,
     AuthModule,
     AccountModule,
+    AddressesModule,
     GatewayModule,
   ],
   controllers: [],
