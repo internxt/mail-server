@@ -61,14 +61,14 @@ export class GatewayController {
   @Post('accounts/:uuid/suspend')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Suspend a mail account' })
-  async suspendAccount(@Param('uuid') _uuid: string) {
-    // mark as frozen and suspend account in Stalwart
+  async suspendAccount(@Param('uuid') uuid: string) {
+    await this.accountService.freezeAccount(uuid);
   }
 
   @Post('accounts/:uuid/reactivate')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Reactivate a mail account' })
-  async reactivateAccount(@Param('uuid') _uuid: string) {
-    // unmark as frozen and reactivate account in Stalwart
+  async reactivateAccount(@Param('uuid') uuid: string) {
+    await this.accountService.reactivateAccount(uuid);
   }
 }

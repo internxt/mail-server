@@ -28,6 +28,14 @@ export class MailAccountModel extends Model {
   @Column(DataType.UUID)
   declare userId: string;
 
+  @AllowNull(false)
+  @Default(DataType.NOW)
+  @Column(DataType.DATE)
+  declare enabledAt: Date;
+
+  @Column(DataType.DATE)
+  declare disabledAt: Date | null;
+
   @Column(DataType.DATE)
   declare deletedAt: Date | null;
 

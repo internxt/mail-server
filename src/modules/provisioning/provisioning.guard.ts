@@ -28,6 +28,14 @@ export class MailAccountGuard implements CanActivate {
       });
     }
 
+    if (account.isFrozen) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'MAIL_FROZEN',
+        message: 'Mail account is frozen due to plan downgrade',
+      });
+    }
+
     return true;
   }
 }

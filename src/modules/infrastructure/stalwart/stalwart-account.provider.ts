@@ -44,4 +44,26 @@ export class StalwartAccountProvider extends AccountProvider {
       quota: principal.quota ?? 0,
     };
   }
+
+  async suspendAccount(name: string): Promise<void> {
+    await this.stalwart.patchPrincipal(name, [
+      {
+        action: 'addItem',
+        field: 'disabledPermissions',
+        value: 'authenticate',
+      },
+    ]);
+    this.logger.log(`Suspended account '${name}'`);
+  }
+
+  async reactivateAccount(name: string): Promise<void> {
+    await this.stalwart.patchPrincipal(name, [
+      {
+        action: 'removeItem',
+        field: 'disabledPermissions',
+        value: 'authenticate',
+      },
+    ]);
+    this.logger.log(`Reactivated account '${name}'`);
+  }
 }

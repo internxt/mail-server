@@ -6,6 +6,8 @@ import {
 export interface MailAccountAttributes {
   id: string;
   userId: string;
+  enabledAt: Date;
+  disabledAt: Date | null;
   addresses: MailAddressAttributes[];
   createdAt: Date;
   updatedAt: Date;
@@ -14,6 +16,8 @@ export interface MailAccountAttributes {
 export class MailAccount {
   readonly id!: string;
   readonly userId!: string;
+  readonly enabledAt!: Date;
+  readonly disabledAt!: Date | null;
   readonly addresses!: MailAddress[];
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
@@ -25,6 +29,10 @@ export class MailAccount {
 
   static build(attributes: MailAccountAttributes): MailAccount {
     return new MailAccount(attributes);
+  }
+
+  get isFrozen(): boolean {
+    return this.disabledAt !== null;
   }
 
   get defaultAddress(): MailAddress | undefined {

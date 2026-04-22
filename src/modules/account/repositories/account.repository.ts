@@ -43,10 +43,26 @@ export class AccountRepository {
     await this.accountModel.destroy({ where: { id } });
   }
 
+  async freeze(id: string): Promise<void> {
+    await this.accountModel.update(
+      { disabledAt: new Date() },
+      { where: { id } },
+    );
+  }
+
+  async reactivate(id: string): Promise<void> {
+    await this.accountModel.update(
+      { disabledAt: null, enabledAt: new Date() },
+      { where: { id } },
+    );
+  }
+
   private toDomain(model: MailAccountModel): MailAccount {
     return MailAccount.build({
       id: model.id,
       userId: model.userId,
+      enabledAt: model.enabledAt,
+      disabledAt: model.disabledAt,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,
       addresses: (model.addresses ?? []).map(toAddressAttributes),

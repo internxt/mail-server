@@ -108,6 +108,32 @@ export class AccountService {
     return this.getAccountOrFail(params.userId);
   }
 
+  async freezeAccount(userId: string): Promise<void> {
+    const account = await this.getAccountOrFail(userId);
+
+    await Promise.all(
+      account.addresses.map((a) =>
+        this.provider.suspendAccount(a.providerExternalId),
+      ),
+    );
+
+    await this.accounts.freeze(account.id);
+    this.logger.log(`Frozen account for user '${userId}'`);
+  }
+
+  async reactivateAccount(userId: string): Promise<void> {
+    const account = await this.getAccountOrFail(userId);
+
+    await Promise.all(
+      account.addresses.map((a) =>
+        this.provider.reactivateAccount(a.providerExternalId),
+      ),
+    );
+
+    await this.accounts.reactivate(account.id);
+    this.logger.log(`Reactivated account for user '${userId}'`);
+  }
+
   async deleteAccount(driveUserUuid: string): Promise<void> {
     const account = await this.getAccountOrFail(driveUserUuid);
 
