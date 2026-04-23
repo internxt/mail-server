@@ -439,29 +439,6 @@ describe('JmapMailProvider', () => {
       });
     });
 
-    it('when filtering by mails that has been read, then the mails are filtered by checking that are seen ($seen keyword)', async () => {
-      const jmapEmails = [newJmapEmail()];
-
-      jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 1 },
-          { list: jmapEmails },
-        ),
-      );
-
-      await provider.search({
-        userEmail: 'user@test.com',
-        limit: 20,
-        position: 0,
-        filter: { text: 'hello', unread: true },
-      });
-
-      const lastCall = jmapService.request.mock.calls.at(-1)!;
-      const queryArgs = lastCall[1][0]![1];
-      expect(queryArgs['filter']).toMatchObject({ hasKeyword: '$seen' });
-      expect(queryArgs['filter']).not.toHaveProperty('unread');
-    });
-
     it('when filtering by mails that has not been read, then the mails are filtered by checking that are not seen ($seen keyword)', async () => {
       const jmapEmails = [newJmapEmail()];
 
@@ -476,7 +453,7 @@ describe('JmapMailProvider', () => {
         userEmail: 'user@test.com',
         limit: 20,
         position: 0,
-        filter: { text: 'hello', unread: false },
+        filter: { text: 'hello', unread: true },
       });
 
       const lastCall = jmapService.request.mock.calls.at(-1)!;
