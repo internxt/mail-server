@@ -191,8 +191,8 @@ export class EmailListResponseDto {
 }
 
 export class SearchEmailQueryDto {
-  @ApiProperty({ description: 'Full-text search' })
-  text!: string;
+  @ApiPropertyOptional({ description: 'Full-text search' })
+  text?: string;
 
   @ApiPropertyOptional({ example: 20 })
   limit?: number;
@@ -223,7 +223,7 @@ export class SearchEmailQueryDto {
   before?: string;
 
   @ApiPropertyOptional({ description: 'Filter by read status' })
-  isRead?: boolean;
+  unread?: boolean;
 
   @ApiPropertyOptional({ description: 'Filter by attachment presence' })
   hasAttachment?: boolean;

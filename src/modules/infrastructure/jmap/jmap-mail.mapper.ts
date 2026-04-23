@@ -103,7 +103,7 @@ export function mapJmapEmailToDetail(e: JmapEmail): DomainEmail {
 export function mapSearchFilterToJmap(
   filter: SearchEmailFilter,
 ): Record<string, unknown> {
-  const { isRead, text, from, to, after, before, hasAttachment } = filter;
+  const { unread, text, from, to, after, before, hasAttachment } = filter;
   return {
     ...(text && { text: `${text.trim()}*` }),
     ...(from?.length && { from: from.join(' ') }),
@@ -111,8 +111,7 @@ export function mapSearchFilterToJmap(
     ...(after && { after }),
     ...(before && { before }),
     ...(hasAttachment !== undefined && { hasAttachment }),
-    ...(isRead === true && { hasKeyword: '$seen' }),
-    ...(isRead === false && { notKeyword: '$seen' }),
+    ...(unread === true && { notKeyword: '$seen' }),
   };
 }
 

@@ -453,13 +453,13 @@ describe('JmapMailProvider', () => {
         userEmail: 'user@test.com',
         limit: 20,
         position: 0,
-        filter: { text: 'hello', isRead: true },
+        filter: { text: 'hello', unread: true },
       });
 
       const lastCall = jmapService.request.mock.calls.at(-1)!;
       const queryArgs = lastCall[1][0]![1];
       expect(queryArgs['filter']).toMatchObject({ hasKeyword: '$seen' });
-      expect(queryArgs['filter']).not.toHaveProperty('isRead');
+      expect(queryArgs['filter']).not.toHaveProperty('unread');
     });
 
     it('when filtering by mails that has not been read, then the mails are filtered by checking that are not seen ($seen keyword)', async () => {
@@ -476,13 +476,13 @@ describe('JmapMailProvider', () => {
         userEmail: 'user@test.com',
         limit: 20,
         position: 0,
-        filter: { text: 'hello', isRead: false },
+        filter: { text: 'hello', unread: false },
       });
 
       const lastCall = jmapService.request.mock.calls.at(-1)!;
       const queryArgs = lastCall[1][0]![1];
       expect(queryArgs['filter']).toMatchObject({ notKeyword: '$seen' });
-      expect(queryArgs['filter']).not.toHaveProperty('isRead');
+      expect(queryArgs['filter']).not.toHaveProperty('unread');
     });
 
     it('when filtering by emails that has attachments, then the mails are filtered by attachments', async () => {

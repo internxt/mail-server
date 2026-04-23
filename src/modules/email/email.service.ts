@@ -46,6 +46,11 @@ export class EmailService {
     position: number;
     filter: SearchEmailFilter;
   }) {
+    const hasFilter = Object.values(params.filter).some(
+      (v) => v !== undefined && v !== '' && (!Array.isArray(v) || v.length > 0),
+    );
+
+    if (!hasFilter) return [];
     return this.mail.search(params);
   }
 

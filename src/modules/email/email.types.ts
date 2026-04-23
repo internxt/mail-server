@@ -72,9 +72,9 @@ export interface EmailListResponse {
 export interface SearchEmailFilter {
   after?: string;
   before?: string;
-  text: string;
+  text?: string;
   from?: string[];
   to?: string[];
-  isRead?: boolean;
+  unread?: boolean;
   hasAttachment?: boolean;
 }

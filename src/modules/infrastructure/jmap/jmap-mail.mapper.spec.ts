@@ -525,19 +525,19 @@ describe('jmap-mail.mapper', () => {
       expect(result.hasAttachment).toBe(false);
     });
 
-    it('when isRead is true, then sets hasKeyword to $seen', () => {
-      const result = mapSearchFilterToJmap({ text: 'hello', isRead: true });
+    it('when unread is true, then sets hasKeyword to $seen', () => {
+      const result = mapSearchFilterToJmap({ text: 'hello', unread: true });
       expect(result.hasKeyword).toBe('$seen');
       expect(result.notKeyword).toBeUndefined();
     });
 
-    it('when isRead is false, then sets notKeyword to $seen', () => {
-      const result = mapSearchFilterToJmap({ text: 'hello', isRead: false });
+    it('when unread is false, then sets notKeyword to $seen', () => {
+      const result = mapSearchFilterToJmap({ text: 'hello', unread: false });
       expect(result.notKeyword).toBe('$seen');
       expect(result.hasKeyword).toBeUndefined();
     });
 
-    it('when isRead is undefined, then neither hasKeyword nor notKeyword is set', () => {
+    it('when unread is undefined, then neither hasKeyword nor notKeyword is set', () => {
       const result = mapSearchFilterToJmap({ text: 'hello' });
       expect(result.hasKeyword).toBeUndefined();
       expect(result.notKeyword).toBeUndefined();
