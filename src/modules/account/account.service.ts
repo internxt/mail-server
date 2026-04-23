@@ -36,6 +36,10 @@ export class AccountService {
     return this.accounts.findByUserId(userId);
   }
 
+  async findUserIdByAddress(address: string): Promise<string | null> {
+    return this.addresses.findUserIdByAddress(address);
+  }
+
   async provisionAccount(params: {
     userId: string;
     address: string;

@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  NotFoundException,
   Param,
   Post,
   UseGuards,
@@ -56,6 +57,21 @@ export class GatewayController {
   async listDomains() {
     const activeDomains = await this.accountService.listActiveDomains();
     return activeDomains.map((d) => ({ domain: d.domain }));
+  }
+
+  @Get('addresses/:address')
+  @ApiOperation({
+    summary: 'Get a mail address resource (used to resolve drive user id)',
+  })
+  async getAddress(@Param('address') address: string) {
+    const normalized = address.toLowerCase();
+    const userId = await this.accountService.findUserIdByAddress(normalized);
+
+    if (!userId) {
+      throw new NotFoundException(`Address '${address}' not found`);
+    }
+
+    return { address: normalized, userId };
   }
 
   @Post('accounts/:uuid/suspend')

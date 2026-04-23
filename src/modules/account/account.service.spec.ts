@@ -63,6 +63,28 @@ describe('AccountService', () => {
     });
   });
 
+  describe('findUserIdByAddress', () => {
+    it('when address exists, then returns the userId', async () => {
+      const userId = 'user-uuid-1';
+      addresses.findUserIdByAddress.mockResolvedValue(userId);
+
+      const result = await service.findUserIdByAddress('alice@internxt.com');
+
+      expect(addresses.findUserIdByAddress).toHaveBeenCalledWith(
+        'alice@internxt.com',
+      );
+      expect(result).toBe(userId);
+    });
+
+    it('when address does not exist, then returns null', async () => {
+      addresses.findUserIdByAddress.mockResolvedValue(null);
+
+      const result = await service.findUserIdByAddress('unknown@internxt.com');
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('findAccount', () => {
     it('when account exists, then returns it', async () => {
       const account = MailAccount.build(newMailAccountAttributes());
