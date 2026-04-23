@@ -198,6 +198,8 @@ export function newMailAccountAttributes(
     addresses: [address],
     createdAt: new Date(),
     updatedAt: new Date(),
+    enabledAt: new Date(),
+    disabledAt: null,
     ...attrs,
   };
 }

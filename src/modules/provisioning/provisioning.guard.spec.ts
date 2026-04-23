@@ -1,18 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
+import { createMock } from '@golevelup/ts-vitest';
 import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { MailAccountGuard } from './provisioning.guard.js';
 import { AccountService } from '../account/account.service.js';
-import { MailAccount } from '../account/domain/mail-account.domain.js';
 import {
-  newMailAccountAttributes,
+  type DeepPartialMocked,
   newUserPayload,
 } from '../../../test/fixtures.js';
 
 describe('MailAccountGuard', () => {
   let guard: MailAccountGuard;
-  let accountService: DeepMocked<AccountService>;
+  let accountService: DeepPartialMocked<AccountService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -36,10 +35,10 @@ describe('MailAccountGuard', () => {
 
   it('when user has a provisioned account, then allows the request', async () => {
     const user = newUserPayload();
-    const account = MailAccount.build(
-      newMailAccountAttributes({ userId: user.uuid }),
-    );
-    accountService.findAccount.mockResolvedValue(account);
+    accountService.findAccount.mockResolvedValue({
+      userId: user.uuid,
+      isFrozen: false,
+    });
 
     const result = await guard.canActivate(mockContext(user));
 
@@ -56,9 +55,23 @@ describe('MailAccountGuard', () => {
       expect.unreachable('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(ForbiddenException);
-      expect((error as ForbiddenException).getResponse()).toEqual(
-        expect.objectContaining({ code: 'MAIL_NOT_SETUP' }),
-      );
+      expect(error).toMatchObject({ response: { code: 'MAIL_NOT_SETUP' } });
+    }
+  });
+
+  it('when user has mail account frozen, then throws ForbiddenException with MAIL_FROZEN code', async () => {
+    const user = newUserPayload();
+    accountService.findAccount.mockResolvedValue({
+      userId: user.uuid,
+      isFrozen: true,
+    });
+
+    try {
+      await guard.canActivate(mockContext(user));
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect(error).toMatchObject({ response: { code: 'MAIL_FROZEN' } });
     }
   });
 });
