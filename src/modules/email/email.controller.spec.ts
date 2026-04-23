@@ -102,29 +102,29 @@ describe('EmailController', () => {
       });
     });
 
-    it('when isRead is true, then passes isRead as boolean true', async () => {
+    it('When filtering by messages that are not read yet, then passes a param indicating so', async () => {
       emailService.search.mockResolvedValue(searchResponse);
 
-      await controller.search(userEmail, { text: 'hello', isRead: true });
+      await controller.search(userEmail, { text: 'hello', unread: true });
 
       expect(emailService.search).toHaveBeenCalledWith({
         userEmail,
         limit: 20,
         position: 0,
-        filter: { text: 'hello', isRead: true },
+        filter: { text: 'hello', unread: true },
       });
     });
 
-    it('when isRead is false, then passes isRead as boolean false', async () => {
+    it('When filtering by messages that are not read yet, then passes a param indicating so', async () => {
       emailService.search.mockResolvedValue(searchResponse);
 
-      await controller.search(userEmail, { text: 'hello', isRead: false });
+      await controller.search(userEmail, { text: 'hello', unread: false });
 
       expect(emailService.search).toHaveBeenCalledWith({
         userEmail,
         limit: 20,
         position: 0,
-        filter: { text: 'hello', isRead: false },
+        filter: { text: 'hello', unread: false },
       });
     });
 

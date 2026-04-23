@@ -10,6 +10,7 @@ import {
   newEmailSummary,
   newSendEmailDto,
   newDraftEmailDto,
+  newSearchEmailDto,
 } from '../../../test/fixtures.js';
 
 describe('EmailService', () => {
@@ -113,12 +114,7 @@ describe('EmailService', () => {
       };
       provider.search.mockResolvedValue(response);
 
-      const params = {
-        userEmail,
-        limit: 20,
-        position: 0,
-        filter: { text: 'hello', isRead: false },
-      };
+      const params = newSearchEmailDto();
       const result = await service.search(params);
 
       expect(provider.search).toHaveBeenCalledWith(params);
