@@ -1,27 +1,29 @@
-export interface MailAccountKeysAttributes {
+export interface MailAddressKeysAttributes {
   id: string;
-  mailAccountId: string;
+  mailAddressId: string;
   publicKey: string;
   encryptionPrivateKey: string;
   recoveryPrivateKey: string;
+  salt: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export class MailAccountKeys {
+export class MailAddressKeys {
   readonly id!: string;
-  readonly mailAccountId!: string;
+  readonly mailAddressId!: string;
   readonly publicKey!: string;
   readonly encryptionPrivateKey!: string;
   readonly recoveryPrivateKey!: string;
+  readonly salt!: string;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
 
-  private constructor(attributes: MailAccountKeysAttributes) {
+  private constructor(attributes: MailAddressKeysAttributes) {
     Object.assign(this, attributes);
   }
 
-  static build(attributes: MailAccountKeysAttributes): MailAccountKeys {
-    return new MailAccountKeys(attributes);
+  static build(attributes: MailAddressKeysAttributes): MailAddressKeys {
+    return new MailAddressKeys(attributes);
   }
 }

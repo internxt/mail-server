@@ -6,7 +6,7 @@ import { DriveGatewayModule } from '../infrastructure/drive/drive-gateway.module
 import { AccountService } from './account.service.js';
 import { MailAccountsController } from './mail-accounts.controller.js';
 import {
-  MailAccountKeysModel,
+  MailAddressKeysModel,
   MailAccountModel,
   MailAddressModel,
   MailDomainModel,
@@ -15,13 +15,13 @@ import {
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
-import { MailAccountKeysRepository } from './repositories/mail-account-keys.repository.js';
+import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 
 @Module({
   imports: [
     SequelizeModule.forFeature([
       MailAccountModel,
-      MailAccountKeysModel,
+      MailAddressKeysModel,
       MailAddressModel,
       MailDomainModel,
       MailProviderAccountModel,
@@ -35,7 +35,7 @@ import { MailAccountKeysRepository } from './repositories/mail-account-keys.repo
     AccountRepository,
     AddressRepository,
     DomainRepository,
-    MailAccountKeysRepository,
+    MailAddressKeysRepository,
     AccountService,
   ],
   exports: [AccountService],

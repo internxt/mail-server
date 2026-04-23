@@ -11,9 +11,9 @@ import type {
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
-import type { MailAccountKeysAttributes } from '../src/modules/account/domain/mail-account-keys.domain.js';
+import type { MailAddressKeysAttributes } from '../src/modules/account/domain/mail-address-keys.domain.js';
 import type { MailAddressAttributes } from '../src/modules/account/domain/mail-address.domain.js';
-import type { MailAccountKeyBundle } from '../src/modules/account/account.service.js';
+import type { MailAddressKeyBundle } from '../src/modules/account/account.service.js';
 import {
   type MailDomainAttributes,
   MailDomainStatus,
@@ -186,24 +186,25 @@ export function newMailAddressAttributes(
   };
 }
 
-export function newMailAccountKeyBundle(
-  attrs?: Partial<MailAccountKeyBundle>,
-): MailAccountKeyBundle {
+export function newMailAddressKeyBundle(
+  attrs?: Partial<MailAddressKeyBundle>,
+): MailAddressKeyBundle {
   return {
     publicKey: random.hash({ length: 64 }),
     encryptionPrivateKey: random.hash({ length: 128 }),
     recoveryPrivateKey: random.hash({ length: 128 }),
+    salt: random.hash({ length: 24 }),
     ...attrs,
   };
 }
 
-export function newMailAccountKeysAttributes(
-  attrs?: Partial<MailAccountKeysAttributes>,
-): MailAccountKeysAttributes {
+export function newMailAddressKeysAttributes(
+  attrs?: Partial<MailAddressKeysAttributes>,
+): MailAddressKeysAttributes {
   return {
     id: randomUuid(),
-    mailAccountId: randomUuid(),
-    ...newMailAccountKeyBundle(),
+    mailAddressId: randomUuid(),
+    ...newMailAddressKeyBundle(),
     createdAt: new Date(),
     updatedAt: new Date(),
     ...attrs,

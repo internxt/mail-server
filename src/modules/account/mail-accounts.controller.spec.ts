@@ -9,7 +9,7 @@ import { DriveGatewayClient } from '../infrastructure/drive/drive-gateway.client
 import { MailAccount } from './domain/mail-account.domain.js';
 import {
   newMailAccountAttributes,
-  newMailAccountKeyBundle,
+  newMailAddressKeyBundle,
   newUserPayload,
 } from '../../../test/fixtures.js';
 import type { CreateMailAccountDto } from './dto/create-mail-account.dto.js';
@@ -36,7 +36,7 @@ describe('MailAccountsController', () => {
     domain: 'inxt.eu',
     displayName: 'Alice Smith',
     encryptedPassword: 'encrypted',
-    keys: newMailAccountKeyBundle(),
+    keys: newMailAddressKeyBundle(),
   });
 
   beforeEach(async () => {

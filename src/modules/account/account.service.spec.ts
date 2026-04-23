@@ -14,10 +14,10 @@ import { MailAddress } from './domain/mail-address.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
-import { MailAccountKeysRepository } from './repositories/mail-account-keys.repository.js';
+import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 import {
   newMailAccountAttributes,
-  newMailAccountKeyBundle,
+  newMailAddressKeyBundle,
   newMailAddressAttributes,
   newMailDomainAttributes,
 } from '../../../test/fixtures.js';
@@ -28,7 +28,7 @@ describe('AccountService', () => {
   let accounts: DeepMocked<AccountRepository>;
   let addresses: DeepMocked<AddressRepository>;
   let domains: DeepMocked<DomainRepository>;
-  let keys: DeepMocked<MailAccountKeysRepository>;
+  let keys: DeepMocked<MailAddressKeysRepository>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -42,7 +42,7 @@ describe('AccountService', () => {
     accounts = module.get(AccountRepository);
     addresses = module.get(AddressRepository);
     domains = module.get(DomainRepository);
-    keys = module.get(MailAccountKeysRepository);
+    keys = module.get(MailAddressKeysRepository);
   });
 
   describe('getAccount', () => {
@@ -115,7 +115,7 @@ describe('AccountService', () => {
       address: 'alice@internxt.com',
       domain: 'internxt.com',
       displayName: 'Alice Smith',
-      keys: newMailAccountKeyBundle(),
+      keys: newMailAddressKeyBundle(),
     };
 
     it('when all inputs are valid, then creates account, address, provider link, and stalwart principal', async () => {
@@ -175,7 +175,7 @@ describe('AccountService', () => {
         }),
       );
       expect(keys.create).toHaveBeenCalledWith({
-        mailAccountId: createdAccount.id,
+        mailAddressId: createdAddressId,
         ...params.keys,
       });
     });

@@ -10,14 +10,14 @@ import {
   Table,
   Unique,
 } from 'sequelize-typescript';
-import { MailAccountModel } from './mail-account.model.js';
+import { MailAddressModel } from './mail-address.model.js';
 
 @Table({
   underscored: true,
   timestamps: true,
-  tableName: 'mail_account_keys',
+  tableName: 'mail_address_keys',
 })
-export class MailAccountKeysModel extends Model {
+export class MailAddressKeysModel extends Model {
   @PrimaryKey
   @Default(DataType.UUIDV4)
   @Column(DataType.UUID)
@@ -25,9 +25,9 @@ export class MailAccountKeysModel extends Model {
 
   @AllowNull(false)
   @Unique
-  @ForeignKey(() => MailAccountModel)
+  @ForeignKey(() => MailAddressModel)
   @Column(DataType.UUID)
-  declare mailAccountId: string;
+  declare mailAddressId: string;
 
   @AllowNull(false)
   @Column(DataType.TEXT)
@@ -41,6 +41,10 @@ export class MailAccountKeysModel extends Model {
   @Column(DataType.TEXT)
   declare recoveryPrivateKey: string;
 
-  @BelongsTo(() => MailAccountModel)
-  declare account: MailAccountModel;
+  @AllowNull(false)
+  @Column(DataType.STRING(64))
+  declare salt: string;
+
+  @BelongsTo(() => MailAddressModel)
+  declare address: MailAddressModel;
 }

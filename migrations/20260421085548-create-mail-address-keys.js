@@ -1,6 +1,6 @@
 'use strict';
 
-const TABLE_NAME = 'mail_account_keys';
+const TABLE_NAME = 'mail_address_keys';
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
@@ -12,11 +12,11 @@ module.exports = {
         primaryKey: true,
         allowNull: false,
       },
-      mail_account_id: {
+      mail_address_id: {
         type: Sequelize.UUID,
         allowNull: false,
         unique: true,
-        references: { model: 'mail_accounts', key: 'id' },
+        references: { model: 'mail_addresses', key: 'id' },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',
       },
@@ -30,6 +30,10 @@ module.exports = {
       },
       recovery_private_key: {
         type: Sequelize.TEXT,
+        allowNull: false,
+      },
+      salt: {
+        type: Sequelize.STRING(64),
         allowNull: false,
       },
       created_at: {

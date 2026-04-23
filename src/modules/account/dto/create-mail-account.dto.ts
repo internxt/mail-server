@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsNotEmpty, IsString, ValidateNested } from 'class-validator';
 
-export class MailAccountKeyBundleDto {
+export class MailAddressKeyBundleDto {
   @ApiProperty({
     description: 'Hybrid (X25519 + ML-KEM-768) public key, base64-encoded',
   })
@@ -25,6 +25,13 @@ export class MailAccountKeyBundleDto {
   @IsString()
   @IsNotEmpty()
   recoveryPrivateKey!: string;
+
+  @ApiProperty({
+    description: 'Base64-encoded Argon2id salt used to derive the keystore key',
+  })
+  @IsString()
+  @IsNotEmpty()
+  salt!: string;
 }
 
 export class CreateMailAccountDto {
@@ -48,8 +55,8 @@ export class CreateMailAccountDto {
   @IsNotEmpty()
   encryptedPassword!: string;
 
-  @ApiProperty({ type: MailAccountKeyBundleDto })
+  @ApiProperty({ type: MailAddressKeyBundleDto })
   @ValidateNested()
-  @Type(() => MailAccountKeyBundleDto)
-  keys!: MailAccountKeyBundleDto;
+  @Type(() => MailAddressKeyBundleDto)
+  keys!: MailAddressKeyBundleDto;
 }

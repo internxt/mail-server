@@ -12,12 +12,13 @@ import { MailDomain } from './domain/mail-domain.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
-import { MailAccountKeysRepository } from './repositories/mail-account-keys.repository.js';
+import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 
-export interface MailAccountKeyBundle {
+export interface MailAddressKeyBundle {
   publicKey: string;
   encryptionPrivateKey: string;
   recoveryPrivateKey: string;
+  salt: string;
 }
 
 @Injectable()
@@ -29,7 +30,7 @@ export class AccountService {
     private readonly accounts: AccountRepository,
     private readonly addresses: AddressRepository,
     private readonly domains: DomainRepository,
-    private readonly keys: MailAccountKeysRepository,
+    private readonly keys: MailAddressKeysRepository,
   ) {}
 
   async getAccount(userId: string): Promise<MailAccount> {
@@ -53,7 +54,7 @@ export class AccountService {
     address: string;
     domain: string;
     displayName: string;
-    keys: MailAccountKeyBundle;
+    keys: MailAddressKeyBundle;
   }): Promise<MailAccount> {
     const [domainRecord, existingAddress, existingAccount] = await Promise.all([
       this.domains.findByDomain(params.domain),
@@ -91,7 +92,7 @@ export class AccountService {
       throw error;
     }
 
-    const address = await this.addresses.create({
+    const addressId = await this.addresses.create({
       mailAccountId: account.id,
       address: params.address,
       domainId: domainRecord.id,
@@ -99,13 +100,13 @@ export class AccountService {
     });
 
     await this.addresses.createProviderLink({
-      mailAddressId: address,
+      mailAddressId: addressId,
       provider: 'stalwart',
       externalId: params.address,
     });
 
     await this.keys.create({
-      mailAccountId: account.id,
+      mailAddressId: addressId,
       ...params.keys,
     });
 
