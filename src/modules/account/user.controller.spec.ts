@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { MailAccountsController } from './mail-accounts.controller.js';
+import { UserController } from './user.controller.js';
 import { AccountService } from './account.service.js';
 import { PaymentsService } from '../infrastructure/payments/payments.service.js';
 import { DriveGatewayClient } from '../infrastructure/drive/drive-gateway.client.js';
@@ -25,8 +25,8 @@ const tierWith = (mailEnabled: boolean): Tier => ({
   },
 });
 
-describe('MailAccountsController', () => {
-  let controller: MailAccountsController;
+describe('UserController', () => {
+  let controller: UserController;
   let accountService: DeepMocked<AccountService>;
   let payments: DeepMocked<PaymentsService>;
   let driveGateway: DeepMocked<DriveGatewayClient>;
@@ -41,12 +41,12 @@ describe('MailAccountsController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [MailAccountsController],
+      controllers: [UserController],
     })
       .useMocker(() => createMock<object>())
       .compile();
 
-    controller = module.get(MailAccountsController);
+    controller = module.get(UserController);
     accountService = module.get(AccountService);
     payments = module.get(PaymentsService);
     driveGateway = module.get(DriveGatewayClient);

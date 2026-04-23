@@ -4,7 +4,7 @@ import { StalwartModule } from '../infrastructure/stalwart/stalwart.module.js';
 import { PaymentsModule } from '../infrastructure/payments/payments.module.js';
 import { DriveGatewayModule } from '../infrastructure/drive/drive-gateway.module.js';
 import { AccountService } from './account.service.js';
-import { MailAccountsController } from './mail-accounts.controller.js';
+import { UserController } from './user.controller.js';
 import {
   MailAddressKeysModel,
   MailAccountModel,
@@ -30,7 +30,7 @@ import { MailAddressKeysRepository } from './repositories/mail-address-keys.repo
     PaymentsModule,
     DriveGatewayModule,
   ],
-  controllers: [MailAccountsController],
+  controllers: [UserController],
   providers: [
     AccountRepository,
     AddressRepository,

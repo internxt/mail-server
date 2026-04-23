@@ -15,11 +15,11 @@ import { DriveGatewayClient } from '../infrastructure/drive/drive-gateway.client
 import { AccountService } from './account.service.js';
 import { CreateMailAccountDto } from './dto/create-mail-account.dto.js';
 
-@ApiTags('Mail accounts')
+@ApiTags('User')
 @ApiBearerAuth()
-@Controller('mail-accounts')
-export class MailAccountsController {
-  private readonly logger = new Logger(MailAccountsController.name);
+@Controller('users')
+export class UserController {
+  private readonly logger = new Logger(UserController.name);
 
   constructor(
     private readonly accountService: AccountService,
@@ -27,7 +27,7 @@ export class MailAccountsController {
     private readonly driveGateway: DriveGatewayClient,
   ) {}
 
-  @Post()
+  @Post('me/mail-account')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Provision the caller`s mail account' })
   async createMailAccount(
