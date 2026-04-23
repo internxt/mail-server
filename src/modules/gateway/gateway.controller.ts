@@ -21,15 +21,6 @@ import { GatewayAuthGuard } from './gateway.guard.js';
 export class GatewayController {
   constructor(private readonly accountService: AccountService) {}
 
-  @Get('domains')
-  @ApiOperation({
-    summary: 'List available mail domains (called by the auth service)',
-  })
-  async listDomains() {
-    const activeDomains = await this.accountService.listActiveDomains();
-    return activeDomains.map((d) => ({ domain: d.domain }));
-  }
-
   @Get('addresses/:address')
   @ApiOperation({
     summary: 'Get a mail address resource (used to resolve drive user id)',

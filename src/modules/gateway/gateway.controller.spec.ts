@@ -5,8 +5,6 @@ import { NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { GatewayController } from './gateway.controller.js';
 import { AccountService } from '../account/account.service.js';
-import { MailDomain } from '../account/domain/mail-domain.domain.js';
-import { newMailDomainAttributes } from '../../../test/fixtures.js';
 
 describe('GatewayController', () => {
   let controller: GatewayController;
@@ -42,31 +40,6 @@ describe('GatewayController', () => {
       await expect(
         controller.getAddress('unknown@internxt.com'),
       ).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('listDomains', () => {
-    it('when active domains exist, then returns them', async () => {
-      const domainList = [
-        MailDomain.build(newMailDomainAttributes({ domain: 'internxt.com' })),
-        MailDomain.build(newMailDomainAttributes({ domain: 'internxt.me' })),
-      ];
-      accountService.listActiveDomains.mockResolvedValue(domainList);
-
-      const result = await controller.listDomains();
-
-      expect(result).toEqual([
-        { domain: 'internxt.com' },
-        { domain: 'internxt.me' },
-      ]);
-    });
-
-    it('when no active domains, then returns empty array', async () => {
-      accountService.listActiveDomains.mockResolvedValue([]);
-
-      const result = await controller.listDomains();
-
-      expect(result).toEqual([]);
     });
   });
 });
