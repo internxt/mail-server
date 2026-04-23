@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { StalwartModule } from '../infrastructure/stalwart/stalwart.module.js';
 import { PaymentsModule } from '../infrastructure/payments/payments.module.js';
-import { DriveGatewayModule } from '../infrastructure/drive/drive-gateway.module.js';
 import { AccountService } from './account.service.js';
 import { UserController } from './user.controller.js';
 import {
@@ -28,7 +27,6 @@ import { MailAddressKeysRepository } from './repositories/mail-address-keys.repo
     ]),
     StalwartModule,
     PaymentsModule,
-    DriveGatewayModule,
   ],
   controllers: [UserController],
   providers: [

@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { UserController } from './user.controller.js';
 import { AccountService } from './account.service.js';
 import { PaymentsService } from '../infrastructure/payments/payments.service.js';
-import { DriveGatewayClient } from '../infrastructure/drive/drive-gateway.client.js';
 import { MailAccount } from './domain/mail-account.domain.js';
 import {
   newMailAccountAttributes,
@@ -17,7 +16,7 @@ import type { Tier } from '../infrastructure/payments/payments.types.js';
 
 const tierWith = (mailEnabled: boolean): Tier => ({
   id: 't1',
-  label: 'pro',
+  label: 'ultimate',
   productId: 'p1',
   billingType: 'monthly',
   featuresPerService: {
@@ -29,13 +28,11 @@ describe('UserController', () => {
   let controller: UserController;
   let accountService: DeepMocked<AccountService>;
   let payments: DeepMocked<PaymentsService>;
-  let driveGateway: DeepMocked<DriveGatewayClient>;
 
   const buildDto = (): CreateMailAccountDto => ({
     address: 'alice',
     domain: 'inxt.eu',
     displayName: 'Alice Smith',
-    encryptedPassword: 'encrypted',
     keys: newMailAddressKeyBundle(),
   });
 
@@ -49,7 +46,6 @@ describe('UserController', () => {
     controller = module.get(UserController);
     accountService = module.get(AccountService);
     payments = module.get(PaymentsService);
-    driveGateway = module.get(DriveGatewayClient);
   });
 
   describe('createMailAccount', () => {
@@ -60,20 +56,6 @@ describe('UserController', () => {
       await expect(
         controller.createMailAccount(user, buildDto()),
       ).rejects.toThrow(ForbiddenException);
-      expect(driveGateway.verifyPassword).not.toHaveBeenCalled();
-      expect(accountService.provisionAccount).not.toHaveBeenCalled();
-    });
-
-    it('when drive rejects password, then propagates UnauthorizedException', async () => {
-      const user = newUserPayload();
-      payments.getUserTier.mockResolvedValue(tierWith(true));
-      driveGateway.verifyPassword.mockRejectedValue(
-        new UnauthorizedException('Invalid credentials'),
-      );
-
-      await expect(
-        controller.createMailAccount(user, buildDto()),
-      ).rejects.toThrow(UnauthorizedException);
       expect(accountService.provisionAccount).not.toHaveBeenCalled();
     });
 
@@ -88,10 +70,6 @@ describe('UserController', () => {
 
       const result = await controller.createMailAccount(user, dto);
 
-      expect(driveGateway.verifyPassword).toHaveBeenCalledWith(
-        user.uuid,
-        dto.encryptedPassword,
-      );
       expect(accountService.provisionAccount).toHaveBeenCalledWith({
         userId: user.uuid,
         address: `${dto.address}@${dto.domain}`,

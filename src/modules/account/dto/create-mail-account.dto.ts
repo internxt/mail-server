@@ -50,11 +50,6 @@ export class CreateMailAccountDto {
   @IsNotEmpty()
   displayName!: string;
 
-  @ApiProperty({ description: 'User password re-encrypted for mail request' })
-  @IsString()
-  @IsNotEmpty()
-  encryptedPassword!: string;
-
   @ApiProperty({ type: MailAddressKeyBundleDto })
   @ValidateNested()
   @Type(() => MailAddressKeyBundleDto)

@@ -24,13 +24,9 @@ export default () => ({
   secrets: {
     jwt: process.env.JWT_SECRET,
     gateway: process.env.GATEWAY_PUBLIC_SECRET,
-    gatewayPrivate: process.env.GATEWAY_PRIVATE_SECRET,
   },
 
   apis: {
-    drive: {
-      url: process.env.DRIVE_API_URL ?? '',
-    },
     payments: {
       url: process.env.PAYMENTS_API_URL ?? '',
     },

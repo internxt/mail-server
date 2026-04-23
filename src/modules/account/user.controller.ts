@@ -11,7 +11,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from '../auth/decorators/user.decorator.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
 import { PaymentsService } from '../infrastructure/payments/payments.service.js';
-import { DriveGatewayClient } from '../infrastructure/drive/drive-gateway.client.js';
 import { AccountService } from './account.service.js';
 import { CreateMailAccountDto } from './dto/create-mail-account.dto.js';
 
@@ -24,7 +23,6 @@ export class UserController {
   constructor(
     private readonly accountService: AccountService,
     private readonly payments: PaymentsService,
-    private readonly driveGateway: DriveGatewayClient,
   ) {}
 
   @Post('me/mail-account')
@@ -40,8 +38,6 @@ export class UserController {
         'Mail access is not available for your current plan',
       );
     }
-
-    await this.driveGateway.verifyPassword(user.uuid, dto.encryptedPassword);
 
     const fullAddress = `${dto.address}@${dto.domain}`;
 
