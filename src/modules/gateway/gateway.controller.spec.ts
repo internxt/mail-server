@@ -68,7 +68,7 @@ describe('GatewayController', () => {
 
   describe('getAddress', () => {
     it('when address is found, then returns address and userId', async () => {
-      const userId = v4();
+      const userId = randomUUID();
       accountService.findUserIdByAddress.mockResolvedValue(userId);
 
       const result = await controller.getAddress('Alice@Internxt.com');
