@@ -44,6 +44,15 @@ export interface Email extends EmailSummary {
   htmlBody: string | null;
 }
 
+export interface ListEmails {
+  userEmail: string;
+  mailbox?: MailboxType;
+  limit: number;
+  position: number;
+  anchorId?: string;
+  unread?: boolean;
+}
+
 export interface SendEmailDto {
   to: EmailAddress[];
   cc?: EmailAddress[];
