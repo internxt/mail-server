@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mail-api
+  name: mail-server
   labels:
-    app: mail-api
+    app: mail-server
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: mail-api
+      app: mail-server
   template:
     metadata:
       labels:
-        app: mail-api
+        app: mail-server
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: mail-api
+        - name: mail-server
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -46,12 +46,13 @@ spec:
               value: {{ .Values.stalwart.adminUser | quote }}
             - name: STALWART_MASTER_USER
               value: {{ .Values.stalwart.masterUser | quote }}
+            - name: PAYMENTS_API_URL
+              value: {{ .Values.paymentsApiUrl | quote }}
+            - name: REDIS_URL
+              value: {{ .Values.redisUrl | quote }}
             - name: MTA_HOOKS_USERNAME
               value: {{ .Values.mta.hooksUsername | quote }}
-            - name: DRIVE_API_URL
-              value: {{ .Values.driveApiUrl | quote }}
-            - name: BRIDGE_API_URL
-              value: {{ .Values.bridgeApiUrl | quote }}
+
           envFrom:
             - secretRef:
                 name: {{ .Values.secretName }}
