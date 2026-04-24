@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
+import { NotFoundException } from '@nestjs/common';
 import { GatewayController } from './gateway.controller.js';
 import { AccountService } from '../account/account.service.js';
 import { MailAccount } from '../account/domain/mail-account.domain.js';
@@ -10,7 +11,7 @@ import {
   newMailAddressAttributes,
   newMailDomainAttributes,
 } from '../../../test/fixtures.js';
-import { v4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 describe('GatewayController', () => {
   let controller: GatewayController;
@@ -30,7 +31,7 @@ describe('GatewayController', () => {
   describe('provisionAccount', () => {
     it('when valid request, then provisions account and returns id and address', async () => {
       const dto = {
-        userId: v4(),
+        userId: randomUUID(),
         address: 'alice@internxt.com',
         domain: 'internxt.com',
         displayName: 'Alice Smith',
@@ -62,6 +63,28 @@ describe('GatewayController', () => {
         userId: account.userId,
         address: dto.address,
       });
+    });
+  });
+
+  describe('getAddress', () => {
+    it('when address is found, then returns address and userId', async () => {
+      const userId = randomUUID();
+      accountService.findUserIdByAddress.mockResolvedValue(userId);
+
+      const result = await controller.getAddress('Alice@Internxt.com');
+
+      expect(accountService.findUserIdByAddress).toHaveBeenCalledWith(
+        'alice@internxt.com',
+      );
+      expect(result).toEqual({ address: 'alice@internxt.com', userId });
+    });
+
+    it('when address is not found, then throws NotFoundException', async () => {
+      accountService.findUserIdByAddress.mockResolvedValue(null);
+
+      await expect(
+        controller.getAddress('unknown@internxt.com'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

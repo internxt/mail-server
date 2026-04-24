@@ -11,7 +11,7 @@ import type {
   ListEmails,
   Mailbox,
   MailboxType,
-  SearchEmailFilter,
+  SearchEmailDto,
   SendEmailDto,
 } from './email.types.js';
 
@@ -35,12 +35,7 @@ export class EmailService {
     return email;
   }
 
-  search(params: {
-    userEmail: string;
-    limit: number;
-    position: number;
-    filter: SearchEmailFilter;
-  }) {
+  search(params: SearchEmailDto) {
     const hasFilter = Object.values(params.filter).some(
       (v) => v !== undefined && v !== '' && (!Array.isArray(v) || v.length > 0),
     );

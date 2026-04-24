@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
+import { Op } from 'sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import {
   MailAddress,
   type MailAddressAttributes,
 } from '../domain/mail-address.domain.js';
+import { MailAccountModel } from '../models/mail-account.model.js';
 import { MailAddressModel } from '../models/mail-address.model.js';
 import { MailProviderAccountModel } from '../models/mail-provider-account.model.js';
 
@@ -45,6 +47,25 @@ export class AddressRepository {
     });
 
     return model ? MailAddress.build(toAddressAttributes(model)) : null;
+  }
+
+  async findByAddresses(addresses: string[]): Promise<Set<string>> {
+    if (addresses.length === 0) return new Set();
+
+    const models = await this.addressModel.findAll({
+      where: { address: { [Op.in]: addresses } },
+    });
+
+    return new Set(models.map((m) => m.address));
+  }
+
+  async findUserIdByAddress(address: string): Promise<string | null> {
+    const model = await this.addressModel.findOne({
+      where: { address },
+      include: [{ model: MailAccountModel }],
+    });
+
+    return model?.account?.userId ?? null;
   }
 
   async findDefaultForAccount(

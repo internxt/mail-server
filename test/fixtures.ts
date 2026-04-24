@@ -7,6 +7,7 @@ import type {
   SendEmailDto,
   DraftEmailDto,
   MailboxType,
+  SearchEmailDto,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
@@ -26,6 +27,22 @@ import type {
   MailboxRole,
   Identity,
 } from '../src/modules/infrastructure/jmap/jmap.types.js';
+import type { DeepMocked } from '@golevelup/ts-vitest';
+
+export type DeepPartial<T> =
+  T extends Array<infer U>
+    ? DeepPartial<U>[]
+    : T extends object
+      ? { [K in keyof T]?: DeepPartial<T[K]> }
+      : T;
+
+export type DeepPartialMocked<T> = DeepMocked<{
+  [K in keyof T]: T[K] extends (...args: infer A) => Promise<infer R>
+    ? (...args: A) => Promise<DeepPartial<R>>
+    : T[K] extends (...args: infer A) => infer R
+      ? (...args: A) => DeepPartial<R>
+      : T[K];
+}>;
 
 const random = new Chance();
 
@@ -289,6 +306,20 @@ export function newJmapIdentity(attrs?: Partial<Identity>): Identity {
     textSignature: '',
     htmlSignature: '',
     mayDelete: true,
+    ...attrs,
+  };
+}
+
+export function newSearchEmailDto(
+  attrs?: Partial<SearchEmailDto>,
+): SearchEmailDto {
+  return {
+    userEmail: random.email(),
+    limit: 20,
+    position: 0,
+    filter: {
+      text: 'hello world!',
+    },
     ...attrs,
   };
 }
