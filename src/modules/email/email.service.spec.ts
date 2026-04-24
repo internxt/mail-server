@@ -50,15 +50,15 @@ describe('EmailService', () => {
       };
       provider.listEmails.mockResolvedValue(response);
 
-      const result = await service.listEmails(userEmail, 'inbox', 20, 0);
-
-      expect(provider.listEmails).toHaveBeenCalledWith(
+      const params = {
         userEmail,
-        'inbox',
-        20,
-        0,
-        undefined,
-      );
+        mailbox: 'inbox' as const,
+        limit: 20,
+        position: 0,
+      };
+      const result = await service.listEmails(params);
+
+      expect(provider.listEmails).toHaveBeenCalledWith(params);
       expect(result).toBe(response);
     });
 
@@ -71,15 +71,15 @@ describe('EmailService', () => {
       };
       provider.listEmails.mockResolvedValue(response);
 
-      const result = await service.listEmails(userEmail, undefined, 20, 0);
-
-      expect(provider.listEmails).toHaveBeenCalledWith(
+      const params = {
         userEmail,
-        undefined,
-        20,
-        0,
-        undefined,
-      );
+        mailbox: undefined,
+        limit: 20,
+        position: 0,
+      };
+      const result = await service.listEmails(params);
+
+      expect(provider.listEmails).toHaveBeenCalledWith(params);
       expect(result).toBe(response);
     });
   });
