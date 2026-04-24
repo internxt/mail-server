@@ -4,12 +4,12 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { AccountService } from '../account/account.service.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../auth/decorators/public.decorator.js';
 import { SKIP_MAIL_ACCOUNT_CHECK_KEY } from './skip-mail-account-check.decorator.js';
+import type { RequestWithMailAddress } from '../account/decorators/mail-address.decorator.js';
 
 @Injectable()
 export class MailAccountGuard implements CanActivate {
@@ -35,7 +35,7 @@ export class MailAccountGuard implements CanActivate {
     }
     const request = context
       .switchToHttp()
-      .getRequest<Request & { user: UserPayload }>();
+      .getRequest<RequestWithMailAddress & { user: UserPayload }>();
     const user = request.user;
 
     const account = await this.accountService.findAccount(user.uuid);
@@ -47,6 +47,17 @@ export class MailAccountGuard implements CanActivate {
         message: 'Mail account has not been set up',
       });
     }
+
+    const defaultAddress = account.defaultAddress;
+    if (!defaultAddress) {
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'MAIL_DEFAULT_ADDRESS_MISSING',
+        message: 'Mail account has no default address',
+      });
+    }
+
+    request.mailAddress = defaultAddress;
 
     return true;
   }

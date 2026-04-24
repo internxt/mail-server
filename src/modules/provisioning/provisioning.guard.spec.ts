@@ -30,28 +30,37 @@ describe('MailAccountGuard', () => {
     reflector = module.get(Reflector);
   });
 
-  function mockContext(user = newUserPayload()): ExecutionContext {
-    const request = { user };
-    return {
+  function mockContext(user = newUserPayload()): {
+    ctx: ExecutionContext;
+    request: { user: ReturnType<typeof newUserPayload>; mailAddress?: unknown };
+  } {
+    const request: {
+      user: ReturnType<typeof newUserPayload>;
+      mailAddress?: unknown;
+    } = { user };
+    const ctx = {
       getHandler: () => () => {},
       getClass: () => Object,
       switchToHttp: () => ({
         getRequest: () => request,
       }),
     } as unknown as ExecutionContext;
+    return { ctx, request };
   }
 
-  it('when user has a provisioned account, then allows the request', async () => {
+  it('when user has a provisioned account, then allows the request and attaches the default address', async () => {
     const user = newUserPayload();
     const account = MailAccount.build(
       newMailAccountAttributes({ userId: user.uuid }),
     );
     accountService.findAccount.mockResolvedValue(account);
 
-    const result = await guard.canActivate(mockContext(user));
+    const { ctx, request } = mockContext(user);
+    const result = await guard.canActivate(ctx);
 
     expect(result).toBe(true);
     expect(accountService.findAccount).toHaveBeenCalledWith(user.uuid);
+    expect(request.mailAddress).toBe(account.defaultAddress);
   });
 
   it('when user has no mail account, then throws ForbiddenException with MAIL_NOT_SETUP code', async () => {
@@ -59,7 +68,7 @@ describe('MailAccountGuard', () => {
     accountService.findAccount.mockResolvedValue(null);
 
     try {
-      await guard.canActivate(mockContext(user));
+      await guard.canActivate(mockContext(user).ctx);
       expect.unreachable('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(ForbiddenException);
@@ -69,15 +78,38 @@ describe('MailAccountGuard', () => {
     }
   });
 
-  it('when handler is marked with SkipMailAccountCheck, then allows without checking the account', async () => {
+  it('when account exists but has no default address, then throws MAIL_DEFAULT_ADDRESS_MISSING', async () => {
+    const user = newUserPayload();
+    const account = MailAccount.build(
+      newMailAccountAttributes({
+        userId: user.uuid,
+        addresses: [],
+      }),
+    );
+    accountService.findAccount.mockResolvedValue(account);
+
+    try {
+      await guard.canActivate(mockContext(user).ctx);
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toEqual(
+        expect.objectContaining({ code: 'MAIL_DEFAULT_ADDRESS_MISSING' }),
+      );
+    }
+  });
+
+  it('when handler is marked with SkipMailAccountCheck, then allows without checking the account or attaching an address', async () => {
     vi.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) =>
       key === SKIP_MAIL_ACCOUNT_CHECK_KEY ? true : undefined,
     );
 
-    const result = await guard.canActivate(mockContext());
+    const { ctx, request } = mockContext();
+    const result = await guard.canActivate(ctx);
 
     expect(result).toBe(true);
     expect(accountService.findAccount).not.toHaveBeenCalled();
+    expect(request.mailAddress).toBeUndefined();
   });
 
   it('when handler is marked as public, then allows without checking the account', async () => {
@@ -85,7 +117,7 @@ describe('MailAccountGuard', () => {
       key === IS_PUBLIC_KEY ? true : undefined,
     );
 
-    const result = await guard.canActivate(mockContext());
+    const result = await guard.canActivate(mockContext().ctx);
 
     expect(result).toBe(true);
     expect(accountService.findAccount).not.toHaveBeenCalled();

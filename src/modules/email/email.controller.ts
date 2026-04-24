@@ -22,7 +22,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { User } from '../auth/decorators/user.decorator.js';
+import { MailAddress } from '../account/decorators/mail-address.decorator.js';
 import { MailAccountGuard } from '../provisioning/provisioning.guard.js';
 import { EmailService } from './email.service.js';
 import {
@@ -68,7 +68,7 @@ export class EmailController {
       'Returns every mailbox for the authenticated user, including folder counts.',
   })
   @ApiOkResponse({ type: [MailboxResponseDto] })
-  getMailboxes(@User('email') email: string) {
+  getMailboxes(@MailAddress('address') email: string) {
     return this.emailService.getMailboxes(email);
   }
 
@@ -115,7 +115,7 @@ export class EmailController {
   })
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
-    @User('email') email: string,
+    @MailAddress('address') email: string,
     @Query('mailbox') mailbox?: MailboxType,
     @Query('limit') limit?: string,
     @Query('position') position?: string,
@@ -140,7 +140,10 @@ export class EmailController {
   })
   @ApiBody({ type: SearchEmailQueryDto })
   @ApiOkResponse({ type: EmailListResponseDto })
-  search(@User('email') email: string, @Body() body: SearchEmailQueryDto) {
+  search(
+    @MailAddress('address') email: string,
+    @Body() body: SearchEmailQueryDto,
+  ) {
     const { limit, position, ...filters } = body;
 
     return this.emailService.search({
@@ -160,7 +163,7 @@ export class EmailController {
   @ApiParam({ name: 'id', description: 'Email ID' })
   @ApiOkResponse({ type: EmailResponseDto })
   @ApiNotFoundResponse({ description: 'Email not found' })
-  get(@User('email') email: string, @Param('id') id: string) {
+  get(@MailAddress('address') email: string, @Param('id') id: string) {
     return this.emailService.getEmail(email, id);
   }
 
@@ -176,7 +179,10 @@ export class EmailController {
     type: EmailCreatedResponseDto,
     description: 'Email sent successfully',
   })
-  send(@User('email') email: string, @Body() dto: SendEmailRequestDto) {
+  send(
+    @MailAddress('address') email: string,
+    @Body() dto: SendEmailRequestDto,
+  ) {
     return this.emailService.sendEmail(email, dto);
   }
 
@@ -191,7 +197,10 @@ export class EmailController {
     type: EmailCreatedResponseDto,
     description: 'Draft saved successfully',
   })
-  saveDraft(@User('email') email: string, @Body() dto: DraftEmailRequestDto) {
+  saveDraft(
+    @MailAddress('address') email: string,
+    @Body() dto: DraftEmailRequestDto,
+  ) {
     return this.emailService.saveDraft(email, dto);
   }
 
@@ -208,7 +217,7 @@ export class EmailController {
   @ApiNoContentResponse({ description: 'Email updated successfully' })
   @ApiNotFoundResponse({ description: 'Email not found' })
   async update(
-    @User('email') email: string,
+    @MailAddress('address') email: string,
     @Param('id') id: string,
     @Body() body: UpdateEmailRequestDto,
   ) {
@@ -234,7 +243,7 @@ export class EmailController {
   @ApiParam({ name: 'id', description: 'Email ID' })
   @ApiNoContentResponse({ description: 'Email deleted successfully' })
   @ApiNotFoundResponse({ description: 'Email not found' })
-  delete(@User('email') email: string, @Param('id') id: string) {
+  delete(@MailAddress('address') email: string, @Param('id') id: string) {
     return this.emailService.deleteEmail(email, id);
   }
 }
