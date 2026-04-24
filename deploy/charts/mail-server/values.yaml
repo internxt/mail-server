@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: internxt/mail-api
+  repository: internxt/mail-server
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -21,25 +21,26 @@ resources:
 
 nodeEnv: production
 
-driveApiUrl: "https://gateway.internxt.com/drive"
-bridgeApiUrl: "https://gateway.internxt.com/network"
+paymentsApiUrl: 'https://gateway.internxt.com/payments'
+
+redisUrl: REPLACE_ME
 
 database:
-  host: postgres-postgresql
-  port: "5432"
-  name: mail
-  username: postgres
+  host: REPLACE_ME
+  port: '5432'
+  name: REPLACE_ME
+  username: REPLACE_ME
 
 stalwart:
   jmapUrl: http://stalwart:8080
   adminUrl: http://stalwart:8080
-  adminUser: mail-api
+  adminUser: mail-server
   masterUser: master
 
 mta:
   hooksUsername: stalwart
 
-secretName: mail-api-secrets
+secretName: mail-server-secrets
 
 probes:
   liveness:

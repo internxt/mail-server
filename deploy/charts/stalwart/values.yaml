@@ -1,4 +1,4 @@
-mailApiHost: mail-api
+mailApiHost: mail-server
 
 replicaCount: 1
 
@@ -31,16 +31,16 @@ resources:
     memory: 1Gi
 
 env:
-  DB_HOST: postgres-postgresql
+  DB_HOST: REPLACE_ME
   DB_PORT: "5432"
-  DB_NAME: stalwart
-  DB_USER: postgres
+  DB_NAME: REPLACE_ME
+  DB_USER: REPLACE_ME
 
-  S3_BUCKET: stalwart-blobs
-  S3_REGION: us-east-1
-  S3_ENDPOINT: http://minio:9000
+  S3_BUCKET: REPLACE_ME
+  S3_REGION: REPLACE_ME
+  S3_ENDPOINT: REPLACE_ME
 
-  ADMIN_USER: mail-api
+  ADMIN_USER: mail-server
   MASTER_USER: master
   MTA_HOOKS_USERNAME: stalwart
 
@@ -73,7 +73,8 @@ config: |
   timeout = "15s"
 
   [store."postgres".tls]
-  enable = false
+  enable = true
+  allow-invalid-certs = true
 
   [store."postgres".pool]
   max-connections = 10
