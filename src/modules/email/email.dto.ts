@@ -1,5 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { MailboxType } from './email.types.js';
+import { MailDomainStatus } from '../account/domain/mail-domain.domain.js';
+
+export class MailDomainDto {
+  @ApiProperty({ type: String, example: 'f3a1b2c4-…' })
+  id!: string;
+
+  @ApiProperty({ type: String, example: 'active' })
+  status!: MailDomainStatus;
+
+  @ApiProperty({ type: String, example: 'internxt.me' })
+  domain!: string;
+
+  @ApiProperty({
+    type: String,
+    example: '2025-06-15T10:29:55Z',
+  })
+  createdAt!: Date;
+
+  @ApiProperty({
+    type: String,
+    example: '2025-06-15T10:29:55Z',
+  })
+  updatedAt!: Date;
+}
 
 export class EmailAddressDto {
   @ApiPropertyOptional({ example: 'Alice Smith' })

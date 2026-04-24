@@ -32,17 +32,34 @@ import {
   EmailResponseDto,
   MailboxResponseDto,
   SearchEmailQueryDto,
+  MailDomainDto,
   SendEmailRequestDto,
   UpdateEmailRequestDto,
 } from './email.dto.js';
 import type { MailboxType } from './email.types.js';
+import { AccountService } from '../account/account.service.js';
+import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.decorator.js';
 
 @ApiBearerAuth()
 @ApiTags('Email')
 @UseGuards(MailAccountGuard)
 @Controller('email')
 export class EmailController {
-  constructor(private readonly emailService: EmailService) {}
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly accountService: AccountService,
+  ) {}
+
+  @Get('domains')
+  @SkipMailAccountCheck()
+  @ApiOperation({
+    summary: 'List domains',
+    description: 'Returns every domain for the authenticated user.',
+  })
+  @ApiOkResponse({ type: [MailDomainDto] })
+  getDomains() {
+    return this.accountService.listActiveDomains();
+  }
 
   @Get('mailboxes')
   @ApiOperation({
