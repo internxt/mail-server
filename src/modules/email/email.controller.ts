@@ -105,11 +105,11 @@ export class EmailController {
     @Query('anchorId') anchorId?: string,
     @Query('unread') unread?: boolean,
   ) {
-    return this.emailService.listEmails(
-      email,
-      mailbox ?? undefined,
-      limit ? Number(limit) || 20 : 20,
-      position ? Number(position) || 0 : 0,
+    return this.emailService.listEmails({
+      userEmail: email,
+      mailbox: mailbox ?? undefined,
+      limit: limit ? Number(limit) || 20 : 20,
+      position: position ? Number(position) || 0 : 0,
       anchorId,
       unread,
     });
