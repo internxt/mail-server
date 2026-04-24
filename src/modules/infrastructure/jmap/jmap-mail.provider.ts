@@ -4,6 +4,7 @@ import type {
   DraftEmailDto,
   Email,
   EmailListResponse,
+  ListEmails,
   Mailbox,
   MailboxType,
   SearchEmailFilter,
@@ -87,22 +88,30 @@ export class JmapMailProvider extends MailProvider {
     return jmapMailboxes.map(mapJmapMailbox);
   }
 
-  async listEmails(
-    userEmail: string,
-    mailbox: MailboxType | undefined,
-    limit: number,
-    position: number,
-    anchorId?: string,
-  ): Promise<EmailListResponse> {
+  async listEmails({
+    userEmail,
+    mailbox,
+    anchorId,
+    position,
+    limit,
+    unread,
+  }: ListEmails): Promise<EmailListResponse> {
     const accountId = await this.jmap.getPrimaryAccountId(userEmail);
 
     if (!mailbox) {
       return this.queryEmails(userEmail, accountId, limit, position, anchorId);
     }
 
+    const unreadKeyword = unread
+      ? {
+          notKeyword: '$seen',
+        }
+      : undefined;
+
     const mailboxId = await this.resolveMailboxId(userEmail, mailbox);
     return this.queryEmails(userEmail, accountId, limit, position, anchorId, {
       inMailbox: mailboxId,
+      ...unreadKeyword,
     });
   }
 

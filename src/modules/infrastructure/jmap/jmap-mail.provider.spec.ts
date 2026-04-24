@@ -79,12 +79,11 @@ describe('JmapMailProvider', () => {
         ),
       );
 
-      const result = await provider.listEmails(
-        'user@test.com',
-        undefined,
-        20,
-        0,
-      );
+      const result = await provider.listEmails({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+      });
 
       expect(result.emails).toHaveLength(2);
       expect(result.total).toBe(42);
@@ -107,7 +106,12 @@ describe('JmapMailProvider', () => {
         ),
       );
 
-      const result = await provider.listEmails('user@test.com', 'inbox', 20, 0);
+      const result = await provider.listEmails({
+        userEmail: 'user@test.com',
+        mailbox: 'inbox',
+        limit: 20,
+        position: 0,
+      });
 
       expect(result.emails).toHaveLength(2);
       expect(result.total).toBe(42);
@@ -123,12 +127,11 @@ describe('JmapMailProvider', () => {
         ),
       );
 
-      const result = await provider.listEmails(
-        'user@test.com',
-        undefined,
-        2,
-        0,
-      );
+      const result = await provider.listEmails({
+        userEmail: 'user@test.com',
+        limit: 2,
+        position: 0,
+      });
 
       expect(result.hasMoreMails).toBe(true);
       expect(result.nextAnchor).toBe(jmapEmails[1]!.id);
@@ -144,12 +147,11 @@ describe('JmapMailProvider', () => {
         ),
       );
 
-      const result = await provider.listEmails(
-        'user@test.com',
-        undefined,
-        20,
-        0,
-      );
+      const result = await provider.listEmails({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+      });
 
       expect(result.hasMoreMails).toBe(false);
       expect(result.nextAnchor).toBeUndefined();

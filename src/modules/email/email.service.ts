@@ -8,6 +8,7 @@ import type {
   DraftEmailDto,
   Email,
   EmailListResponse,
+  ListEmails,
   Mailbox,
   MailboxType,
   SearchEmailDto,
@@ -22,14 +23,8 @@ export class EmailService {
     return this.mail.getMailboxes(userEmail);
   }
 
-  listEmails(
-    userEmail: string,
-    mailbox: MailboxType | undefined,
-    limit: number,
-    position: number,
-    anchorId?: string,
-  ): Promise<EmailListResponse> {
-    return this.mail.listEmails(userEmail, mailbox, limit, position, anchorId);
+  listEmails(params: ListEmails): Promise<EmailListResponse> {
+    return this.mail.listEmails(params);
   }
 
   async getEmail(userEmail: string, id: string): Promise<Email> {

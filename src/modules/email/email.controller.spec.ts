@@ -173,13 +173,14 @@ describe('EmailController', () => {
 
       const result = await controller.list(userEmail);
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        undefined,
-        20,
-        0,
-        undefined,
-      );
+        mailbox: undefined,
+        limit: 20,
+        position: 0,
+        anchorId: undefined,
+        unread: undefined,
+      });
       expect(result).toBe(response);
     });
 
@@ -192,13 +193,14 @@ describe('EmailController', () => {
 
       await controller.list(userEmail, 'inbox');
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        'inbox',
-        20,
-        0,
-        undefined,
-      );
+        mailbox: 'inbox',
+        limit: 20,
+        position: 0,
+        anchorId: undefined,
+        unread: undefined,
+      });
     });
 
     it('when called with limit, position and anchorId, then it parses them', async () => {
@@ -210,13 +212,14 @@ describe('EmailController', () => {
 
       await controller.list(userEmail, 'sent', '10', '5', 'Ma1f09b');
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        'sent',
-        10,
-        5,
-        'Ma1f09b',
-      );
+        mailbox: 'sent',
+        limit: 10,
+        position: 5,
+        anchorId: 'Ma1f09b',
+        unread: undefined,
+      });
     });
 
     it('when called with non-numeric strings, then it falls back to defaults', async () => {
@@ -228,13 +231,14 @@ describe('EmailController', () => {
 
       await controller.list(userEmail, 'inbox', 'abc', 'xyz');
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        'inbox',
-        20,
-        0,
-        undefined,
-      );
+        mailbox: 'inbox',
+        limit: 20,
+        position: 0,
+        anchorId: undefined,
+        unread: undefined,
+      });
     });
   });
 });

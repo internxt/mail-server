@@ -89,6 +89,13 @@ export class EmailController {
     description: 'Anchor ID for pagination.',
     example: 'Ma1f09b…',
   })
+  @ApiQuery({
+    name: 'unread',
+    required: false,
+    type: Boolean,
+    description: 'Filter by read status.',
+    example: true,
+  })
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
     @User('email') email: string,
@@ -96,14 +103,16 @@ export class EmailController {
     @Query('limit') limit?: string,
     @Query('position') position?: string,
     @Query('anchorId') anchorId?: string,
+    @Query('unread') unread?: boolean,
   ) {
-    return this.emailService.listEmails(
-      email,
-      mailbox ?? undefined,
-      limit ? Number(limit) || 20 : 20,
-      position ? Number(position) || 0 : 0,
+    return this.emailService.listEmails({
+      userEmail: email,
+      mailbox: mailbox ?? undefined,
+      limit: limit ? Number(limit) || 20 : 20,
+      position: position ? Number(position) || 0 : 0,
       anchorId,
-    );
+      unread,
+    });
   }
 
   @Post('search')
