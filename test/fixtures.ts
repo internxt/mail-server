@@ -7,6 +7,7 @@ import type {
   SendEmailDto,
   DraftEmailDto,
   MailboxType,
+  SearchEmailDto,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
@@ -305,6 +306,20 @@ export function newJmapIdentity(attrs?: Partial<Identity>): Identity {
     textSignature: '',
     htmlSignature: '',
     mayDelete: true,
+    ...attrs,
+  };
+}
+
+export function newSearchEmailDto(
+  attrs?: Partial<SearchEmailDto>,
+): SearchEmailDto {
+  return {
+    userEmail: random.email(),
+    limit: 20,
+    position: 0,
+    filter: {
+      text: 'hello world!',
+    },
     ...attrs,
   };
 }

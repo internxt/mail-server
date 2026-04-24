@@ -3,6 +3,7 @@ import type {
   EmailSummary,
   Mailbox as DomainMailbox,
   MailboxType,
+  SearchEmailFilter,
   SendEmailDto,
   DraftEmailDto,
 } from '../../email/email.types.js';
@@ -96,6 +97,21 @@ export function mapJmapEmailToDetail(e: JmapEmail): DomainEmail {
     sentAt: e.sentAt ?? null,
     textBody,
     htmlBody,
+  };
+}
+
+export function mapSearchFilterToJmap(
+  filter: SearchEmailFilter,
+): Record<string, unknown> {
+  const { unread, text, from, to, after, before, hasAttachment } = filter;
+  return {
+    ...(text && { text: `${text.trim()}*` }),
+    ...(from?.length && { from: from.join(' ') }),
+    ...(to?.length && { to: to.join(' ') }),
+    ...(after && { after }),
+    ...(before && { before }),
+    ...(hasAttachment !== undefined && { hasAttachment }),
+    ...(unread === true && { notKeyword: '$seen' }),
   };
 }
 

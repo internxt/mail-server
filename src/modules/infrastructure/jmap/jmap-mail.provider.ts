@@ -6,6 +6,7 @@ import type {
   EmailListResponse,
   Mailbox,
   MailboxType,
+  SearchEmailFilter,
   SendEmailDto,
 } from '../../email/email.types.js';
 import { JmapService } from './jmap.service.js';
@@ -22,6 +23,7 @@ import {
   mapJmapEmailToSummary,
   mapJmapEmailToDetail,
   mapJmapRoleToMailboxType,
+  mapSearchFilterToJmap,
   mapSendDtoToJmapCreate,
   mapDraftDtoToJmapCreate,
 } from './jmap-mail.mapper.js';
@@ -180,6 +182,29 @@ export class JmapMailProvider extends MailProvider {
 
     const email = response.methodResponses[0]![1].list[0];
     return email ? mapJmapEmailToDetail(email) : null;
+  }
+
+  async search({
+    userEmail,
+    limit,
+    position,
+    filter,
+  }: {
+    userEmail: string;
+    limit: number;
+    position: number;
+    filter: SearchEmailFilter;
+  }) {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    return this.queryEmails(
+      userEmail,
+      accountId,
+      limit,
+      position,
+      undefined,
+      mapSearchFilterToJmap(filter),
+    );
   }
 
   async sendEmail(

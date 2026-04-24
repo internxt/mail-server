@@ -8,6 +8,7 @@ import {
   newEmailSummary,
   newUserPayload,
 } from '../../../test/fixtures.js';
+import type { EmailListResponse } from './email.types.js';
 
 describe('EmailController', () => {
   let controller: EmailController;
@@ -34,6 +35,130 @@ describe('EmailController', () => {
 
       expect(emailService.getMailboxes).toHaveBeenCalledWith(userEmail);
       expect(result).toBe(mailboxes);
+    });
+  });
+
+  describe('search', () => {
+    const searchResponse: EmailListResponse = {
+      emails: [newEmailSummary()],
+      total: 1,
+      hasMoreMails: false,
+    };
+
+    it('when called with text filter, then passes it in the filter', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello' },
+      });
+    });
+
+    it('when called with from and to, then passes them in the filter', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        from: ['alice@example.com'],
+        to: ['bob@example.com'],
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: {
+          text: 'hello',
+          from: ['alice@example.com'],
+          to: ['bob@example.com'],
+        },
+      });
+    });
+
+    it('when called with after and before, then passes them in the filter', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        after: '2024-01-01T00:00:00Z',
+        before: '2024-12-31T23:59:59Z',
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: {
+          text: 'hello',
+          after: '2024-01-01T00:00:00Z',
+          before: '2024-12-31T23:59:59Z',
+        },
+      });
+    });
+
+    it('When filtering by messages that are not read yet, then passes a param indicating so', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, { text: 'hello', unread: true });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', unread: true },
+      });
+    });
+
+    it('When filtering by messages that are not read yet, then passes a param indicating so', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, { text: 'hello', unread: false });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', unread: false },
+      });
+    });
+
+    it('when hasAttachment is true, then passes hasAttachment as boolean true', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        hasAttachment: true,
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', hasAttachment: true },
+      });
+    });
+
+    it('when called with limit and position, then passes them as numbers', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        limit: 10,
+        position: 5,
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 10,
+        position: 5,
+        filter: { text: 'hello' },
+      });
     });
   });
 

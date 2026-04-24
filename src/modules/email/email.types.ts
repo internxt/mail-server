@@ -62,9 +62,26 @@ export interface DraftEmailDto {
   htmlBody?: string;
 }
 
+export interface SearchEmailDto {
+  userEmail: string;
+  limit: number;
+  position: number;
+  filter: SearchEmailFilter;
+}
+
 export interface EmailListResponse {
   emails: EmailSummary[];
   total: number;
   hasMoreMails: boolean;
   nextAnchor?: string;
+}
+
+export interface SearchEmailFilter {
+  after?: string;
+  before?: string;
+  text?: string;
+  from?: string[];
+  to?: string[];
+  unread?: boolean;
+  hasAttachment?: boolean;
 }

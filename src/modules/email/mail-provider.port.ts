@@ -4,6 +4,7 @@ import type {
   EmailListResponse,
   Mailbox,
   MailboxType,
+  SearchEmailDto,
   SendEmailDto,
 } from './email.types.js';
 
@@ -21,6 +22,7 @@ export abstract class MailProvider {
     userEmail: string,
     dto: SendEmailDto,
   ): Promise<{ id: string }>;
+  abstract search(params: SearchEmailDto): Promise<EmailListResponse>;
   abstract saveDraft(
     userEmail: string,
     dto: DraftEmailDto,
