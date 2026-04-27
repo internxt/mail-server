@@ -34,10 +34,10 @@ jobs:
       - name: Update mail-server image
         uses: steebchen/kubectl@v2.0.0
         with:
-          config: ${{ secrets.KUBE_CONFIG_DATA }}
+          config: ${{ secrets.KUBE_CONFIG_DATA_TEST }}
           command: set image --record deployment/mail-server mail-server=${{ secrets.DOCKERHUB_USERNAME }}/mail-server:${{ github.sha }} -n mail
       - name: Verify mail-server rollout
         uses: steebchen/kubectl@v2.0.0
         with:
-          config: ${{ secrets.KUBE_CONFIG_DATA }}
+          config: ${{ secrets.KUBE_CONFIG_DATA_TEST }}
           command: rollout status deployment/mail-server -n mail
