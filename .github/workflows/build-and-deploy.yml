@@ -1,7 +1,7 @@
 name: Build & Deploy to Production
 on:
   push:
-    branches: ['chore/initial-k8-config']
+    branches: ['master']
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,10 +34,10 @@ jobs:
       - name: Update mail-server image
         uses: steebchen/kubectl@v2.0.0
         with:
-          config: ${{ secrets.KUBE_CONFIG_DATA_TEST }}
+          config: ${{ secrets.KUBE_CONFIG_DATA }}
           command: set image --record deployment/mail-server mail-server=${{ secrets.DOCKERHUB_USERNAME }}/mail-server:${{ github.sha }} -n mail
       - name: Verify mail-server rollout
         uses: steebchen/kubectl@v2.0.0
         with:
-          config: ${{ secrets.KUBE_CONFIG_DATA_TEST }}
+          config: ${{ secrets.KUBE_CONFIG_DATA }}
           command: rollout status deployment/mail-server -n mail
