@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { StalwartModule } from '../infrastructure/stalwart/stalwart.module.js';
+import { PaymentsModule } from '../infrastructure/payments/payments.module.js';
 import { AccountService } from './account.service.js';
+import { UserController } from './user.controller.js';
 import {
+  MailAddressKeysModel,
   MailAccountModel,
   MailAddressModel,
   MailDomainModel,
@@ -11,21 +14,26 @@ import {
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
+import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 
 @Module({
   imports: [
     SequelizeModule.forFeature([
       MailAccountModel,
+      MailAddressKeysModel,
       MailAddressModel,
       MailDomainModel,
       MailProviderAccountModel,
     ]),
     StalwartModule,
+    PaymentsModule,
   ],
+  controllers: [UserController],
   providers: [
     AccountRepository,
     AddressRepository,
     DomainRepository,
+    MailAddressKeysRepository,
     AccountService,
   ],
   exports: [AccountService],

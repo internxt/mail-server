@@ -1,10 +1,8 @@
 import {
-  Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -14,7 +12,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AccountService } from '../account/account.service.js';
 import { GatewayAuthGuard } from './gateway.guard.js';
-import { ProvisionAccountRequestDto } from './gateway.dto.js';
 
 @ApiTags('Gateway')
 @ApiBearerAuth('gateway')
@@ -22,42 +19,7 @@ import { ProvisionAccountRequestDto } from './gateway.dto.js';
 @UseGuards(GatewayAuthGuard)
 @Controller('gateway')
 export class GatewayController {
-  private readonly logger = new Logger(GatewayController.name);
-
   constructor(private readonly accountService: AccountService) {}
-
-  @Post('accounts')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({
-    summary: 'Provision a new mail account (called by the auth service)',
-  })
-  async provisionAccount(@Body() dto: ProvisionAccountRequestDto) {
-    const account = await this.accountService.provisionAccount({
-      userId: dto.userId,
-      address: dto.address,
-      domain: dto.domain,
-      displayName: dto.displayName,
-    });
-
-    this.logger.log(
-      `Gateway: provisioned account '${dto.address}' for '${dto.userId}'`,
-    );
-
-    return {
-      id: account.id,
-      userId: account.userId,
-      address: account.defaultAddress?.address ?? dto.address,
-    };
-  }
-
-  @Get('domains')
-  @ApiOperation({
-    summary: 'List available mail domains (called by the auth service)',
-  })
-  async listDomains() {
-    const activeDomains = await this.accountService.listActiveDomains();
-    return activeDomains.map((d) => ({ domain: d.domain }));
-  }
 
   @Get('addresses/:address')
   @ApiOperation({

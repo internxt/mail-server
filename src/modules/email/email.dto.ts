@@ -1,5 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { MailboxType } from './email.types.js';
+import { MailDomainStatus } from '../account/domain/mail-domain.domain.js';
+
+export class MailDomainDto {
+  @ApiProperty({ type: String, example: 'f3a1b2c4-…' })
+  id!: string;
+
+  @ApiProperty({ type: String, example: 'active' })
+  status!: MailDomainStatus;
+
+  @ApiProperty({ type: String, example: 'internxt.me' })
+  domain!: string;
+
+  @ApiProperty({
+    type: String,
+    example: '2025-06-15T10:29:55Z',
+  })
+  createdAt!: Date;
+
+  @ApiProperty({
+    type: String,
+    example: '2025-06-15T10:29:55Z',
+  })
+  updatedAt!: Date;
+}
 
 export class EmailAddressDto {
   @ApiPropertyOptional({ example: 'Alice Smith' })
@@ -188,6 +212,45 @@ export class EmailListResponseDto {
 
   @ApiPropertyOptional({ example: 'Ma1f09b…' })
   nextAnchor?: string;
+}
+
+export class SearchEmailQueryDto {
+  @ApiPropertyOptional({ description: 'Full-text search' })
+  text?: string;
+
+  @ApiPropertyOptional({ example: 20 })
+  limit?: number;
+
+  @ApiPropertyOptional({ example: 0 })
+  position?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by sender',
+    example: ['a@inxt.eu', 'b@inxt.me'],
+  })
+  from?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Filter by recipient',
+    example: ['a@inxt.eu', 'b@inxt.me'],
+  })
+  to?: string[];
+
+  @ApiPropertyOptional({
+    description: 'ISO 8601 date — emails received after this date',
+  })
+  after?: string;
+
+  @ApiPropertyOptional({
+    description: 'ISO 8601 date — emails received before this date',
+  })
+  before?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by read status' })
+  unread?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter by attachment presence' })
+  hasAttachment?: boolean;
 }
 
 export class EmailCreatedResponseDto {

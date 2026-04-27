@@ -27,8 +27,8 @@ export default () => ({
   },
 
   apis: {
-    drive: {
-      url: process.env.DRIVE_API_URL ?? '',
+    payments: {
+      url: process.env.PAYMENTS_API_URL ?? '',
     },
   },
 });

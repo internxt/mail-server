@@ -3,15 +3,20 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { EmailController } from './email.controller.js';
 import { EmailService } from './email.service.js';
+import { AccountService } from '../account/account.service.js';
 import {
   newMailbox,
   newEmailSummary,
+  newMailDomainAttributes,
   newUserPayload,
 } from '../../../test/fixtures.js';
+import type { EmailListResponse } from './email.types.js';
+import { MailDomain } from '../account/domain/mail-domain.domain.js';
 
 describe('EmailController', () => {
   let controller: EmailController;
   let emailService: DeepMocked<EmailService>;
+  let accountService: DeepMocked<AccountService>;
   const userEmail = newUserPayload().email;
 
   beforeEach(async () => {
@@ -23,6 +28,30 @@ describe('EmailController', () => {
 
     controller = module.get<EmailController>(EmailController);
     emailService = module.get(EmailService);
+    accountService = module.get(AccountService);
+  });
+
+  describe('getDomains', () => {
+    it('when getDomains is called, then it returns the active domains', async () => {
+      const domains = [
+        MailDomain.build(newMailDomainAttributes()),
+        MailDomain.build(newMailDomainAttributes()),
+      ];
+      accountService.listActiveDomains.mockResolvedValue(domains);
+
+      const result = await controller.getDomains();
+
+      expect(accountService.listActiveDomains).toHaveBeenCalled();
+      expect(result).toBe(domains);
+    });
+
+    it('when there are no active domains, then it returns an empty array', async () => {
+      accountService.listActiveDomains.mockResolvedValue([]);
+
+      const result = await controller.getDomains();
+
+      expect(result).toEqual([]);
+    });
   });
 
   describe('getMailboxes', () => {
@@ -37,6 +66,130 @@ describe('EmailController', () => {
     });
   });
 
+  describe('search', () => {
+    const searchResponse: EmailListResponse = {
+      emails: [newEmailSummary()],
+      total: 1,
+      hasMoreMails: false,
+    };
+
+    it('when called with text filter, then passes it in the filter', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello' },
+      });
+    });
+
+    it('when called with from and to, then passes them in the filter', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        from: ['alice@example.com'],
+        to: ['bob@example.com'],
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: {
+          text: 'hello',
+          from: ['alice@example.com'],
+          to: ['bob@example.com'],
+        },
+      });
+    });
+
+    it('when called with after and before, then passes them in the filter', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        after: '2024-01-01T00:00:00Z',
+        before: '2024-12-31T23:59:59Z',
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: {
+          text: 'hello',
+          after: '2024-01-01T00:00:00Z',
+          before: '2024-12-31T23:59:59Z',
+        },
+      });
+    });
+
+    it('When filtering by messages that are not read yet, then passes a param indicating so', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, { text: 'hello', unread: true });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', unread: true },
+      });
+    });
+
+    it('When filtering by messages that are not read yet, then passes a param indicating so', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, { text: 'hello', unread: false });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', unread: false },
+      });
+    });
+
+    it('when hasAttachment is true, then passes hasAttachment as boolean true', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        hasAttachment: true,
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 20,
+        position: 0,
+        filter: { text: 'hello', hasAttachment: true },
+      });
+    });
+
+    it('when called with limit and position, then passes them as numbers', async () => {
+      emailService.search.mockResolvedValue(searchResponse);
+
+      await controller.search(userEmail, {
+        text: 'hello',
+        limit: 10,
+        position: 5,
+      });
+
+      expect(emailService.search).toHaveBeenCalledWith({
+        userEmail,
+        limit: 10,
+        position: 5,
+        filter: { text: 'hello' },
+      });
+    });
+  });
+
   describe('list', () => {
     it('when called with no query params, then it lists all emails', async () => {
       const response = {
@@ -48,13 +201,14 @@ describe('EmailController', () => {
 
       const result = await controller.list(userEmail);
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        undefined,
-        20,
-        0,
-        undefined,
-      );
+        mailbox: undefined,
+        limit: 20,
+        position: 0,
+        anchorId: undefined,
+        unread: undefined,
+      });
       expect(result).toBe(response);
     });
 
@@ -67,13 +221,14 @@ describe('EmailController', () => {
 
       await controller.list(userEmail, 'inbox');
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        'inbox',
-        20,
-        0,
-        undefined,
-      );
+        mailbox: 'inbox',
+        limit: 20,
+        position: 0,
+        anchorId: undefined,
+        unread: undefined,
+      });
     });
 
     it('when called with limit, position and anchorId, then it parses them', async () => {
@@ -85,13 +240,14 @@ describe('EmailController', () => {
 
       await controller.list(userEmail, 'sent', '10', '5', 'Ma1f09b');
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        'sent',
-        10,
-        5,
-        'Ma1f09b',
-      );
+        mailbox: 'sent',
+        limit: 10,
+        position: 5,
+        anchorId: 'Ma1f09b',
+        unread: undefined,
+      });
     });
 
     it('when called with non-numeric strings, then it falls back to defaults', async () => {
@@ -103,13 +259,14 @@ describe('EmailController', () => {
 
       await controller.list(userEmail, 'inbox', 'abc', 'xyz');
 
-      expect(emailService.listEmails).toHaveBeenCalledWith(
+      expect(emailService.listEmails).toHaveBeenCalledWith({
         userEmail,
-        'inbox',
-        20,
-        0,
-        undefined,
-      );
+        mailbox: 'inbox',
+        limit: 20,
+        position: 0,
+        anchorId: undefined,
+        unread: undefined,
+      });
     });
   });
 });

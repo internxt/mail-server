@@ -8,8 +8,10 @@ import type {
   DraftEmailDto,
   Email,
   EmailListResponse,
+  ListEmails,
   Mailbox,
   MailboxType,
+  SearchEmailDto,
   SendEmailDto,
 } from './email.types.js';
 
@@ -21,14 +23,8 @@ export class EmailService {
     return this.mail.getMailboxes(userEmail);
   }
 
-  listEmails(
-    userEmail: string,
-    mailbox: MailboxType | undefined,
-    limit: number,
-    position: number,
-    anchorId?: string,
-  ): Promise<EmailListResponse> {
-    return this.mail.listEmails(userEmail, mailbox, limit, position, anchorId);
+  listEmails(params: ListEmails): Promise<EmailListResponse> {
+    return this.mail.listEmails(params);
   }
 
   async getEmail(userEmail: string, id: string): Promise<Email> {
@@ -37,6 +33,15 @@ export class EmailService {
       throw new NotFoundException(`Email ${id} not found`);
     }
     return email;
+  }
+
+  search(params: SearchEmailDto) {
+    const hasFilter = Object.values(params.filter).some(
+      (v) => v !== undefined && v !== '' && (!Array.isArray(v) || v.length > 0),
+    );
+
+    if (!hasFilter) return [];
+    return this.mail.search(params);
   }
 
   async sendEmail(

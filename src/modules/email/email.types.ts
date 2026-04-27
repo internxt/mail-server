@@ -44,6 +44,15 @@ export interface Email extends EmailSummary {
   htmlBody: string | null;
 }
 
+export interface ListEmails {
+  userEmail: string;
+  mailbox?: MailboxType;
+  limit: number;
+  position: number;
+  anchorId?: string;
+  unread?: boolean;
+}
+
 export interface SendEmailDto {
   to: EmailAddress[];
   cc?: EmailAddress[];
@@ -62,9 +71,26 @@ export interface DraftEmailDto {
   htmlBody?: string;
 }
 
+export interface SearchEmailDto {
+  userEmail: string;
+  limit: number;
+  position: number;
+  filter: SearchEmailFilter;
+}
+
 export interface EmailListResponse {
   emails: EmailSummary[];
   total: number;
   hasMoreMails: boolean;
   nextAnchor?: string;
+}
+
+export interface SearchEmailFilter {
+  after?: string;
+  before?: string;
+  text?: string;
+  from?: string[];
+  to?: string[];
+  unread?: boolean;
+  hasAttachment?: boolean;
 }

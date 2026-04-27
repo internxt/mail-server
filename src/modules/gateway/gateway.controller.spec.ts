@@ -2,16 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { GatewayController } from './gateway.controller.js';
 import { AccountService } from '../account/account.service.js';
-import { MailAccount } from '../account/domain/mail-account.domain.js';
-import { MailDomain } from '../account/domain/mail-domain.domain.js';
-import {
-  newMailAccountAttributes,
-  newMailAddressAttributes,
-  newMailDomainAttributes,
-} from '../../../test/fixtures.js';
-import { randomUUID } from 'crypto';
 
 describe('GatewayController', () => {
   let controller: GatewayController;
@@ -26,44 +19,6 @@ describe('GatewayController', () => {
 
     controller = module.get(GatewayController);
     accountService = module.get(AccountService);
-  });
-
-  describe('provisionAccount', () => {
-    it('when valid request, then provisions account and returns id and address', async () => {
-      const dto = {
-        userId: randomUUID(),
-        address: 'alice@internxt.com',
-        domain: 'internxt.com',
-        displayName: 'Alice Smith',
-      };
-      const account = MailAccount.build(
-        newMailAccountAttributes({
-          userId: dto.userId,
-          addresses: [
-            newMailAddressAttributes({
-              address: dto.address,
-              isDefault: true,
-            }),
-          ],
-        }),
-      );
-
-      accountService.provisionAccount.mockResolvedValue(account);
-
-      const result = await controller.provisionAccount(dto);
-
-      expect(accountService.provisionAccount).toHaveBeenCalledWith({
-        userId: dto.userId,
-        address: dto.address,
-        domain: dto.domain,
-        displayName: dto.displayName,
-      });
-      expect(result).toEqual({
-        id: account.id,
-        userId: account.userId,
-        address: dto.address,
-      });
-    });
   });
 
   describe('getAddress', () => {
@@ -85,31 +40,6 @@ describe('GatewayController', () => {
       await expect(
         controller.getAddress('unknown@internxt.com'),
       ).rejects.toThrow(NotFoundException);
-    });
-  });
-
-  describe('listDomains', () => {
-    it('when active domains exist, then returns them', async () => {
-      const domainList = [
-        MailDomain.build(newMailDomainAttributes({ domain: 'internxt.com' })),
-        MailDomain.build(newMailDomainAttributes({ domain: 'internxt.me' })),
-      ];
-      accountService.listActiveDomains.mockResolvedValue(domainList);
-
-      const result = await controller.listDomains();
-
-      expect(result).toEqual([
-        { domain: 'internxt.com' },
-        { domain: 'internxt.me' },
-      ]);
-    });
-
-    it('when no active domains, then returns empty array', async () => {
-      accountService.listActiveDomains.mockResolvedValue([]);
-
-      const result = await controller.listDomains();
-
-      expect(result).toEqual([]);
     });
   });
 });

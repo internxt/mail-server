@@ -7,10 +7,13 @@ import type {
   SendEmailDto,
   DraftEmailDto,
   MailboxType,
+  SearchEmailDto,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
+import type { MailAddressKeysAttributes } from '../src/modules/account/domain/mail-address-keys.domain.js';
 import type { MailAddressAttributes } from '../src/modules/account/domain/mail-address.domain.js';
+import type { MailAddressKeyBundle } from '../src/modules/account/account.service.js';
 import {
   type MailDomainAttributes,
   MailDomainStatus,
@@ -183,6 +186,31 @@ export function newMailAddressAttributes(
   };
 }
 
+export function newMailAddressKeyBundle(
+  attrs?: Partial<MailAddressKeyBundle>,
+): MailAddressKeyBundle {
+  return {
+    publicKey: random.hash({ length: 64 }),
+    encryptionPrivateKey: random.hash({ length: 128 }),
+    recoveryPrivateKey: random.hash({ length: 128 }),
+    salt: random.hash({ length: 24 }),
+    ...attrs,
+  };
+}
+
+export function newMailAddressKeysAttributes(
+  attrs?: Partial<MailAddressKeysAttributes>,
+): MailAddressKeysAttributes {
+  return {
+    id: randomUuid(),
+    mailAddressId: randomUuid(),
+    ...newMailAddressKeyBundle(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...attrs,
+  };
+}
+
 export function newMailAccountAttributes(
   attrs?: Partial<MailAccountAttributes>,
 ): MailAccountAttributes {
@@ -307,6 +335,20 @@ export function newJmapIdentity(attrs?: Partial<Identity>): Identity {
     textSignature: '',
     htmlSignature: '',
     mayDelete: true,
+    ...attrs,
+  };
+}
+
+export function newSearchEmailDto(
+  attrs?: Partial<SearchEmailDto>,
+): SearchEmailDto {
+  return {
+    userEmail: random.email(),
+    limit: 20,
+    position: 0,
+    filter: {
+      text: 'hello world!',
+    },
     ...attrs,
   };
 }

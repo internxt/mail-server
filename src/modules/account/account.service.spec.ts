@@ -14,9 +14,10 @@ import { MailAddress } from './domain/mail-address.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
+import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 import {
-  type DeepPartialMocked,
   newMailAccountAttributes,
+  newMailAddressKeyBundle,
   newMailAddressAttributes,
   newMailDomainAttributes,
 } from '../../../test/fixtures.js';
@@ -26,7 +27,8 @@ describe('AccountService', () => {
   let provider: DeepMocked<AccountProvider>;
   let accounts: DeepMocked<AccountRepository>;
   let addresses: DeepMocked<AddressRepository>;
-  let domains: DeepPartialMocked<DomainRepository>;
+  let domains: DeepMocked<DomainRepository>;
+  let keys: DeepMocked<MailAddressKeysRepository>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,6 +42,7 @@ describe('AccountService', () => {
     accounts = module.get(AccountRepository);
     addresses = module.get(AddressRepository);
     domains = module.get(DomainRepository);
+    keys = module.get(MailAddressKeysRepository);
   });
 
   describe('getAccount', () => {
@@ -112,6 +115,7 @@ describe('AccountService', () => {
       address: 'alice@internxt.com',
       domain: 'internxt.com',
       displayName: 'Alice Smith',
+      keys: newMailAddressKeyBundle(),
     };
 
     it('when all inputs are valid, then creates account, address, provider link, and stalwart principal', async () => {
@@ -170,6 +174,10 @@ describe('AccountService', () => {
           displayName: params.displayName,
         }),
       );
+      expect(keys.create).toHaveBeenCalledWith({
+        mailAddressId: createdAddressId,
+        ...params.keys,
+      });
     });
 
     it('when domain does not exist, then throws NotFoundException', async () => {
@@ -458,9 +466,9 @@ describe('AccountService', () => {
     beforeEach(() => {
       addresses.findByAddresses.mockResolvedValue(new Set([]));
       domains.findAllActive.mockResolvedValue([
-        { domain: 'domain' },
-        { domain: 'domain1' },
-        { domain: 'domain2' },
+        newMailDomainAttributes({ domain: 'domain' }),
+        newMailDomainAttributes({ domain: 'domain1' }),
+        newMailDomainAttributes({ domain: 'domain2' }),
       ]);
     });
 
@@ -474,8 +482,8 @@ describe('AccountService', () => {
 
     it('when domain is not available, return is not available and suggestion', async () => {
       domains.findAllActive.mockResolvedValue([
-        { domain: 'domain1' },
-        { domain: 'domain2' },
+        newMailDomainAttributes({ domain: 'domain1' }),
+        newMailDomainAttributes({ domain: 'domain2' }),
       ]);
 
       const res = await service.checkAddressAvailability('username', 'domain');

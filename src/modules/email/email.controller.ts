@@ -31,17 +31,35 @@ import {
   EmailListResponseDto,
   EmailResponseDto,
   MailboxResponseDto,
+  SearchEmailQueryDto,
+  MailDomainDto,
   SendEmailRequestDto,
   UpdateEmailRequestDto,
 } from './email.dto.js';
 import type { MailboxType } from './email.types.js';
+import { AccountService } from '../account/account.service.js';
+import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.decorator.js';
 
 @ApiBearerAuth()
 @ApiTags('Email')
 @UseGuards(MailAccountGuard)
 @Controller('email')
 export class EmailController {
-  constructor(private readonly emailService: EmailService) {}
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly accountService: AccountService,
+  ) {}
+
+  @Get('domains')
+  @SkipMailAccountCheck()
+  @ApiOperation({
+    summary: 'List domains',
+    description: 'Returns every domain for the authenticated user.',
+  })
+  @ApiOkResponse({ type: [MailDomainDto] })
+  getDomains() {
+    return this.accountService.listActiveDomains();
+  }
 
   @Get('mailboxes')
   @ApiOperation({
@@ -88,6 +106,13 @@ export class EmailController {
     description: 'Anchor ID for pagination.',
     example: 'Ma1f09b…',
   })
+  @ApiQuery({
+    name: 'unread',
+    required: false,
+    type: Boolean,
+    description: 'Filter by read status.',
+    example: true,
+  })
   @ApiOkResponse({ type: EmailListResponseDto })
   list(
     @User('email') email: string,
@@ -95,14 +120,35 @@ export class EmailController {
     @Query('limit') limit?: string,
     @Query('position') position?: string,
     @Query('anchorId') anchorId?: string,
+    @Query('unread') unread?: boolean,
   ) {
-    return this.emailService.listEmails(
-      email,
-      mailbox ?? undefined,
-      limit ? Number(limit) || 20 : 20,
-      position ? Number(position) || 0 : 0,
+    return this.emailService.listEmails({
+      userEmail: email,
+      mailbox: mailbox ?? undefined,
+      limit: limit ? Number(limit) || 20 : 20,
+      position: position ? Number(position) || 0 : 0,
       anchorId,
-    );
+      unread,
+    });
+  }
+
+  @Post('search')
+  @ApiOperation({
+    summary: 'Search emails',
+    description:
+      'Search emails by text, sender, recipient, date range, read status or attachment.',
+  })
+  @ApiBody({ type: SearchEmailQueryDto })
+  @ApiOkResponse({ type: EmailListResponseDto })
+  search(@User('email') email: string, @Body() body: SearchEmailQueryDto) {
+    const { limit, position, ...filters } = body;
+
+    return this.emailService.search({
+      userEmail: email,
+      limit: limit ?? 20,
+      position: position ?? 0,
+      filter: filters,
+    });
   }
 
   @Get(':id')

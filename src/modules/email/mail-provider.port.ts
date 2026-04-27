@@ -2,25 +2,22 @@ import type {
   DraftEmailDto,
   Email,
   EmailListResponse,
+  ListEmails,
   Mailbox,
   MailboxType,
+  SearchEmailDto,
   SendEmailDto,
 } from './email.types.js';
 
 export abstract class MailProvider {
   abstract getMailboxes(userEmail: string): Promise<Mailbox[]>;
-  abstract listEmails(
-    userEmail: string,
-    mailbox: MailboxType | undefined,
-    limit: number,
-    position: number,
-    anchorId?: string,
-  ): Promise<EmailListResponse>;
+  abstract listEmails(params: ListEmails): Promise<EmailListResponse>;
   abstract getEmail(userEmail: string, id: string): Promise<Email | null>;
   abstract sendEmail(
     userEmail: string,
     dto: SendEmailDto,
   ): Promise<{ id: string }>;
+  abstract search(params: SearchEmailDto): Promise<EmailListResponse>;
   abstract saveDraft(
     userEmail: string,
     dto: DraftEmailDto,
