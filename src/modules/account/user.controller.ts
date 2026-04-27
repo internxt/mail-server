@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
   Logger,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { GetMailAccountKeysDto } from './dto/get-mail-account-keys.dto.js';
 import { User } from '../auth/decorators/user.decorator.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
 import { PaymentsService } from '../infrastructure/payments/payments.service.js';
@@ -63,5 +66,16 @@ export class UserController {
       address: account.defaultAddress?.address ?? fullAddress,
       domain: dto.domain,
     };
+  }
+
+  @Get('me/mail-account/keys')
+  @ApiOperation({
+    summary: 'Get encryption keys and salt for one of the caller`s addresses',
+  })
+  async getMailAccountKeys(
+    @User() user: UserPayload,
+    @Query() query: GetMailAccountKeysDto,
+  ) {
+    return this.accountService.getAddressKeys(user.uuid, query.address);
   }
 }
