@@ -48,6 +48,24 @@ describe('UserController', () => {
     payments = module.get(PaymentsService);
   });
 
+  describe('getMailAccountKeys', () => {
+    it('when called, then forwards to AccountService and returns the bundle', async () => {
+      const user = newUserPayload();
+      const bundle = { address: 'alice@inxt.eu', ...newMailAddressKeyBundle() };
+      accountService.getAddressKeys.mockResolvedValue(bundle);
+
+      const result = await controller.getMailAccountKeys(user, {
+        address: bundle.address,
+      });
+
+      expect(accountService.getAddressKeys).toHaveBeenCalledWith(
+        user.uuid,
+        bundle.address,
+      );
+      expect(result).toBe(bundle);
+    });
+  });
+
   describe('createMailAccount', () => {
     it('when tier disables mail, then throws ForbiddenException', async () => {
       const user = newUserPayload();

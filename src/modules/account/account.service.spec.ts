@@ -19,8 +19,11 @@ import {
   newMailAccountAttributes,
   newMailAddressKeyBundle,
   newMailAddressAttributes,
+  newMailAddressKeysAttributes,
   newMailDomainAttributes,
 } from '../../../test/fixtures.js';
+import { MailAddressKeys } from './domain/mail-address-keys.domain.js';
+import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 
 describe('AccountService', () => {
   let service: AccountService;
@@ -85,6 +88,73 @@ describe('AccountService', () => {
       const result = await service.findUserIdByAddress('unknown@internxt.com');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getAddressKeys', () => {
+    it('when address belongs to user, then returns the key bundle', async () => {
+      const addr = newMailAddressAttributes();
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [addr] }),
+      );
+      const keysAttrs = newMailAddressKeysAttributes({
+        mailAddressId: addr.id,
+      });
+      accounts.findByUserId.mockResolvedValue(account);
+      keys.findByAddressId.mockResolvedValue(MailAddressKeys.build(keysAttrs));
+
+      const result = await service.getAddressKeys(account.userId, addr.address);
+
+      expect(keys.findByAddressId).toHaveBeenCalledWith(addr.id);
+      expect(result).toStrictEqual({
+        address: addr.address,
+        publicKey: keysAttrs.publicKey,
+        encryptionPrivateKey: keysAttrs.encryptionPrivateKey,
+        recoveryPrivateKey: keysAttrs.recoveryPrivateKey,
+        salt: keysAttrs.salt,
+      });
+    });
+
+    it('when account does not exist, then throws MailNotSetupException', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(
+        service.getAddressKeys('unknown', 'a@b.com'),
+      ).rejects.toThrow(MailNotSetupException);
+    });
+
+    it('when account has no addresses, then throws MailNotSetupException', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [] }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await expect(
+        service.getAddressKeys(account.userId, 'a@b.com'),
+      ).rejects.toThrow(MailNotSetupException);
+    });
+
+    it('when address is not on the account, then throws NotFoundException', async () => {
+      const account = MailAccount.build(newMailAccountAttributes());
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await expect(
+        service.getAddressKeys(account.userId, 'someone-else@example.com'),
+      ).rejects.toThrow(NotFoundException);
+      expect(keys.findByAddressId).not.toHaveBeenCalled();
+    });
+
+    it('when keys are missing for the address, then throws NotFoundException', async () => {
+      const addr = newMailAddressAttributes();
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [addr] }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+      keys.findByAddressId.mockResolvedValue(null);
+
+      await expect(
+        service.getAddressKeys(account.userId, addr.address),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

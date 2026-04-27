@@ -1,13 +1,13 @@
 import {
   type CanActivate,
   type ExecutionContext,
-  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { AccountService } from '../account/account.service.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../auth/decorators/public.decorator.js';
+import { MailNotSetupException } from './mail-not-setup.exception.js';
 import { SKIP_MAIL_ACCOUNT_CHECK_KEY } from './skip-mail-account-check.decorator.js';
 import type { RequestWithMailAddress } from '../account/decorators/mail-address.decorator.js';
 
@@ -41,11 +41,7 @@ export class MailAccountGuard implements CanActivate {
     const account = await this.accountService.findAccount(user.uuid);
 
     if (!account) {
-      throw new ForbiddenException({
-        statusCode: 403,
-        code: 'MAIL_NOT_SETUP',
-        message: 'Mail account has not been set up',
-      });
+      throw new MailNotSetupException();
     }
 
     const defaultAddress = account.defaultAddress;

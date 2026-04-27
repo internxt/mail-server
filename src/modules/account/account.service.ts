@@ -6,6 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
 import { MailAccount } from './domain/mail-account.domain.js';
 import { MailDomain } from './domain/mail-domain.domain.js';
@@ -47,6 +48,38 @@ export class AccountService {
 
   async findUserIdByAddress(address: string): Promise<string | null> {
     return this.addresses.findUserIdByAddress(address);
+  }
+
+  async getAddressKeys(
+    userId: string,
+    address: string,
+  ): Promise<MailAddressKeyBundle & { address: string }> {
+    const account = await this.accounts.findByUserId(userId);
+    if (!account || account.addresses.length === 0) {
+      throw new MailNotSetupException();
+    }
+
+    const addressRecord = account.addresses.find((a) => a.address === address);
+    if (!addressRecord) {
+      throw new NotFoundException(
+        `Address '${address}' not found for this account`,
+      );
+    }
+
+    const keys = await this.keys.findByAddressId(addressRecord.id);
+    if (!keys) {
+      throw new NotFoundException(
+        `No encryption keys for address '${address}'`,
+      );
+    }
+
+    return {
+      address: addressRecord.address,
+      publicKey: keys.publicKey,
+      encryptionPrivateKey: keys.encryptionPrivateKey,
+      recoveryPrivateKey: keys.recoveryPrivateKey,
+      salt: keys.salt,
+    };
   }
 
   async provisionAccount(params: {
