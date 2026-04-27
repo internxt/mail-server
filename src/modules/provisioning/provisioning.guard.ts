@@ -1,6 +1,7 @@
 import {
   type CanActivate,
   type ExecutionContext,
+  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { AccountService } from '../account/account.service.js';
