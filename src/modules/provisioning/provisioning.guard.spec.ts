@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { createMock } from '@golevelup/ts-vitest';
+import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { MailAccountGuard } from './provisioning.guard.js';
 import { AccountService } from '../account/account.service.js';
-import { MailAccount } from '../account/domain/mail-account.domain.js';
 import { IS_PUBLIC_KEY } from '../auth/decorators/public.decorator.js';
 import { SKIP_MAIL_ACCOUNT_CHECK_KEY } from './skip-mail-account-check.decorator.js';
 import {
