@@ -2,6 +2,7 @@ import {
   type CanActivate,
   type ExecutionContext,
   Injectable,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AccountService } from '../account/account.service.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
