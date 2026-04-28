@@ -193,7 +193,6 @@ export function newMailAddressKeyBundle(
     publicKey: random.hash({ length: 64 }),
     encryptionPrivateKey: random.hash({ length: 128 }),
     recoveryPrivateKey: random.hash({ length: 128 }),
-    salt: random.hash({ length: 24 }),
     ...attrs,
   };
 }

@@ -19,7 +19,6 @@ export interface MailAddressKeyBundle {
   publicKey: string;
   encryptionPrivateKey: string;
   recoveryPrivateKey: string;
-  salt: string;
 }
 
 @Injectable()
@@ -78,7 +77,6 @@ export class AccountService {
       publicKey: keys.publicKey,
       encryptionPrivateKey: keys.encryptionPrivateKey,
       recoveryPrivateKey: keys.recoveryPrivateKey,
-      salt: keys.salt,
     };
   }
 

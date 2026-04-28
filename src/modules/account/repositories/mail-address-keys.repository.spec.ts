@@ -34,7 +34,6 @@ describe('MailAddressKeysRepository', () => {
         publicKey: attrs.publicKey,
         encryptionPrivateKey: attrs.encryptionPrivateKey,
         recoveryPrivateKey: attrs.recoveryPrivateKey,
-        salt: attrs.salt,
       };
       keysModel.create.mockResolvedValue(
         attrs as unknown as MailAddressKeysModel,
@@ -46,7 +45,6 @@ describe('MailAddressKeysRepository', () => {
       expect(result.id).toBe(attrs.id);
       expect(result.mailAddressId).toBe(attrs.mailAddressId);
       expect(result.publicKey).toBe(attrs.publicKey);
-      expect(result.salt).toBe(attrs.salt);
     });
   });
 
