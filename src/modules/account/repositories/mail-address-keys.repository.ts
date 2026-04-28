@@ -11,7 +11,6 @@ export interface CreateMailAddressKeysParams {
   publicKey: string;
   encryptionPrivateKey: string;
   recoveryPrivateKey: string;
-  salt: string;
 }
 
 @Injectable()
@@ -44,7 +43,6 @@ export class MailAddressKeysRepository {
       publicKey: model.publicKey,
       encryptionPrivateKey: model.encryptionPrivateKey,
       recoveryPrivateKey: model.recoveryPrivateKey,
-      salt: model.salt,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,
     };

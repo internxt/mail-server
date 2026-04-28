@@ -53,7 +53,6 @@ export class UserController {
         publicKey: dto.keys.publicKey,
         encryptionPrivateKey: dto.keys.encryptionPrivateKey,
         recoveryPrivateKey: dto.keys.recoveryPrivateKey,
-        salt: dto.keys.salt,
       },
     });
 

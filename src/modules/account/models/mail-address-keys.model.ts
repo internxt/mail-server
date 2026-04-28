@@ -41,10 +41,6 @@ export class MailAddressKeysModel extends Model {
   @Column(DataType.TEXT)
   declare recoveryPrivateKey: string;
 
-  @AllowNull(false)
-  @Column(DataType.STRING(64))
-  declare salt: string;
-
   @BelongsTo(() => MailAddressModel)
   declare address: MailAddressModel;
 }

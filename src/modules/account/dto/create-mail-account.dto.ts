@@ -25,13 +25,6 @@ export class MailAddressKeyBundleDto {
   @IsString()
   @IsNotEmpty()
   recoveryPrivateKey!: string;
-
-  @ApiProperty({
-    description: 'Base64-encoded Argon2id salt used to derive the keystore key',
-  })
-  @IsString()
-  @IsNotEmpty()
-  salt!: string;
 }
 
 export class CreateMailAccountDto {

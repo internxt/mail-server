@@ -111,7 +111,6 @@ describe('AccountService', () => {
         publicKey: keysAttrs.publicKey,
         encryptionPrivateKey: keysAttrs.encryptionPrivateKey,
         recoveryPrivateKey: keysAttrs.recoveryPrivateKey,
-        salt: keysAttrs.salt,
       });
     });
 

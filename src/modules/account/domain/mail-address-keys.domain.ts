@@ -4,7 +4,6 @@ export interface MailAddressKeysAttributes {
   publicKey: string;
   encryptionPrivateKey: string;
   recoveryPrivateKey: string;
-  salt: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -15,7 +14,6 @@ export class MailAddressKeys {
   readonly publicKey!: string;
   readonly encryptionPrivateKey!: string;
   readonly recoveryPrivateKey!: string;
-  readonly salt!: string;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
 
