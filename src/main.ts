@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV}` });
 
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
@@ -45,7 +45,9 @@ async function bootstrap() {
 
   app.use(helmet());
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'health', method: RequestMethod.GET }],
+  });
   app.disable('x-powered-by');
   app.enableShutdownHooks();
 
