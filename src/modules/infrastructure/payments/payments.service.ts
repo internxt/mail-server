@@ -13,6 +13,8 @@ import type { Tier } from './payments.types.js';
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly baseUrl: string;
+  private readonly origin: string;
+  private readonly basePath: string;
   private readonly jwtSecret: string;
   private httpClient!: Client;
 
@@ -22,10 +24,14 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   ) {
     this.baseUrl = this.configService.getOrThrow<string>('apis.payments.url');
     this.jwtSecret = this.configService.getOrThrow<string>('secrets.jwt');
+    const parsed = new URL(this.baseUrl);
+    this.origin = parsed.origin;
+    this.basePath =
+      parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/$/, '');
   }
 
   onModuleInit() {
-    this.httpClient = new Client(this.baseUrl, {
+    this.httpClient = new Client(this.origin, {
       allowH2: true,
       keepAliveTimeout: 30_000,
       pipelining: 1,
@@ -45,7 +51,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
     const { statusCode, body } = await this.httpClient.request({
       method: 'GET',
-      path: '/products/tier',
+      path: `${this.basePath}/products/tier`,
       headers: {
         'content-type': 'application/json',
         accept: 'application/json',
