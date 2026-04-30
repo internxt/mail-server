@@ -4,6 +4,7 @@ metadata:
   name: mail-server
   labels:
     app: mail-server
+    owner: internxt
 spec:
   type: {{ .Values.service.type }}
   selector:

@@ -4,6 +4,7 @@ metadata:
   name: stalwart
   labels:
     app: stalwart
+    owner: internxt
 spec:
   serviceName: stalwart
   replicas: {{ .Values.replicaCount }}
@@ -14,6 +15,7 @@ spec:
     metadata:
       labels:
         app: stalwart
+        owner: internxt
       annotations:
         checksum/config: {{ .Values.config | sha256sum }}
     spec:
