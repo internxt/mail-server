@@ -4,6 +4,7 @@ metadata:
   name: stalwart
   labels:
     app: stalwart
+    owner: internxt
 spec:
   type: {{ .Values.service.type }}
   selector:
