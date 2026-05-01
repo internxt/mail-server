@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
+import { Reflector } from '@nestjs/core';
 import { StalwartModule } from '../infrastructure/stalwart/stalwart.module.js';
 import { PaymentsModule } from '../infrastructure/payments/payments.module.js';
 import { AccountService } from './account.service.js';
 import { UserController } from './user.controller.js';
+import { MailAccountGuard } from '../provisioning/provisioning.guard.js';
 import {
   MailAddressKeysModel,
   MailAccountModel,
@@ -35,6 +37,8 @@ import { MailAddressKeysRepository } from './repositories/mail-address-keys.repo
     DomainRepository,
     MailAddressKeysRepository,
     AccountService,
+    MailAccountGuard,
+    Reflector,
   ],
   exports: [AccountService],
 })
