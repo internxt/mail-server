@@ -49,18 +49,42 @@ describe('UserController', () => {
   });
 
   describe('getMailAccountKeys', () => {
-    it('when called, then forwards to AccountService and returns the bundle', async () => {
+    it('when address query is omitted, then uses the caller`s default address', async () => {
       const user = newUserPayload();
-      const bundle = { address: 'alice@inxt.eu', ...newMailAddressKeyBundle() };
+      const defaultAddress = 'alice@inxt.eu';
+      const bundle = { address: defaultAddress, ...newMailAddressKeyBundle() };
       accountService.getAddressKeys.mockResolvedValue(bundle);
 
-      const result = await controller.getMailAccountKeys(user, {
-        address: bundle.address,
+      const result = await controller.getMailAccountKeys(
+        user,
+        defaultAddress,
+        {},
+      );
+
+      expect(accountService.getAddressKeys).toHaveBeenCalledWith(
+        user.uuid,
+        defaultAddress,
+      );
+      expect(result).toBe(bundle);
+    });
+
+    it('when address query is provided, then uses the explicit address override', async () => {
+      const user = newUserPayload();
+      const defaultAddress = 'alice@inxt.eu';
+      const overrideAddress = 'alias@inxt.eu';
+      const bundle = {
+        address: overrideAddress,
+        ...newMailAddressKeyBundle(),
+      };
+      accountService.getAddressKeys.mockResolvedValue(bundle);
+
+      const result = await controller.getMailAccountKeys(user, defaultAddress, {
+        address: overrideAddress,
       });
 
       expect(accountService.getAddressKeys).toHaveBeenCalledWith(
         user.uuid,
-        bundle.address,
+        overrideAddress,
       );
       expect(result).toBe(bundle);
     });
