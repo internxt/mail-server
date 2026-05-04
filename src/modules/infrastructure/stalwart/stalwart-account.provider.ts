@@ -4,7 +4,11 @@ import type {
   AccountInfo,
   CreateAccountParams,
 } from '../../account/account.types.js';
-import { StalwartService } from './stalwart.service.js';
+import {
+  StalwartApiError,
+  StalwartService,
+  splitEmail,
+} from './stalwart.service.js';
 
 @Injectable()
 export class StalwartAccountProvider extends AccountProvider {
@@ -15,33 +19,40 @@ export class StalwartAccountProvider extends AccountProvider {
   }
 
   async createAccount(params: CreateAccountParams): Promise<void> {
-    await this.stalwart.createPrincipal({
-      type: 'individual',
-      name: params.primaryAddress,
+    const { local, domain } = splitEmail(params.primaryAddress);
+    const domainId = await this.stalwart.resolveDomainId(domain);
+    if (!domainId) {
+      throw new StalwartApiError(
+        `Cannot create account: domain '${domain}' is not configured in Stalwart`,
+        { domain },
+      );
+    }
+
+    await this.stalwart.createAccount({
+      name: local,
+      domainId,
       description: params.displayName,
-      secrets: [params.password],
-      emails: [params.primaryAddress],
-      quota: params.quota ?? 0,
-      roles: ['user'],
+      password: params.password,
+      quotaBytes: params.quota ?? 0,
     });
 
     this.logger.log(`Created account '${params.primaryAddress}'`);
   }
 
-  async deleteAccount(name: string): Promise<void> {
-    await this.stalwart.deletePrincipal(name);
-    this.logger.log(`Deleted account '${name}'`);
+  async deleteAccount(email: string): Promise<void> {
+    await this.stalwart.deleteAccountByEmail(email);
+    this.logger.log(`Deleted account '${email}'`);
   }
 
-  async getAccount(name: string): Promise<AccountInfo | null> {
-    const principal = await this.stalwart.getPrincipal(name);
-    if (!principal) return null;
+  async getAccount(email: string): Promise<AccountInfo | null> {
+    const account = await this.stalwart.getAccountByEmail(email);
+    if (!account) return null;
 
     return {
-      name: principal.name,
-      displayName: principal.description ?? '',
-      emails: principal.emails ?? [],
-      quota: principal.quota ?? 0,
+      name: account.emailAddress,
+      displayName: account.description ?? '',
+      emails: [account.emailAddress],
+      quota: account.quotas?.maxDiskQuota ?? 0,
     };
   }
 }
