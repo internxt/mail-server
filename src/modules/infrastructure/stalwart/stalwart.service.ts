@@ -6,27 +6,49 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from 'undici';
+import type {
+  ID,
+  JmapGetResponse,
+  JmapInvocation,
+  JmapMethodCall,
+  JmapQueryResponse,
+  JmapResponse,
+  JmapSetResponse,
+} from '../jmap/jmap.types.js';
 
-interface StalwartPrincipal {
+const JMAP_API_PATH = '/jmap';
+const CAPABILITY_CORE = 'urn:ietf:params:jmap:core';
+const CAPABILITY_STALWART = 'urn:stalwart:jmap';
+const ADMIN_CAPABILITIES = [CAPABILITY_CORE, CAPABILITY_STALWART] as const;
+
+const JMAP_METHOD = {
+  ACCOUNT_GET: 'x:Account/get',
+  ACCOUNT_QUERY: 'x:Account/query',
+  ACCOUNT_SET: 'x:Account/set',
+  DOMAIN_GET: 'x:Domain/get',
+  DOMAIN_QUERY: 'x:Domain/query',
+} as const;
+
+const TYPE_USER = 'User';
+const TYPE_PASSWORD = 'Password';
+const CREATE_REF = 'new1';
+
+export interface StalwartAccountCreate {
   name: string;
-  type: string;
+  domainId: string;
   description?: string;
-  secrets?: string[];
-  emails?: string[];
-  quota?: number;
-  memberOf?: string[];
-  roles?: string[];
-  lists?: string[];
-  enabledPermissions?: string[];
-  disabledPermissions?: string[];
+  password: string;
+  quotaBytes?: number;
 }
 
-type PatchAction = 'set' | 'addItem' | 'removeItem';
-
-interface PatchOperation {
-  action: PatchAction;
-  field: string;
-  value: unknown;
+export interface StalwartAccount {
+  id: ID;
+  '@type': 'User' | 'Group';
+  name: string;
+  emailAddress: string;
+  domainId: ID;
+  description?: string;
+  quotas?: Record<string, number>;
 }
 
 @Injectable()
@@ -35,6 +57,7 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
   private readonly adminUrl: string;
   private readonly adminUser: string;
   private readonly adminSecret: string;
+  private readonly domainIdMap = new Map<string, ID>();
   private httpClient!: Client;
 
   constructor(private readonly configService: ConfigService) {
@@ -53,7 +76,7 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
       pipelining: 1,
     });
     this.logger.log(
-      `Stalwart admin client initialized targeting ${this.adminUrl}`,
+      `Stalwart admin JMAP client initialized targeting ${this.adminUrl}`,
     );
   }
 
@@ -61,134 +84,179 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     await this.httpClient.close();
   }
 
-  async createPrincipal(principal: StalwartPrincipal): Promise<void> {
-    const { statusCode, body } = await this.httpClient.request({
-      method: 'POST',
-      path: '/api/principal',
-      headers: this.headers(),
-      body: JSON.stringify(principal),
-    });
+  async createAccount(params: StalwartAccountCreate): Promise<ID> {
+    const create: Record<string, unknown> = {
+      '@type': TYPE_USER,
+      name: params.name,
+      domainId: params.domainId,
+      credentials: { '@type': TYPE_PASSWORD, secret: params.password },
+      roles: { '@type': TYPE_USER },
+    };
+    if (params.description !== undefined) {
+      create.description = params.description;
+    }
+    if (params.quotaBytes) {
+      create.quotas = { maxDiskQuota: params.quotaBytes };
+    }
 
-    const text = await body.text();
+    const response = await this.jmapCall<JmapSetResponse<StalwartAccount>>([
+      [JMAP_METHOD.ACCOUNT_SET, { create: { [CREATE_REF]: create } }, 'c1'],
+    ]);
+    const set = firstResponse(response);
 
-    if (statusCode !== 200 && statusCode !== 201) {
+    const failed = set.notCreated?.[CREATE_REF];
+    if (failed) {
       throw new StalwartApiError(
-        `Failed to create principal '${principal.name}': HTTP ${statusCode}`,
-        statusCode,
-        text,
+        `Failed to create account '${params.name}'@${params.domainId}: ${failed.type} ${failed.description}`,
+        failed,
       );
     }
 
-    this.assertNoBodyError(
-      statusCode,
-      text,
-      `Failed to create principal '${principal.name}'`,
-    );
+    const created = set.created?.[CREATE_REF];
+    if (!created?.id) {
+      throw new StalwartApiError(
+        `Account creation returned no id for '${params.name}'`,
+        set,
+      );
+    }
+    return created.id;
   }
 
-  async getPrincipal(name: string): Promise<StalwartPrincipal | null> {
+  async getAccountByEmail(email: string): Promise<StalwartAccount | null> {
+    const { local, domain } = splitEmail(email);
+    const domainId = await this.resolveDomainId(domain);
+    if (!domainId) return null;
+
+    const response = await this.jmapCall<
+      JmapQueryResponse | JmapGetResponse<StalwartAccount>
+    >([
+      [JMAP_METHOD.ACCOUNT_QUERY, { filter: { name: local, domainId } }, 'q1'],
+      [
+        JMAP_METHOD.ACCOUNT_GET,
+        {
+          '#ids': {
+            resultOf: 'q1',
+            name: JMAP_METHOD.ACCOUNT_QUERY,
+            path: '/ids',
+          },
+        },
+        'g1',
+      ],
+    ]);
+    const get = response
+      .methodResponses[1]![1] as JmapGetResponse<StalwartAccount>;
+    return get.list[0] ?? null;
+  }
+
+  async deleteAccountByEmail(email: string): Promise<void> {
+    const { local, domain } = splitEmail(email);
+    const domainId = await this.resolveDomainId(domain);
+    if (!domainId) {
+      throw new StalwartApiError(`Account '${email}' not found`, null);
+    }
+
+    const response = await this.jmapCall<
+      JmapQueryResponse | JmapSetResponse<StalwartAccount>
+    >([
+      [JMAP_METHOD.ACCOUNT_QUERY, { filter: { name: local, domainId } }, 'q1'],
+      [
+        JMAP_METHOD.ACCOUNT_SET,
+        {
+          '#destroy': {
+            resultOf: 'q1',
+            name: JMAP_METHOD.ACCOUNT_QUERY,
+            path: '/ids',
+          },
+        },
+        's1',
+      ],
+    ]);
+    const query = response.methodResponses[0]![1] as JmapQueryResponse;
+    if (query.ids.length === 0) {
+      throw new StalwartApiError(`Account '${email}' not found`, null);
+    }
+
+    const set = response
+      .methodResponses[1]![1] as JmapSetResponse<StalwartAccount>;
+    const targetId = query.ids[0]!;
+    const failed = set.notDestroyed?.[targetId];
+    if (failed) {
+      throw new StalwartApiError(
+        `Failed to delete account '${email}': ${failed.type} ${failed.description}`,
+        failed,
+      );
+    }
+  }
+
+  async resolveDomainId(domain: string): Promise<ID | null> {
+    const cached = this.domainIdMap.get(domain);
+    if (cached) return cached;
+
+    // Domain/query's `text` filter is fuzzy/substring, so verify exact name
+    // match against the resolved Domain/get list before caching.
+    const response = await this.jmapCall<
+      JmapQueryResponse | JmapGetResponse<{ id: ID; name: string }>
+    >([
+      [JMAP_METHOD.DOMAIN_QUERY, { filter: { text: domain } }, 'q1'],
+      [
+        JMAP_METHOD.DOMAIN_GET,
+        {
+          '#ids': {
+            resultOf: 'q1',
+            name: JMAP_METHOD.DOMAIN_QUERY,
+            path: '/ids',
+          },
+        },
+        'g1',
+      ],
+    ]);
+    const get = response.methodResponses[1]![1] as JmapGetResponse<{
+      id: ID;
+      name: string;
+    }>;
+    const match = get.list.find(
+      (d) => d.name.toLowerCase() === domain.toLowerCase(),
+    );
+    if (!match) return null;
+
+    this.domainIdMap.set(domain, match.id);
+    return match.id;
+  }
+
+  private async jmapCall<T>(
+    methodCalls: JmapMethodCall[],
+  ): Promise<JmapResponse<JmapInvocation<T>[]>> {
     const { statusCode, body } = await this.httpClient.request({
-      method: 'GET',
-      path: `/api/principal/${encodeURIComponent(name)}`,
+      method: 'POST',
+      path: JMAP_API_PATH,
       headers: this.headers(),
+      body: JSON.stringify({
+        using: ADMIN_CAPABILITIES as readonly string[],
+        methodCalls,
+      }),
     });
 
     const text = await body.text();
-
-    if (statusCode === 404) {
-      return null;
-    }
 
     if (statusCode !== 200) {
       throw new StalwartApiError(
-        `Failed to get principal '${name}': HTTP ${statusCode}`,
-        statusCode,
+        `JMAP admin request failed: HTTP ${statusCode}`,
         text,
       );
     }
 
-    this.assertNoBodyError(
-      statusCode,
-      text,
-      `Failed to get principal '${name}'`,
-    );
-
-    const response = JSON.parse(text) as { data: StalwartPrincipal };
-    return response.data;
-  }
-
-  async patchPrincipal(
-    name: string,
-    operations: PatchOperation[],
-  ): Promise<void> {
-    const { statusCode, body } = await this.httpClient.request({
-      method: 'PATCH',
-      path: `/api/principal/${encodeURIComponent(name)}`,
-      headers: this.headers(),
-      body: JSON.stringify(operations),
-    });
-
-    const text = await body.text();
-
-    if (statusCode !== 200 && statusCode !== 204) {
+    const response = JSON.parse(text) as JmapResponse<JmapInvocation<T>[]>;
+    const errors = response.methodResponses.filter(([n]) => n === 'error');
+    if (errors.length > 0) {
+      throw new StalwartApiError('JMAP admin method error', errors);
+    }
+    if (response.methodResponses.length !== methodCalls.length) {
       throw new StalwartApiError(
-        `Failed to patch principal '${name}': HTTP ${statusCode}`,
-        statusCode,
-        text,
+        `JMAP admin response shape mismatch: expected ${methodCalls.length} method response(s), got ${response.methodResponses.length}`,
+        response,
       );
     }
-
-    this.assertNoBodyError(
-      statusCode,
-      text,
-      `Failed to patch principal '${name}'`,
-    );
-  }
-
-  async deletePrincipal(name: string): Promise<void> {
-    const { statusCode, body } = await this.httpClient.request({
-      method: 'DELETE',
-      path: `/api/principal/${encodeURIComponent(name)}`,
-      headers: this.headers(),
-    });
-
-    const text = await body.text();
-
-    if (statusCode !== 200 && statusCode !== 204) {
-      throw new StalwartApiError(
-        `Failed to delete principal '${name}': HTTP ${statusCode}`,
-        statusCode,
-        text,
-      );
-    }
-
-    this.assertNoBodyError(
-      statusCode,
-      text,
-      `Failed to delete principal '${name}'`,
-    );
-  }
-
-  private assertNoBodyError(
-    statusCode: number,
-    text: string,
-    context: string,
-  ): void {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return;
-    }
-
-    if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
-      const { error, details } = parsed as { error: string; details?: string };
-      throw new StalwartApiError(
-        `${context}: ${error}${details ? ` — ${details}` : ''}`,
-        statusCode,
-        text,
-      );
-    }
+    return response;
   }
 
   private headers(): Record<string, string> {
@@ -203,11 +271,22 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
   }
 }
 
+export function splitEmail(email: string): { local: string; domain: string } {
+  const idx = email.lastIndexOf('@');
+  if (idx <= 0 || idx === email.length - 1) {
+    throw new StalwartApiError(`Invalid email '${email}'`, null);
+  }
+  return { local: email.slice(0, idx), domain: email.slice(idx + 1) };
+}
+
+function firstResponse<T>(response: JmapResponse<JmapInvocation<T>[]>): T {
+  return response.methodResponses[0]![1];
+}
+
 export class StalwartApiError extends Error {
   constructor(
     message: string,
-    public readonly statusCode: number,
-    public readonly details: string,
+    public readonly details: unknown,
   ) {
     super(message);
     this.name = 'StalwartApiError';
