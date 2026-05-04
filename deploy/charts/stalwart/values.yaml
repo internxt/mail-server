@@ -4,7 +4,7 @@ replicaCount: 1
 
 image:
   repository: stalwartlabs/mail-server
-  tag: v0.11.0
+  tag: v0.16.3
   pullPolicy: IfNotPresent
 
 service:
@@ -20,7 +20,7 @@ service:
 persistence:
   enabled: true
   size: 5Gi
-  storageClass: ""
+  storageClass: ''
 
 resources:
   requests:
@@ -32,7 +32,7 @@ resources:
 
 env:
   DB_HOST: REPLACE_ME
-  DB_PORT: "5432"
+  DB_PORT: '5432'
   DB_NAME: REPLACE_ME
   DB_USER: REPLACE_ME
 
