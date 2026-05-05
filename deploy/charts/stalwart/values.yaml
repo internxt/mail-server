@@ -3,8 +3,8 @@ mailApiHost: mail-server
 replicaCount: 1
 
 image:
-  repository: stalwartlabs/mail-server
-  tag: v0.16.3
+  repository: stalwartlabs/stalwart
+  tag: v0.16.4
   pullPolicy: IfNotPresent
 
 service:
