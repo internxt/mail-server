@@ -137,8 +137,9 @@ describe('StalwartService', () => {
         name: 'alice',
         domainId: 'dom1',
         description: 'Alice',
-        credentials: { '@type': 'Password', secret: 'pw' },
+        credentials: { '0': { '@type': 'Password', secret: 'pw' } },
         roles: { '@type': 'User' },
+        permissions: { '@type': 'Inherit' },
         quotas: { maxDiskQuota: 5_000_000 },
       });
     });
