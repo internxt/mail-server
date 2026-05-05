@@ -16,6 +16,7 @@ spec:
         app: mail-server
         owner: internxt
     spec:
+      automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

@@ -1,21 +1,31 @@
-mailApiHost: mail-server
-
 replicaCount: 1
 
 image:
   repository: stalwartlabs/stalwart
-  tag: v0.16.4
+  tag: v0.16
   pullPolicy: IfNotPresent
+
+role: ''
+
+pushShard: ''
+
+recoveryMode:
+  enabled: false
 
 service:
   type: LoadBalancer
   ports:
-    http: 8080
+    management: 8080
+    http: 80
+    https: 443
     smtp: 25
+    smtps: 465
     submission: 587
     imap: 143
-    submissions: 0
-    imaps: 0
+    imaps: 993
+    pop3: 110
+    pop3s: 995
+    managesieve: 4190
 
 persistence:
   enabled: true
@@ -26,102 +36,20 @@ resources:
   requests:
     cpu: 250m
     memory: 512Mi
+    ephemeral-storage: 256Mi
   limits:
     cpu: 1000m
     memory: 1Gi
+    ephemeral-storage: 1Gi
 
-env:
-  DB_HOST: REPLACE_ME
-  DB_PORT: '5432'
-  DB_NAME: REPLACE_ME
-  DB_USER: REPLACE_ME
-
-  S3_BUCKET: REPLACE_ME
-  S3_REGION: REPLACE_ME
-  S3_ENDPOINT: REPLACE_ME
-
-  ADMIN_USER: mail-server
-  MASTER_USER: master
-  MTA_HOOKS_USERNAME: stalwart
+dataStore:
+  '@type': PostgreSql
+  host: REPLACE_ME
+  port: 5432
+  database: REPLACE_ME
+  authUsername: REPLACE_ME
+  authSecret:
+    '@type': EnvironmentVariable
+    variableName: STALWART_DB_PASSWORD
 
 secretName: stalwart-secrets
-
-config: |
-  [server.listener."http"]
-  bind = ["[::]:8080"]
-  protocol = "http"
-
-  [server.listener."smtp"]
-  bind = ["[::]:25"]
-  protocol = "smtp"
-
-  [server.listener."submission"]
-  bind = ["[::]:587"]
-  protocol = "smtp"
-
-  [server.listener."imap"]
-  bind = ["[::]:143"]
-  protocol = "imap"
-
-  [store."postgres"]
-  type = "postgresql"
-  host = "%{env:DB_HOST}%"
-  port = "%{env:DB_PORT}%"
-  database = "%{env:DB_NAME}%"
-  user = "%{env:DB_USER}%"
-  password = "%{env:DB_PASSWORD}%"
-  timeout = "15s"
-
-  [store."postgres".tls]
-  enable = true
-  allow-invalid-certs = true
-
-  [store."postgres".pool]
-  max-connections = 10
-
-  [store."s3"]
-  type = "s3"
-  bucket = "%{env:S3_BUCKET}%"
-  region = "%{env:S3_REGION}%"
-  endpoint = "%{env:S3_ENDPOINT}%"
-  access-key = "%{env:S3_ACCESS_KEY}%"
-  secret-key = "%{env:S3_SECRET_KEY}%"
-  timeout = "30s"
-  key-prefix = "blobs/"
-
-  [storage]
-  data = "postgres"
-  fts = "postgres"
-  blob = "s3"
-  lookup = "postgres"
-  directory = "internal"
-
-  [directory."internal"]
-  type = "internal"
-  store = "postgres"
-
-  [authentication.fallback-admin]
-  user = "%{env:ADMIN_USER}%"
-  secret = "%{env:ADMIN_SECRET}%"
-
-  [authentication.master]
-  user = "%{env:MASTER_USER}%"
-  secret = "%{env:MASTER_SECRET}%"
-
-  [session.hook."quota-check"]
-  enable = true
-  url = "http://{{ .Values.mailApiHost }}:3100/api/mta-hooks"
-  stages = ["data"]
-
-  [session.hook."quota-check".auth]
-  username = "%{env:MTA_HOOKS_USERNAME}%"
-  secret = "%{env:MTA_HOOKS_SECRET}%"
-
-  [session.hook."quota-check".options]
-  tempfail-on-error = true
-
-  [tracer."stdout"]
-  type = "stdout"
-  level = "info"
-  ansi = false
-  enable = true
