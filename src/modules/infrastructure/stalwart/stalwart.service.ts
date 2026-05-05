@@ -89,8 +89,9 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
       '@type': TYPE_USER,
       name: params.name,
       domainId: params.domainId,
-      credentials: { '@type': TYPE_PASSWORD, secret: params.password },
+      credentials: { '0': { '@type': TYPE_PASSWORD, secret: params.password } },
       roles: { '@type': TYPE_USER },
+      permissions: { '@type': 'Inherit' },
     };
     if (params.description !== undefined) {
       create.description = params.description;
