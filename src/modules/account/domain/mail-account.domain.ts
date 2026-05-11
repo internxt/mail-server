@@ -3,9 +3,16 @@ import {
   type MailAddressAttributes,
 } from './mail-address.domain.js';
 
+export enum MailAccountState {
+  Active = 'active',
+  Suspended = 'suspended',
+}
+
 export interface MailAccountAttributes {
   id: string;
   userId: string;
+  state: MailAccountState;
+  suspendedAt: Date | null;
   addresses: MailAddressAttributes[];
   createdAt: Date;
   updatedAt: Date;
@@ -14,6 +21,8 @@ export interface MailAccountAttributes {
 export class MailAccount {
   readonly id!: string;
   readonly userId!: string;
+  readonly state!: MailAccountState;
+  readonly suspendedAt!: Date | null;
   readonly addresses!: MailAddress[];
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
@@ -29,5 +38,9 @@ export class MailAccount {
 
   get defaultAddress(): MailAddress | undefined {
     return this.addresses.find((a) => a.isDefault);
+  }
+
+  get isSuspended(): boolean {
+    return this.state === MailAccountState.Suspended;
   }
 }

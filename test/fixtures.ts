@@ -10,7 +10,10 @@ import type {
   SearchEmailDto,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
-import type { MailAccountAttributes } from '../src/modules/account/domain/mail-account.domain.js';
+import {
+  type MailAccountAttributes,
+  MailAccountState,
+} from '../src/modules/account/domain/mail-account.domain.js';
 import type { MailAddressKeysAttributes } from '../src/modules/account/domain/mail-address-keys.domain.js';
 import type { MailAddressAttributes } from '../src/modules/account/domain/mail-address.domain.js';
 import type { MailAddressKeyBundle } from '../src/modules/account/account.service.js';
@@ -222,6 +225,8 @@ export function newMailAccountAttributes(
   return {
     id: accountId,
     userId: randomUuid(),
+    state: MailAccountState.Active,
+    suspendedAt: null,
     addresses: [address],
     createdAt: new Date(),
     updatedAt: new Date(),

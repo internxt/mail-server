@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { MailAccount } from '../domain/mail-account.domain.js';
+import {
+  MailAccount,
+  MailAccountState,
+} from '../domain/mail-account.domain.js';
 import { MailAccountModel } from '../models/mail-account.model.js';
 import { MailAddressModel } from '../models/mail-address.model.js';
 import { MailProviderAccountModel } from '../models/mail-provider-account.model.js';
@@ -47,6 +50,8 @@ export class AccountRepository {
     return MailAccount.build({
       id: model.id,
       userId: model.userId,
+      state: model.state as MailAccountState,
+      suspendedAt: model.suspendedAt,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,
       addresses: (model.addresses ?? []).map(toAddressAttributes),
