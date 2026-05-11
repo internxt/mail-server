@@ -31,7 +31,7 @@ export class MailAccountModel extends Model {
   @AllowNull(false)
   @Default('active')
   @Column(DataType.STRING(20))
-  declare state: string;
+  declare status: string;
 
   @Column(DataType.DATE)
   declare suspendedAt: Date | null;

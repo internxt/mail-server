@@ -10,7 +10,16 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { GetMailAccountKeysDto } from './dto/get-mail-account-keys.dto.js';
 import { User } from '../auth/decorators/user.decorator.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
@@ -19,6 +28,11 @@ import { AccountService } from './account.service.js';
 import { CreateMailAccountDto } from './dto/create-mail-account.dto.js';
 import { MailAccountGuard } from '../provisioning/provisioning.guard.js';
 import { MailAddress } from './decorators/mail-address.decorator.js';
+import {
+  CreateMailAccountResponseDto,
+  MailAccountKeysResponseDto,
+  MailAccountStatusResponseDto,
+} from './dto/mail-account.response.dto.js';
 
 @ApiTags('User')
 @ApiBearerAuth()
@@ -31,13 +45,36 @@ export class UserController {
     private readonly payments: PaymentsService,
   ) {}
 
+  @Get('me/mail-account')
+  @UseGuards(MailAccountGuard)
+  @ApiOperation({
+    summary: 'Get the caller`s mail account status',
+    description:
+      'Returns the account status. When suspended, includes `suspendedAt` and the scheduled `deletionAt`.',
+  })
+  @ApiOkResponse({ type: MailAccountStatusResponseDto })
+  @ApiNotFoundResponse({ description: 'No mail account exists for the caller' })
+  async getMailAccount(
+    @User() user: UserPayload,
+  ): Promise<MailAccountStatusResponseDto> {
+    return this.accountService.getAccountStatus(user.uuid);
+  }
+
   @Post('me/mail-account')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Provision the caller`s mail account' })
+  @ApiCreatedResponse({ type: CreateMailAccountResponseDto })
+  @ApiForbiddenResponse({
+    description: 'Caller`s tier does not include mail access',
+  })
+  @ApiNotFoundResponse({ description: 'Requested domain does not exist' })
+  @ApiConflictResponse({
+    description: 'Caller already has an account, or the address is taken',
+  })
   async createMailAccount(
     @User() user: UserPayload,
     @Body() dto: CreateMailAccountDto,
-  ) {
+  ): Promise<CreateMailAccountResponseDto> {
     const tier = await this.payments.getUserTier(user.uuid);
     if (!tier.featuresPerService.mail?.enabled) {
       throw new ForbiddenException(
@@ -77,11 +114,15 @@ export class UserController {
     description:
       'If `address` is omitted, returns keys for the caller`s primary address.',
   })
+  @ApiOkResponse({ type: MailAccountKeysResponseDto })
+  @ApiNotFoundResponse({
+    description: 'Address not found on this account, or keys not set',
+  })
   async getMailAccountKeys(
     @User() user: UserPayload,
     @MailAddress('address') defaultAddress: string,
     @Query() query: GetMailAccountKeysDto,
-  ) {
+  ): Promise<MailAccountKeysResponseDto> {
     const address = query.address ?? defaultAddress;
     return this.accountService.getAddressKeys(user.uuid, address);
   }

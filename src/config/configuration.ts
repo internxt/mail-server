@@ -21,6 +21,13 @@ export default () => ({
     masterPassword: process.env.STALWART_MASTER_PASSWORD ?? '',
   },
 
+  accounts: {
+    suspendedRetentionDays: Number.parseInt(
+      process.env.SUSPENDED_ACCOUNT_RETENTION_DAYS ?? '30',
+      10,
+    ),
+  },
+
   secrets: {
     jwt: process.env.JWT_SECRET,
     gateway: process.env.GATEWAY_PUBLIC_SECRET,

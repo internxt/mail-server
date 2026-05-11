@@ -11,7 +11,7 @@ export enum MailAccountState {
 export interface MailAccountAttributes {
   id: string;
   userId: string;
-  state: MailAccountState;
+  status: MailAccountState;
   suspendedAt: Date | null;
   addresses: MailAddressAttributes[];
   createdAt: Date;
@@ -21,7 +21,7 @@ export interface MailAccountAttributes {
 export class MailAccount {
   readonly id!: string;
   readonly userId!: string;
-  readonly state!: MailAccountState;
+  readonly status!: MailAccountState;
   readonly suspendedAt!: Date | null;
   readonly addresses!: MailAddress[];
   readonly createdAt!: Date;
@@ -41,6 +41,6 @@ export class MailAccount {
   }
 
   get isSuspended(): boolean {
-    return this.state === MailAccountState.Suspended;
+    return this.status === MailAccountState.Suspended;
   }
 }

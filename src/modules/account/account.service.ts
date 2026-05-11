@@ -6,9 +6,10 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
-import { MailAccount } from './domain/mail-account.domain.js';
+import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
 import { MailDomain } from './domain/mail-domain.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
@@ -21,6 +22,14 @@ export interface MailAddressKeyBundle {
   recoveryPrivateKey: string;
 }
 
+export interface MailAccountStatus {
+  id: string;
+  defaultAddress: string | null;
+  status: MailAccountState;
+  suspendedAt: Date | null;
+  deletionAt: Date | null;
+}
+
 @Injectable()
 export class AccountService {
   private readonly logger = new Logger(AccountService.name);
@@ -31,10 +40,29 @@ export class AccountService {
     private readonly addresses: AddressRepository,
     private readonly domains: DomainRepository,
     private readonly keys: MailAddressKeysRepository,
+    private readonly config: ConfigService,
   ) {}
 
   async getAccount(userId: string): Promise<MailAccount> {
     return this.getAccountOrFail(userId);
+  }
+
+  async getAccountStatus(userId: string): Promise<MailAccountStatus> {
+    const account = await this.getAccountOrFail(userId);
+
+    return {
+      id: account.id,
+      defaultAddress: account.defaultAddress?.address ?? null,
+      status: account.status,
+      suspendedAt: account.suspendedAt,
+      deletionAt: this.computeDeletionAt(account.suspendedAt),
+    };
+  }
+
+  private computeDeletionAt(suspendedAt: Date | null): Date | null {
+    if (!suspendedAt) return null;
+    const days = this.config.get<number>('accounts.suspendedRetentionDays')!;
+    return new Date(suspendedAt.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
   async listActiveDomains(): Promise<MailDomain[]> {
