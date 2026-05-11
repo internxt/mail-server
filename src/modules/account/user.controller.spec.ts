@@ -49,7 +49,7 @@ describe('UserController', () => {
   });
 
   describe('getMailAccount', () => {
-    it('when called, then delegates to accountService.getAccountStatus', async () => {
+    it('when account is suspended, then returns suspendedAt and deletionAt from the service', async () => {
       const user = newUserPayload();
       const status: MailAccountStatus = {
         id: 'acc-1',
@@ -57,6 +57,23 @@ describe('UserController', () => {
         status: MailAccountState.Suspended,
         suspendedAt: new Date('2026-01-01T00:00:00.000Z'),
         deletionAt: new Date('2026-01-31T00:00:00.000Z'),
+      };
+      accountService.getAccountStatus.mockResolvedValue(status);
+
+      const result = await controller.getMailAccount(user);
+
+      expect(accountService.getAccountStatus).toHaveBeenCalledWith(user.uuid);
+      expect(result).toBe(status);
+    });
+
+    it('when account is active, then returns null suspendedAt and deletionAt', async () => {
+      const user = newUserPayload();
+      const status: MailAccountStatus = {
+        id: 'acc-1',
+        defaultAddress: 'alice@inxt.eu',
+        status: MailAccountState.Active,
+        suspendedAt: null,
+        deletionAt: null,
       };
       accountService.getAccountStatus.mockResolvedValue(status);
 
