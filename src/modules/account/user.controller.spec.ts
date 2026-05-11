@@ -3,9 +3,9 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { ForbiddenException } from '@nestjs/common';
 import { UserController } from './user.controller.js';
-import { AccountService } from './account.service.js';
+import { AccountService, type MailAccountStatus } from './account.service.js';
+import { MailAccountState, MailAccount } from './domain/mail-account.domain.js';
 import { PaymentsService } from '../infrastructure/payments/payments.service.js';
-import { MailAccount } from './domain/mail-account.domain.js';
 import {
   newMailAccountAttributes,
   newMailAddressKeyBundle,
@@ -46,6 +46,25 @@ describe('UserController', () => {
     controller = module.get(UserController);
     accountService = module.get(AccountService);
     payments = module.get(PaymentsService);
+  });
+
+  describe('getMailAccount', () => {
+    it('when called, then delegates to accountService.getAccountStatus', async () => {
+      const user = newUserPayload();
+      const status: MailAccountStatus = {
+        id: 'acc-1',
+        defaultAddress: 'alice@inxt.eu',
+        status: MailAccountState.Suspended,
+        suspendedAt: new Date('2026-01-01T00:00:00.000Z'),
+        deletionAt: new Date('2026-01-31T00:00:00.000Z'),
+      };
+      accountService.getAccountStatus.mockResolvedValue(status);
+
+      const result = await controller.getMailAccount(user);
+
+      expect(accountService.getAccountStatus).toHaveBeenCalledWith(user.uuid);
+      expect(result).toBe(status);
+    });
   });
 
   describe('getMailAccountKeys', () => {

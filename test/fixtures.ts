@@ -225,7 +225,7 @@ export function newMailAccountAttributes(
   return {
     id: accountId,
     userId: randomUuid(),
-    state: MailAccountState.Active,
+    status: MailAccountState.Active,
     suspendedAt: null,
     addresses: [address],
     createdAt: new Date(),

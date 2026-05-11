@@ -50,7 +50,7 @@ export class AccountRepository {
     return MailAccount.build({
       id: model.id,
       userId: model.userId,
-      state: model.state as MailAccountState,
+      status: model.status as MailAccountState,
       suspendedAt: model.suspendedAt,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,

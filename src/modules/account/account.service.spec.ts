@@ -6,9 +6,10 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AccountService } from './account.service.js';
 import { AccountProvider } from './account-provider.port.js';
-import { MailAccount } from './domain/mail-account.domain.js';
+import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
 import { MailDomain } from './domain/mail-domain.domain.js';
 import { MailAddress } from './domain/mail-address.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
@@ -32,6 +33,7 @@ describe('AccountService', () => {
   let addresses: DeepMocked<AddressRepository>;
   let domains: DeepMocked<DomainRepository>;
   let keys: DeepMocked<MailAddressKeysRepository>;
+  let config: DeepMocked<ConfigService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -46,6 +48,7 @@ describe('AccountService', () => {
     addresses = module.get(AddressRepository);
     domains = module.get(DomainRepository);
     keys = module.get(MailAddressKeysRepository);
+    config = module.get(ConfigService);
   });
 
   describe('getAccount', () => {
@@ -64,6 +67,50 @@ describe('AccountService', () => {
       accounts.findByUserId.mockResolvedValue(null);
 
       await expect(service.getAccount('unknown-uuid')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('getAccountStatus', () => {
+    it('when account is active, then returns status with null suspendedAt and deletionAt', async () => {
+      const attrs = newMailAccountAttributes();
+      accounts.findByUserId.mockResolvedValue(MailAccount.build(attrs));
+
+      const result = await service.getAccountStatus(attrs.userId);
+
+      expect(result).toEqual({
+        id: attrs.id,
+        defaultAddress: attrs.addresses[0]?.address ?? null,
+        status: MailAccountState.Active,
+        suspendedAt: null,
+        deletionAt: null,
+      });
+    });
+
+    it('when account is suspended, then computes deletionAt from retention config', async () => {
+      const suspendedAt = new Date('2026-01-01T00:00:00.000Z');
+      const attrs = newMailAccountAttributes({
+        status: MailAccountState.Suspended,
+        suspendedAt,
+      });
+      accounts.findByUserId.mockResolvedValue(MailAccount.build(attrs));
+      config.get.mockReturnValue(30);
+
+      const result = await service.getAccountStatus(attrs.userId);
+
+      expect(config.get).toHaveBeenCalledWith(
+        'accounts.suspendedRetentionDays',
+      );
+      expect(result.status).toBe(MailAccountState.Suspended);
+      expect(result.suspendedAt).toEqual(suspendedAt);
+      expect(result.deletionAt).toEqual(new Date('2026-01-31T00:00:00.000Z'));
+    });
+
+    it('when account does not exist, then throws NotFoundException', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.getAccountStatus('unknown-uuid')).rejects.toThrow(
         NotFoundException,
       );
     });
