@@ -7,6 +7,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import dayjs from 'dayjs';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
 import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
@@ -62,7 +63,7 @@ export class AccountService {
   private computeDeletionAt(suspendedAt: Date | null): Date | null {
     if (!suspendedAt) return null;
     const days = this.config.get<number>('accounts.suspendedRetentionDays')!;
-    return new Date(suspendedAt.getTime() + days * 24 * 60 * 60 * 1000);
+    return dayjs(suspendedAt).add(days, 'day').toDate();
   }
 
   async listActiveDomains(): Promise<MailDomain[]> {
