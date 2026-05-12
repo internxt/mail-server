@@ -4,6 +4,7 @@ metadata:
   name: stalwart-config
   labels:
     app: stalwart
+    owner: internxt
 data:
-  config.toml: |
-{{ tpl .Values.config . | indent 4 }}
+  config.json: |
+{{ .Values.dataStore | toJson | indent 4 }}

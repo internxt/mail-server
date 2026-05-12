@@ -10,13 +10,25 @@ spec:
   selector:
     app: stalwart
   ports:
+    - name: management
+      port: {{ .Values.service.ports.management }}
+      targetPort: management
+      protocol: TCP
     - name: http
       port: {{ .Values.service.ports.http }}
       targetPort: http
       protocol: TCP
+    - name: https
+      port: {{ .Values.service.ports.https }}
+      targetPort: https
+      protocol: TCP
     - name: smtp
       port: {{ .Values.service.ports.smtp }}
       targetPort: smtp
+      protocol: TCP
+    - name: smtps
+      port: {{ .Values.service.ports.smtps }}
+      targetPort: smtps
       protocol: TCP
     - name: submission
       port: {{ .Values.service.ports.submission }}
@@ -26,15 +38,19 @@ spec:
       port: {{ .Values.service.ports.imap }}
       targetPort: imap
       protocol: TCP
-    {{- if gt (int .Values.service.ports.submissions) 0 }}
-    - name: submissions
-      port: {{ .Values.service.ports.submissions }}
-      targetPort: submissions
-      protocol: TCP
-    {{- end }}
-    {{- if gt (int .Values.service.ports.imaps) 0 }}
     - name: imaps
       port: {{ .Values.service.ports.imaps }}
       targetPort: imaps
       protocol: TCP
-    {{- end }}
+    - name: pop3
+      port: {{ .Values.service.ports.pop3 }}
+      targetPort: pop3
+      protocol: TCP
+    - name: pop3s
+      port: {{ .Values.service.ports.pop3s }}
+      targetPort: pop3s
+      protocol: TCP
+    - name: managesieve
+      port: {{ .Values.service.ports.managesieve }}
+      targetPort: managesieve
+      protocol: TCP
