@@ -51,5 +51,7 @@ dataStore:
   authSecret:
     '@type': EnvironmentVariable
     variableName: STALWART_DB_PASSWORD
+  useTls: true
+  allowInvalidCerts: true
 
 secretName: stalwart-secrets
