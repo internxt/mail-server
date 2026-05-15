@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/sequelize';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
+import { Op } from 'sequelize';
 import { MailAddressKeysRepository } from './mail-address-keys.repository.js';
 import { MailAddressKeysModel } from '../models/mail-address-keys.model.js';
 import { newMailAddressKeysAttributes } from '../../../../test/fixtures.js';
@@ -70,6 +71,51 @@ describe('MailAddressKeysRepository', () => {
       const result = await repository.findByAddressId('missing-id');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('findPublicKeysByAddressIds', () => {
+    it('when given an empty list, then returns an empty map without querying', async () => {
+      const result = await repository.findPublicKeysByAddressIds([]);
+
+      expect(result).toEqual(new Map());
+      expect(keysModel.findAll).not.toHaveBeenCalled();
+    });
+
+    it('when given more than 50 ids, then throws without querying', async () => {
+      const tooMany = Array.from({ length: 51 }, (_, i) => `addr-${i}`);
+
+      await expect(
+        repository.findPublicKeysByAddressIds(tooMany),
+      ).rejects.toThrow(/exceeds max 50/);
+      expect(keysModel.findAll).not.toHaveBeenCalled();
+    });
+
+    it('when ids match rows, then returns a Map keyed by mailAddressId', async () => {
+      const models = [
+        { mailAddressId: 'addr-1', publicKey: 'pub-1' },
+        { mailAddressId: 'addr-2', publicKey: 'pub-2' },
+      ] as unknown as MailAddressKeysModel[];
+      keysModel.findAll.mockResolvedValue(models);
+
+      const result = await repository.findPublicKeysByAddressIds([
+        'addr-1',
+        'addr-2',
+        'addr-missing',
+      ]);
+
+      expect(keysModel.findAll).toHaveBeenCalledWith({
+        where: {
+          mailAddressId: { [Op.in]: ['addr-1', 'addr-2', 'addr-missing'] },
+        },
+        attributes: ['mailAddressId', 'publicKey'],
+      });
+      expect(result).toEqual(
+        new Map([
+          ['addr-1', 'pub-1'],
+          ['addr-2', 'pub-2'],
+        ]),
+      );
     });
   });
 

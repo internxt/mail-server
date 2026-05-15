@@ -4,6 +4,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { EmailService } from './email.service.js';
 import { MailProvider } from './mail-provider.port.js';
+import { AccountService } from '../account/account.service.js';
 import {
   newMailbox,
   newEmail,
@@ -11,11 +12,13 @@ import {
   newSendEmailDto,
   newDraftEmailDto,
   newSearchEmailDto,
+  newEncryptionBlock,
 } from '../../../test/fixtures.js';
 
 describe('EmailService', () => {
   let service: EmailService;
   let provider: DeepMocked<MailProvider>;
+  let accountService: DeepMocked<AccountService>;
   const userEmail = 'test@example.com';
 
   beforeEach(async () => {
@@ -27,6 +30,7 @@ describe('EmailService', () => {
 
     service = module.get(EmailService);
     provider = module.get<DeepMocked<MailProvider>>(MailProvider);
+    accountService = module.get<DeepMocked<AccountService>>(AccountService);
   });
 
   describe('getMailboxes', () => {
@@ -140,6 +144,55 @@ describe('EmailService', () => {
         BadRequestException,
       );
       expect(provider.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('when DTO has encryption block, then serializes it into textBody and clears htmlBody', async () => {
+      const encryption = newEncryptionBlock();
+      const dto = newSendEmailDto({ encryption, htmlBody: '<p>original</p>' });
+      provider.sendEmail.mockResolvedValue({ id: 'enc-id' });
+
+      await service.sendEmail(userEmail, dto);
+
+      const expectedBundle = Buffer.from(JSON.stringify(encryption)).toString(
+        'base64',
+      );
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({
+          textBody: `INTERNXT-ENCRYPTED-EMAIL-v1\n${expectedBundle}`,
+          htmlBody: undefined,
+        }),
+      );
+    });
+
+    it('when DTO has no encryption, then passes body through unchanged', async () => {
+      const dto = newSendEmailDto({ htmlBody: '<p>hello</p>' });
+      provider.sendEmail.mockResolvedValue({ id: 'plain-id' });
+
+      await service.sendEmail(userEmail, dto);
+
+      expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto);
+    });
+  });
+
+  describe('lookupRecipientKeys', () => {
+    it('when called, then delegates to accountService and wraps the result', async () => {
+      const recipients = [
+        { address: 'alice@internxt.me', publicKey: 'pubkey-alice' },
+        { address: 'bob@external.com', publicKey: null },
+      ];
+      accountService.lookupPublicKeysForAddresses.mockResolvedValue(recipients);
+
+      const result = await service.lookupRecipientKeys([
+        'alice@internxt.me',
+        'bob@external.com',
+      ]);
+
+      expect(accountService.lookupPublicKeysForAddresses).toHaveBeenCalledWith([
+        'alice@internxt.me',
+        'bob@external.com',
+      ]);
+      expect(result).toEqual({ recipients });
     });
   });
 

@@ -53,6 +53,18 @@ export interface ListEmails {
   unread?: boolean;
 }
 
+export interface EncryptedWrappedKey {
+  hybridCiphertext: string;
+  encryptedKey: string;
+}
+
+export interface EncryptionBlock {
+  version: 'v1';
+  encryptedSubject: string;
+  encryptedText: string;
+  wrappedKeys: Record<string, EncryptedWrappedKey>;
+}
+
 export interface SendEmailDto {
   to: EmailAddress[];
   cc?: EmailAddress[];
@@ -60,6 +72,7 @@ export interface SendEmailDto {
   subject: string;
   textBody?: string;
   htmlBody?: string;
+  encryption?: EncryptionBlock;
 }
 
 export interface DraftEmailDto {

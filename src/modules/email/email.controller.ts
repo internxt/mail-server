@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
   ApiNoContentResponse,
@@ -30,6 +31,8 @@ import {
   EmailCreatedResponseDto,
   EmailListResponseDto,
   EmailResponseDto,
+  LookupRecipientKeysRequestDto,
+  LookupRecipientKeysResponseDto,
   MailboxResponseDto,
   SearchEmailQueryDto,
   MailDomainDto,
@@ -165,6 +168,25 @@ export class EmailController {
   @ApiNotFoundResponse({ description: 'Email not found' })
   get(@MailAddress('address') email: string, @Param('id') id: string) {
     return this.emailService.getEmail(email, id);
+  }
+
+  @Post('keys/lookup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Look up recipient public keys',
+    description:
+      'Returns the public encryption key for each address if it belongs to an ' +
+      'active Internxt domain. Returns null for external or unknown addresses.',
+  })
+  @ApiBody({ type: LookupRecipientKeysRequestDto })
+  @ApiOkResponse({ type: LookupRecipientKeysResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid request: 1-50 valid emails required',
+  })
+  lookupRecipientKeys(
+    @Body() dto: LookupRecipientKeysRequestDto,
+  ): Promise<LookupRecipientKeysResponseDto> {
+    return this.emailService.lookupRecipientKeys(dto.addresses);
   }
 
   @Post('send')

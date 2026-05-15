@@ -204,6 +204,112 @@ describe('AccountService', () => {
     });
   });
 
+  describe('lookupPublicKeysForAddresses', () => {
+    it('when no addresses belong to active Internxt domains, then returns null publicKey for every address without DB lookups', async () => {
+      domains.findAllActive.mockResolvedValue([
+        newMailDomainAttributes({ domain: 'internxt.com' }),
+      ]);
+
+      const result = await service.lookupPublicKeysForAddresses([
+        'a@external.com',
+        'b@gmail.com',
+      ]);
+
+      expect(result).toEqual([
+        { address: 'a@external.com', publicKey: null },
+        { address: 'b@gmail.com', publicKey: null },
+      ]);
+      expect(addresses.findAddressIdsByAddresses).not.toHaveBeenCalled();
+      expect(keys.findPublicKeysByAddressIds).not.toHaveBeenCalled();
+    });
+
+    it('when called with a mix of internal and external addresses, then resolves keys only for the internal ones and preserves input order', async () => {
+      domains.findAllActive.mockResolvedValue([
+        newMailDomainAttributes({ domain: 'internxt.com' }),
+        newMailDomainAttributes({ domain: 'internxt.me' }),
+      ]);
+      addresses.findAddressIdsByAddresses.mockResolvedValue(
+        new Map([
+          ['alice@internxt.com', 'addr-1'],
+          ['bob@internxt.me', 'addr-2'],
+        ]),
+      );
+      keys.findPublicKeysByAddressIds.mockResolvedValue(
+        new Map([
+          ['addr-1', 'pubkey-alice'],
+          ['addr-2', 'pubkey-bob'],
+        ]),
+      );
+
+      const result = await service.lookupPublicKeysForAddresses([
+        'alice@internxt.com',
+        'eve@external.com',
+        'bob@internxt.me',
+      ]);
+
+      expect(addresses.findAddressIdsByAddresses).toHaveBeenCalledWith([
+        'alice@internxt.com',
+        'bob@internxt.me',
+      ]);
+      expect(keys.findPublicKeysByAddressIds).toHaveBeenCalledWith([
+        'addr-1',
+        'addr-2',
+      ]);
+      expect(result).toEqual([
+        { address: 'alice@internxt.com', publicKey: 'pubkey-alice' },
+        { address: 'eve@external.com', publicKey: null },
+        { address: 'bob@internxt.me', publicKey: 'pubkey-bob' },
+      ]);
+    });
+
+    it('when an internal address has no provisioned keys, then returns null for that address', async () => {
+      domains.findAllActive.mockResolvedValue([
+        newMailDomainAttributes({ domain: 'internxt.com' }),
+      ]);
+      addresses.findAddressIdsByAddresses.mockResolvedValue(
+        new Map([['alice@internxt.com', 'addr-1']]),
+      );
+      keys.findPublicKeysByAddressIds.mockResolvedValue(new Map());
+
+      const result = await service.lookupPublicKeysForAddresses([
+        'alice@internxt.com',
+      ]);
+
+      expect(result).toEqual([
+        { address: 'alice@internxt.com', publicKey: null },
+      ]);
+    });
+
+    it('when an internal address has no row in the addresses table, then returns null for that address', async () => {
+      domains.findAllActive.mockResolvedValue([
+        newMailDomainAttributes({ domain: 'internxt.com' }),
+      ]);
+      addresses.findAddressIdsByAddresses.mockResolvedValue(new Map());
+      keys.findPublicKeysByAddressIds.mockResolvedValue(new Map());
+
+      const result = await service.lookupPublicKeysForAddresses([
+        'ghost@internxt.com',
+      ]);
+
+      expect(result).toEqual([
+        { address: 'ghost@internxt.com', publicKey: null },
+      ]);
+    });
+
+    it('when input contains a malformed address with no @, then it is treated as external and returns null', async () => {
+      domains.findAllActive.mockResolvedValue([
+        newMailDomainAttributes({ domain: 'internxt.com' }),
+      ]);
+
+      const result = await service.lookupPublicKeysForAddresses([
+        'not-an-email',
+      ]);
+
+      expect(result).toEqual([{ address: 'not-an-email', publicKey: null }]);
+      expect(addresses.findAddressIdsByAddresses).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findAccount', () => {
     it('when account exists, then returns it', async () => {
       const account = MailAccount.build(newMailAccountAttributes());

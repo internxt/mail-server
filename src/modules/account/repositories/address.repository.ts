@@ -10,6 +10,8 @@ import { MailAccountModel } from '../models/mail-account.model.js';
 import { MailAddressModel } from '../models/mail-address.model.js';
 import { MailProviderAccountModel } from '../models/mail-provider-account.model.js';
 
+const MAX_BATCH_LOOKUP = 50;
+
 export function toAddressAttributes(
   model: MailAddressModel,
 ): MailAddressAttributes {
@@ -51,12 +53,35 @@ export class AddressRepository {
 
   async findByAddresses(addresses: string[]): Promise<Set<string>> {
     if (addresses.length === 0) return new Set();
+    if (addresses.length > MAX_BATCH_LOOKUP) {
+      throw new Error(
+        `findByAddresses: batch size ${addresses.length} exceeds max ${MAX_BATCH_LOOKUP}`,
+      );
+    }
 
     const models = await this.addressModel.findAll({
       where: { address: { [Op.in]: addresses } },
     });
 
     return new Set(models.map((m) => m.address));
+  }
+
+  async findAddressIdsByAddresses(
+    addresses: string[],
+  ): Promise<Map<string, string>> {
+    if (addresses.length === 0) return new Map();
+    if (addresses.length > MAX_BATCH_LOOKUP) {
+      throw new Error(
+        `findAddressIdsByAddresses: batch size ${addresses.length} exceeds max ${MAX_BATCH_LOOKUP}`,
+      );
+    }
+
+    const models = await this.addressModel.findAll({
+      where: { address: { [Op.in]: addresses } },
+      attributes: ['id', 'address'],
+    });
+
+    return new Map(models.map((m) => [m.address, m.id]));
   }
 
   async findUserIdByAddress(address: string): Promise<string | null> {
