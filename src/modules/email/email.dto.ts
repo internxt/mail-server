@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail } from 'class-validator';
 import type { MailboxType } from './email.types.js';
 import { MailDomainStatus } from '../account/domain/mail-domain.domain.js';
 
@@ -33,6 +34,31 @@ export class EmailAddressDto {
   email!: string;
 }
 
+export class EncryptedWrappedKeyDto {
+  @ApiProperty({ description: 'Hybrid ciphertext (base64)' })
+  hybridCiphertext!: string;
+
+  @ApiProperty({ description: 'Encrypted symmetric key (base64)' })
+  encryptedKey!: string;
+}
+
+export class EncryptionBlockDto {
+  @ApiProperty({ example: 'v1' })
+  version!: 'v1';
+
+  @ApiProperty({ description: 'Encrypted subject (base64)' })
+  encryptedSubject!: string;
+
+  @ApiProperty({ description: 'Encrypted text body (base64)' })
+  encryptedText!: string;
+
+  @ApiProperty({
+    type: Object,
+    description: 'Per-address wrapped keys, keyed by email address',
+  })
+  wrappedKeys!: Record<string, EncryptedWrappedKeyDto>;
+}
+
 export class SendEmailRequestDto {
   @ApiProperty({
     type: [EmailAddressDto],
@@ -60,6 +86,39 @@ export class SendEmailRequestDto {
     description: 'HTML version of the email body',
   })
   htmlBody?: string;
+
+  @ApiPropertyOptional({ type: EncryptionBlockDto })
+  encryption?: EncryptionBlockDto;
+}
+
+export class LookupRecipientKeysRequestDto {
+  @ApiProperty({
+    type: [String],
+    description: '1-50 email addresses to look up',
+    example: ['alice@internxt.me', 'bob@internxt.com'],
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @IsEmail({}, { each: true })
+  addresses!: string[];
+}
+
+export class RecipientKeyDto {
+  @ApiProperty({ example: 'alice@internxt.me' })
+  address!: string;
+
+  @ApiProperty({
+    example: 'base64encodedpublickey==',
+    nullable: true,
+    type: String,
+  })
+  publicKey!: string | null;
+}
+
+export class LookupRecipientKeysResponseDto {
+  @ApiProperty({ type: [RecipientKeyDto] })
+  recipients!: RecipientKeyDto[];
 }
 
 export class DraftEmailRequestDto {

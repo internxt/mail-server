@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AccountService } from '../account/account.service.js';
 import { MailProvider } from './mail-provider.port.js';
 import type {
   DraftEmailDto,
@@ -15,9 +16,14 @@ import type {
   SendEmailDto,
 } from './email.types.js';
 
+const ENCRYPTED_PREFIX = 'INTERNXT-ENCRYPTED-EMAIL-v1';
+
 @Injectable()
 export class EmailService {
-  constructor(private readonly mail: MailProvider) {}
+  constructor(
+    private readonly mail: MailProvider,
+    private readonly accountService: AccountService,
+  ) {}
 
   getMailboxes(userEmail: string): Promise<Mailbox[]> {
     return this.mail.getMailboxes(userEmail);
@@ -44,6 +50,14 @@ export class EmailService {
     return this.mail.search(params);
   }
 
+  async lookupRecipientKeys(addresses: string[]): Promise<{
+    recipients: Array<{ address: string; publicKey: string | null }>;
+  }> {
+    const recipients =
+      await this.accountService.lookupPublicKeysForAddresses(addresses);
+    return { recipients };
+  }
+
   async sendEmail(
     userEmail: string,
     dto: SendEmailDto,
@@ -51,6 +65,18 @@ export class EmailService {
     if (dto.to.length === 0) {
       throw new BadRequestException('At least one recipient is required');
     }
+
+    if (dto.encryption) {
+      const bundle = Buffer.from(JSON.stringify(dto.encryption)).toString(
+        'base64',
+      );
+      dto = {
+        ...dto,
+        textBody: `${ENCRYPTED_PREFIX}\n${bundle}`,
+        htmlBody: undefined,
+      };
+    }
+
     return this.mail.sendEmail(userEmail, dto);
   }
 

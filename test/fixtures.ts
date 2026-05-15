@@ -8,6 +8,8 @@ import type {
   DraftEmailDto,
   MailboxType,
   SearchEmailDto,
+  EncryptedWrappedKey,
+  EncryptionBlock,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import {
@@ -136,6 +138,30 @@ export function newEmail(attrs?: Partial<Email>): Email {
     sentAt: randomISODate(),
     textBody: random.paragraph(),
     htmlBody: `<p>${random.paragraph()}</p>`,
+    ...attrs,
+  };
+}
+
+export function newEncryptedWrappedKey(
+  attrs?: Partial<EncryptedWrappedKey>,
+): EncryptedWrappedKey {
+  return {
+    hybridCiphertext: random.hash({ length: 64 }),
+    encryptedKey: random.hash({ length: 64 }),
+    ...attrs,
+  };
+}
+
+export function newEncryptionBlock(
+  attrs?: Partial<EncryptionBlock>,
+): EncryptionBlock {
+  return {
+    version: 'v1',
+    encryptedSubject: random.hash({ length: 32 }),
+    encryptedText: random.hash({ length: 128 }),
+    wrappedKeys: {
+      [random.email()]: newEncryptedWrappedKey(),
+    },
     ...attrs,
   };
 }

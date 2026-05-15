@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
+import { Op } from 'sequelize';
 import {
   MailAddressKeys,
   type MailAddressKeysAttributes,
 } from '../domain/mail-address-keys.domain.js';
 import { MailAddressKeysModel } from '../models/mail-address-keys.model.js';
+
+const MAX_BATCH_LOOKUP = 50;
 
 export interface CreateMailAddressKeysParams {
   mailAddressId: string;
@@ -30,6 +33,24 @@ export class MailAddressKeysRepository {
   ): Promise<MailAddressKeys | null> {
     const model = await this.keysModel.findOne({ where: { mailAddressId } });
     return model ? this.toDomain(model) : null;
+  }
+
+  async findPublicKeysByAddressIds(
+    mailAddressIds: string[],
+  ): Promise<Map<string, string>> {
+    if (mailAddressIds.length === 0) return new Map();
+    if (mailAddressIds.length > MAX_BATCH_LOOKUP) {
+      throw new Error(
+        `findPublicKeysByAddressIds: batch size ${mailAddressIds.length} exceeds max ${MAX_BATCH_LOOKUP}`,
+      );
+    }
+
+    const models = await this.keysModel.findAll({
+      where: { mailAddressId: { [Op.in]: mailAddressIds } },
+      attributes: ['mailAddressId', 'publicKey'],
+    });
+
+    return new Map(models.map((m) => [m.mailAddressId, m.publicKey]));
   }
 
   async deleteByAddressId(mailAddressId: string): Promise<void> {

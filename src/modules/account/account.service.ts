@@ -70,6 +70,36 @@ export class AccountService {
     return this.domains.findAllActive();
   }
 
+  async lookupPublicKeysForAddresses(
+    addresses: string[],
+  ): Promise<Array<{ address: string; publicKey: string | null }>> {
+    const activeDomains = await this.domains.findAllActive();
+    const domainSet = new Set(activeDomains.map((d) => d.domain));
+
+    const internxtAddresses = addresses.filter((a) => {
+      const domain = a.split('@')[1];
+      return domain && domainSet.has(domain);
+    });
+
+    if (internxtAddresses.length === 0) {
+      return addresses.map((address) => ({ address, publicKey: null }));
+    }
+
+    const addressIdMap =
+      await this.addresses.findAddressIdsByAddresses(internxtAddresses);
+    const keyMap = await this.keys.findPublicKeysByAddressIds([
+      ...addressIdMap.values(),
+    ]);
+
+    return addresses.map((address) => {
+      const addressId = addressIdMap.get(address);
+      return {
+        address,
+        publicKey: addressId ? (keyMap.get(addressId) ?? null) : null,
+      };
+    });
+  }
+
   async findAccount(userId: string): Promise<MailAccount | null> {
     return this.accounts.findByUserId(userId);
   }

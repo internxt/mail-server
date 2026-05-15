@@ -31,6 +31,26 @@ describe('EmailController', () => {
     accountService = module.get(AccountService);
   });
 
+  describe('lookupRecipientKeys', () => {
+    it('when called with valid addresses, then returns recipients from the service', async () => {
+      const recipients = [
+        { address: 'alice@internxt.me', publicKey: 'pubkey-alice' },
+        { address: 'bob@external.com', publicKey: null },
+      ];
+      emailService.lookupRecipientKeys.mockResolvedValue({ recipients });
+
+      const result = await controller.lookupRecipientKeys({
+        addresses: ['alice@internxt.me', 'bob@external.com'],
+      });
+
+      expect(emailService.lookupRecipientKeys).toHaveBeenCalledWith([
+        'alice@internxt.me',
+        'bob@external.com',
+      ]);
+      expect(result).toEqual({ recipients });
+    });
+  });
+
   describe('getDomains', () => {
     it('when getDomains is called, then it returns the active domains', async () => {
       const domains = [
