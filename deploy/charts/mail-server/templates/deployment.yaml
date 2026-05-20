@@ -45,16 +45,10 @@ spec:
               value: {{ .Values.stalwart.jmapUrl | quote }}
             - name: STALWART_ADMIN_URL
               value: {{ .Values.stalwart.adminUrl | quote }}
-            - name: STALWART_ADMIN_USER
-              value: {{ .Values.stalwart.adminUser | quote }}
-            - name: STALWART_MASTER_USER
-              value: {{ .Values.stalwart.masterUser | quote }}
             - name: PAYMENTS_API_URL
               value: {{ .Values.paymentsApiUrl | quote }}
             - name: REDIS_URL
               value: {{ .Values.redisUrl | quote }}
-            - name: MTA_HOOKS_USERNAME
-              value: {{ .Values.mta.hooksUsername | quote }}
 
           envFrom:
             - secretRef:
