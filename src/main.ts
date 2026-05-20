@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: `.env.${process.env.NODE_ENV}` });
 
-import { RequestMethod, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
@@ -45,9 +45,6 @@ async function bootstrap() {
 
   app.use(helmet());
 
-  app.setGlobalPrefix('api', {
-    exclude: [{ path: 'health', method: RequestMethod.GET }],
-  });
   app.disable('x-powered-by');
   app.enableShutdownHooks();
 
@@ -58,9 +55,7 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig, {
-    ignoreGlobalPrefix: true,
-  });
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
 
   const customOptions: SwaggerCustomOptions = {
     swaggerOptions: {
@@ -68,7 +63,7 @@ async function bootstrap() {
     },
   };
 
-  SwaggerModule.setup('api', app, document, customOptions);
+  SwaggerModule.setup('docs', app, document, customOptions);
   await app.listen(APP_PORT);
   logger.log(`Application listening on port: ${APP_PORT}`);
   logger.log(`Trusting proxy enabled: ${enableTrustProxy ? 'yes' : 'no'}`);
