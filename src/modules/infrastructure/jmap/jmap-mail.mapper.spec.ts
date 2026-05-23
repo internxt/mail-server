@@ -333,7 +333,7 @@ describe('jmap-mail.mapper', () => {
       const dto = newSendEmailDto();
       const mailboxId = 'sent-mailbox-id';
 
-      const result = mapSendDtoToJmapCreate(dto, mailboxId);
+      const result = mapSendDtoToJmapCreate(dto, mailboxId, newEmailAddress());
 
       expect(result.mailboxIds).toEqual({ [mailboxId]: true });
     });
@@ -341,7 +341,7 @@ describe('jmap-mail.mapper', () => {
     it('when given a send DTO, then sets $seen', () => {
       const dto = newSendEmailDto();
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.keywords).toEqual({ $seen: true });
     });
@@ -350,7 +350,7 @@ describe('jmap-mail.mapper', () => {
       const to = [newEmailAddress()];
       const dto = newSendEmailDto({ to, subject: 'Test subject' });
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.to).toEqual(to);
       expect(result.subject).toBe('Test subject');
@@ -361,7 +361,7 @@ describe('jmap-mail.mapper', () => {
       const bcc = [newEmailAddress()];
       const dto = newSendEmailDto({ cc, bcc });
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.cc).toEqual(cc);
       expect(result.bcc).toEqual(bcc);
@@ -370,7 +370,7 @@ describe('jmap-mail.mapper', () => {
     it('when DTO has no cc and bcc, then omits them', () => {
       const dto = newSendEmailDto({ cc: undefined, bcc: undefined });
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.cc).toBeUndefined();
       expect(result.bcc).toBeUndefined();
@@ -379,7 +379,7 @@ describe('jmap-mail.mapper', () => {
     it('when DTO has textBody, then creates text body part and bodyValues', () => {
       const dto = newSendEmailDto({ textBody: 'Hello' });
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.textBody).toEqual([{ partId: 'text', type: 'text/plain' }]);
       expect(result.bodyValues?.['text']?.value).toBe('Hello');
@@ -388,7 +388,7 @@ describe('jmap-mail.mapper', () => {
     it('when DTO has htmlBody, then creates html body part and bodyValues', () => {
       const dto = newSendEmailDto({ htmlBody: '<p>Hi</p>' });
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.htmlBody).toEqual([{ partId: 'html', type: 'text/html' }]);
       expect(result.bodyValues?.['html']?.value).toBe('<p>Hi</p>');
@@ -400,7 +400,7 @@ describe('jmap-mail.mapper', () => {
         htmlBody: '<p>Hello</p>',
       });
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.bodyValues?.['text']?.value).toBe('Hello');
       expect(result.bodyValues?.['html']?.value).toBe('<p>Hello</p>');
@@ -412,7 +412,7 @@ describe('jmap-mail.mapper', () => {
         htmlBody: undefined,
       });
 
-      const result = mapSendDtoToJmapCreate(dto, 'mid');
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.textBody).toBeUndefined();
       expect(result.htmlBody).toBeUndefined();
@@ -424,7 +424,7 @@ describe('jmap-mail.mapper', () => {
     it('when given a draft DTO, then sets $draft keyword', () => {
       const dto = newDraftEmailDto();
 
-      const result = mapDraftDtoToJmapCreate(dto, 'mid');
+      const result = mapDraftDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.keywords).toEqual({ $draft: true });
     });
@@ -433,7 +433,7 @@ describe('jmap-mail.mapper', () => {
       const dto = newDraftEmailDto();
       const mailboxId = 'drafts-mailbox-id';
 
-      const result = mapDraftDtoToJmapCreate(dto, mailboxId);
+      const result = mapDraftDtoToJmapCreate(dto, mailboxId, newEmailAddress());
 
       expect(result.mailboxIds).toEqual({ [mailboxId]: true });
     });
@@ -441,7 +441,7 @@ describe('jmap-mail.mapper', () => {
     it('when draft DTO has all fields empty, then creates minimal object', () => {
       const dto: DraftEmailDto = {};
 
-      const result = mapDraftDtoToJmapCreate(dto, 'mid');
+      const result = mapDraftDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.to).toBeUndefined();
       expect(result.cc).toBeUndefined();
@@ -463,7 +463,7 @@ describe('jmap-mail.mapper', () => {
         textBody: 'Draft text',
       });
 
-      const result = mapDraftDtoToJmapCreate(dto, 'mid');
+      const result = mapDraftDtoToJmapCreate(dto, 'mid', newEmailAddress());
 
       expect(result.to).toEqual(to);
       expect(result.cc).toEqual(cc);
