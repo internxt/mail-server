@@ -193,6 +193,42 @@ export class JmapMailProvider extends MailProvider {
     return email ? mapJmapEmailToDetail(email) : null;
   }
 
+  async getTextBodies(
+    userEmail: string,
+    ids: string[],
+  ): Promise<Map<string, string | null>> {
+    const bodies = new Map<string, string | null>();
+    if (ids.length === 0) return bodies;
+
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
+      userEmail,
+      [
+        [
+          'Email/get',
+          {
+            accountId,
+            ids,
+            properties: ['id', 'textBody', 'bodyValues'],
+            fetchTextBodyValues: true,
+          },
+          'r0',
+        ],
+      ],
+    );
+
+    for (const email of response.methodResponses[0]![1].list) {
+      const partId = email.textBody?.[0]?.partId;
+      bodies.set(
+        email.id,
+        partId ? (email.bodyValues?.[partId]?.value ?? null) : null,
+      );
+    }
+
+    return bodies;
+  }
+
   async search({
     userEmail,
     limit,

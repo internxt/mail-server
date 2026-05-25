@@ -49,6 +49,11 @@ export class EncryptionBlockDto {
   @ApiProperty({ description: 'Encrypted subject (base64)' })
   encryptedSubject!: string;
 
+  @ApiProperty({
+    description: 'Encrypted preview snippet (base64), ~256 chars plaintext',
+  })
+  encryptedPreview!: string;
+
   @ApiProperty({ description: 'Encrypted text body (base64)' })
   encryptedText!: string;
 
@@ -186,6 +191,20 @@ export class MailboxResponseDto {
   unreadEmails!: number;
 }
 
+export class EncryptedSummaryDto {
+  @ApiProperty({ description: 'Encrypted subject (base64)' })
+  encryptedSubject!: string;
+
+  @ApiProperty({ description: 'Encrypted preview snippet (base64)' })
+  encryptedPreview!: string;
+
+  @ApiProperty({
+    type: EncryptedWrappedKeyDto,
+    description: "The authenticated caller's wrapped key",
+  })
+  wrappedKey!: EncryptedWrappedKeyDto;
+}
+
 export class EmailSummaryResponseDto {
   @ApiProperty({ example: 'Ma1f09b…' })
   id!: string;
@@ -222,6 +241,16 @@ export class EmailSummaryResponseDto {
 
   @ApiProperty({ example: 4096, description: 'Size in bytes' })
   size!: number;
+
+  @ApiPropertyOptional({
+    type: EncryptedSummaryDto,
+    nullable: true,
+    description:
+      'Present only for encrypted emails the caller can decrypt. Carries the ' +
+      'encrypted subject/preview and the caller’s wrapped key for inline ' +
+      'client-side decryption.',
+  })
+  encryption?: EncryptedSummaryDto | null;
 }
 
 export class EmailResponseDto extends EmailSummaryResponseDto {

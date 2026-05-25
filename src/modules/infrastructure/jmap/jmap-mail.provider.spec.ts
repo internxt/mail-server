@@ -180,6 +180,35 @@ describe('JmapMailProvider', () => {
     });
   });
 
+  describe('getTextBodies', () => {
+    it('When ids are empty, then it returns an empty map without requesting', async () => {
+      const result = await provider.getTextBodies('user@test.com', []);
+
+      expect(result.size).toBe(0);
+      expect(jmapService.request).not.toHaveBeenCalled();
+    });
+
+    it('When ids are given, then it maps each id to its text body value', async () => {
+      const email = newJmapEmail();
+      const partId = email.textBody![0]!.partId!;
+      const expectedBody = email.bodyValues![partId]!.value;
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [email] }));
+
+      const result = await provider.getTextBodies('user@test.com', [email.id]);
+
+      expect(result.get(email.id)).toBe(expectedBody);
+    });
+
+    it('When an email has no text part, then its value is null', async () => {
+      const email = newJmapEmail({ textBody: [], bodyValues: {} });
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [email] }));
+
+      const result = await provider.getTextBodies('user@test.com', [email.id]);
+
+      expect(result.get(email.id)).toBeNull();
+    });
+  });
+
   describe('sendEmail', () => {
     it('When email is created and submitted, then it returns the created id', async () => {
       const sentMailbox = newJmapMailbox({ role: 'sent' });
