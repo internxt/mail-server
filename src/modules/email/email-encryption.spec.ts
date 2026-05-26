@@ -44,41 +44,16 @@ describe('email-encryption', () => {
   });
 
   describe('projectForCaller', () => {
-    it('when caller has a wrapped key, then projects subject, preview and only that key', () => {
-      const callerKey = newEncryptedWrappedKey();
-      const envelope = newEncryptionBlock({
-        wrappedKeys: {
-          'caller@internxt.me': callerKey,
-          'other@internxt.me': newEncryptedWrappedKey(),
-        },
-      });
+    it('when given an envelope, then projects the preview and full wrapped-key array', () => {
+      const wrappedKeys = [newEncryptedWrappedKey(), newEncryptedWrappedKey()];
+      const envelope = newEncryptionBlock({ wrappedKeys });
 
-      const result = projectForCaller(envelope, 'caller@internxt.me');
+      const result = projectForCaller(envelope);
 
       expect(result).toEqual({
-        encryptedSubject: envelope.encryptedSubject,
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKey: callerKey,
+        wrappedKeys,
       });
-    });
-
-    it('when caller address differs in case, then matches case-insensitively', () => {
-      const callerKey = newEncryptedWrappedKey();
-      const envelope = newEncryptionBlock({
-        wrappedKeys: { 'caller@internxt.me': callerKey },
-      });
-
-      const result = projectForCaller(envelope, 'Caller@Internxt.ME');
-
-      expect(result?.wrappedKey).toEqual(callerKey);
-    });
-
-    it('when caller has no wrapped key, then returns null', () => {
-      const envelope = newEncryptionBlock({
-        wrappedKeys: { 'someone@internxt.me': newEncryptedWrappedKey() },
-      });
-
-      expect(projectForCaller(envelope, 'caller@internxt.me')).toBeNull();
     });
   });
 });

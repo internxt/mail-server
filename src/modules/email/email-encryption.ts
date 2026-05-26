@@ -33,20 +33,15 @@ export function parseEnvelope(textBody: string): EncryptionBlock | null {
 }
 
 /**
- * Projects the summary-safe fields for a single caller: the shared encrypted
- * subject/preview plus only that caller's wrapped key. Never exposes the full
- * per-recipient key map. Returns null when the caller has no key (cannot decrypt).
+ * Projects the summary-safe fields from an envelope: the encrypted preview plus
+ * the de-identified wrapped-key array. The client trial-decrypts the keys to
+ * determine readability — the backend holds no keys and cannot filter per caller.
  */
 export function projectForCaller(
   envelope: EncryptionBlock,
-  callerEmail: string,
-): EncryptedSummaryFields | null {
-  const wrappedKey = envelope.wrappedKeys[callerEmail.toLowerCase()];
-  if (!wrappedKey) return null;
-
+): EncryptedSummaryFields {
   return {
-    encryptedSubject: envelope.encryptedSubject,
     encryptedPreview: envelope.encryptedPreview,
-    wrappedKey,
+    wrappedKeys: envelope.wrappedKeys,
   };
 }

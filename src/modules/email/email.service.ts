@@ -62,11 +62,6 @@ export class EmailService {
     return result;
   }
 
-  /**
-   * Path 2a: for encrypted rows on the page, fetch their bodies in one batched
-   * call, parse the envelope, and project only the caller's decryptable fields
-   * onto the summary. Plaintext-only pages incur no extra call.
-   */
   private async enrichEncryptedSummaries(
     userEmail: string,
     summaries: EmailSummary[],
@@ -82,9 +77,7 @@ export class EmailService {
     for (const summary of encrypted) {
       const body = bodies.get(summary.id);
       const envelope = body ? parseEnvelope(body) : null;
-      summary.encryption = envelope
-        ? projectForCaller(envelope, userEmail)
-        : null;
+      summary.encryption = envelope ? projectForCaller(envelope) : null;
     }
   }
 

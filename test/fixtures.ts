@@ -157,12 +157,9 @@ export function newEncryptionBlock(
 ): EncryptionBlock {
   return {
     version: 'v1',
-    encryptedSubject: random.hash({ length: 32 }),
     encryptedPreview: random.hash({ length: 64 }),
     encryptedText: random.hash({ length: 128 }),
-    wrappedKeys: {
-      [random.email()]: newEncryptedWrappedKey(),
-    },
+    wrappedKeys: [newEncryptedWrappedKey()],
     ...attrs,
   };
 }

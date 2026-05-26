@@ -21,9 +21,8 @@ export interface Mailbox {
 }
 
 export interface EncryptedSummaryFields {
-  encryptedSubject: string;
   encryptedPreview: string;
-  wrappedKey: EncryptedWrappedKey;
+  wrappedKeys: EncryptedWrappedKey[];
 }
 
 export interface EmailSummary {
@@ -67,10 +66,9 @@ export interface EncryptedWrappedKey {
 
 export interface EncryptionBlock {
   version: 'v1';
-  encryptedSubject: string;
   encryptedPreview: string;
   encryptedText: string;
-  wrappedKeys: Record<string, EncryptedWrappedKey>;
+  wrappedKeys: EncryptedWrappedKey[];
 }
 
 export interface SendEmailDto {

@@ -46,9 +46,6 @@ export class EncryptionBlockDto {
   @ApiProperty({ example: 'v1' })
   version!: 'v1';
 
-  @ApiProperty({ description: 'Encrypted subject (base64)' })
-  encryptedSubject!: string;
-
   @ApiProperty({
     description: 'Encrypted preview snippet (base64), ~256 chars plaintext',
   })
@@ -58,10 +55,10 @@ export class EncryptionBlockDto {
   encryptedText!: string;
 
   @ApiProperty({
-    type: Object,
-    description: 'Per-address wrapped keys, keyed by email address',
+    type: [EncryptedWrappedKeyDto],
+    description: 'De-identified wrapped keys, one per recipient',
   })
-  wrappedKeys!: Record<string, EncryptedWrappedKeyDto>;
+  wrappedKeys!: EncryptedWrappedKeyDto[];
 }
 
 export class SendEmailRequestDto {
@@ -192,17 +189,15 @@ export class MailboxResponseDto {
 }
 
 export class EncryptedSummaryDto {
-  @ApiProperty({ description: 'Encrypted subject (base64)' })
-  encryptedSubject!: string;
-
   @ApiProperty({ description: 'Encrypted preview snippet (base64)' })
   encryptedPreview!: string;
 
   @ApiProperty({
-    type: EncryptedWrappedKeyDto,
-    description: "The authenticated caller's wrapped key",
+    type: [EncryptedWrappedKeyDto],
+    description:
+      'De-identified wrapped keys; the client trial-decrypts to read',
   })
-  wrappedKey!: EncryptedWrappedKeyDto;
+  wrappedKeys!: EncryptedWrappedKeyDto[];
 }
 
 export class EmailSummaryResponseDto {
@@ -246,9 +241,8 @@ export class EmailSummaryResponseDto {
     type: EncryptedSummaryDto,
     nullable: true,
     description:
-      'Present only for encrypted emails the caller can decrypt. Carries the ' +
-      'encrypted subject/preview and the caller’s wrapped key for inline ' +
-      'client-side decryption.',
+      'Present only for encrypted emails. Carries the encrypted preview and ' +
+      'the de-identified wrapped keys for inline client-side decryption.',
   })
   encryption?: EncryptedSummaryDto | null;
 }

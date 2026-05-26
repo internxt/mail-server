@@ -102,11 +102,9 @@ describe('EmailService', () => {
       expect(provider.getTextBodies).not.toHaveBeenCalled();
     });
 
-    it('when page has encrypted rows, then it enriches only those with the caller key', async () => {
+    it('when page has encrypted rows, then it enriches those with the preview and wrapped keys', async () => {
       const envelope = newEncryptionBlock({
-        wrappedKeys: {
-          [userEmail.toLowerCase()]: newEncryptedWrappedKey(),
-        },
+        wrappedKeys: [newEncryptedWrappedKey(), newEncryptedWrappedKey()],
       });
       const encrypted = newEmailSummary({
         preview: `${ENCRYPTED_PREFIX} truncated…`,
@@ -132,17 +130,13 @@ describe('EmailService', () => {
         encrypted.id,
       ]);
       expect(result.emails[0]!.encryption).toEqual({
-        encryptedSubject: envelope.encryptedSubject,
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKey: envelope.wrappedKeys[userEmail.toLowerCase()],
+        wrappedKeys: envelope.wrappedKeys,
       });
       expect(result.emails[1]!.encryption).toBeUndefined();
     });
 
-    it('when caller has no wrapped key for an encrypted row, then encryption is null', async () => {
-      const envelope = newEncryptionBlock({
-        wrappedKeys: { 'someone-else@internxt.me': newEncryptedWrappedKey() },
-      });
+    it('when an encrypted row body is missing, then encryption is null', async () => {
       const encrypted = newEmailSummary({
         preview: `${ENCRYPTED_PREFIX} truncated…`,
       });
@@ -152,9 +146,7 @@ describe('EmailService', () => {
         total: 1,
         hasMoreMails: false,
       });
-      provider.getTextBodies.mockResolvedValue(
-        new Map([[encrypted.id, packEnvelope(envelope)]]),
-      );
+      provider.getTextBodies.mockResolvedValue(new Map());
 
       const result = await service.listEmails({
         userEmail,
