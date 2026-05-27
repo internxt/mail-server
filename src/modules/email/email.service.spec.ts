@@ -133,7 +133,40 @@ describe('EmailService', () => {
         encryptedPreview: envelope.encryptedPreview,
         wrappedKeys: envelope.wrappedKeys,
       });
+      expect(result.emails[0]!.preview).toBe('');
       expect(result.emails[1]!.encryption).toBeUndefined();
+      expect(result.emails[1]!.preview).toBe('plain preview');
+    });
+
+    it('when an encrypted preview has leading whitespace, then it is still detected and enriched', async () => {
+      const envelope = newEncryptionBlock();
+      const encrypted = newEmailSummary({
+        preview: `\n  ${ENCRYPTED_PREFIX} truncated…`,
+      });
+
+      provider.listEmails.mockResolvedValue({
+        emails: [encrypted],
+        total: 1,
+        hasMoreMails: false,
+      });
+      provider.getTextBodies.mockResolvedValue(
+        new Map([[encrypted.id, packEnvelope(envelope)]]),
+      );
+
+      const result = await service.listEmails({
+        userEmail,
+        limit: 20,
+        position: 0,
+      });
+
+      expect(provider.getTextBodies).toHaveBeenCalledWith(userEmail, [
+        encrypted.id,
+      ]);
+      expect(result.emails[0]!.encryption).toEqual({
+        encryptedPreview: envelope.encryptedPreview,
+        wrappedKeys: envelope.wrappedKeys,
+      });
+      expect(result.emails[0]!.preview).toBe('');
     });
 
     it('when an encrypted row body is missing, then encryption is null', async () => {
@@ -155,6 +188,7 @@ describe('EmailService', () => {
       });
 
       expect(result.emails[0]!.encryption).toBeNull();
+      expect(result.emails[0]!.preview).toBe('');
     });
   });
 

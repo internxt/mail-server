@@ -78,6 +78,7 @@ export class EmailService {
       const body = bodies.get(summary.id);
       const envelope = body ? parseEnvelope(body) : null;
       summary.encryption = envelope ? projectForCaller(envelope) : null;
+      summary.preview = '';
     }
   }
 

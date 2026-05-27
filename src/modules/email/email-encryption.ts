@@ -14,15 +14,17 @@ export function packEnvelope(envelope: EncryptionBlock): string {
 /**
  * Cheap detector usable on the summary preview alone — no body fetch required.
  * A provider's preview is derived from the body, which begins with the marker.
+ * Leading whitespace is tolerated
  */
 export function isEncryptedBody(text: string): boolean {
-  return text.startsWith(ENCRYPTED_PREFIX);
+  return text.trimStart().startsWith(ENCRYPTED_PREFIX);
 }
 
 export function parseEnvelope(textBody: string): EncryptionBlock | null {
-  if (!isEncryptedBody(textBody)) return null;
+  const trimmed = textBody.trimStart();
+  if (!trimmed.startsWith(ENCRYPTED_PREFIX)) return null;
 
-  const bundle = textBody.slice(ENCRYPTED_PREFIX.length).trimStart();
+  const bundle = trimmed.slice(ENCRYPTED_PREFIX.length).trimStart();
   try {
     return JSON.parse(
       Buffer.from(bundle, 'base64').toString('utf8'),

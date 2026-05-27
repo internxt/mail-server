@@ -26,6 +26,12 @@ describe('email-encryption', () => {
       expect(parseEnvelope('just a regular plaintext body')).toBeNull();
     });
 
+    it('when packed body has leading whitespace, then parseEnvelope still round-trips', () => {
+      const envelope = newEncryptionBlock();
+
+      expect(parseEnvelope(`\n  ${packEnvelope(envelope)}`)).toEqual(envelope);
+    });
+
     it('when body has the marker but garbage payload, then returns null', () => {
       expect(
         parseEnvelope(`${ENCRYPTED_PREFIX}\nnot-valid-base64-json`),
@@ -40,6 +46,10 @@ describe('email-encryption', () => {
 
     it('when text does not start with the marker, then returns false', () => {
       expect(isEncryptedBody('Hi team, here are the notes')).toBe(false);
+    });
+
+    it('when the marker is preceded by whitespace, then returns true', () => {
+      expect(isEncryptedBody(`\n  ${ENCRYPTED_PREFIX}\nAAAA`)).toBe(true);
     });
   });
 
