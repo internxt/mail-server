@@ -258,7 +258,11 @@ describe('JmapMailProvider', () => {
   describe('saveDraft', () => {
     it('When draft is saved, then it returns the created id', async () => {
       const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
 
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [draftsMailbox] }),
       );
@@ -274,7 +278,11 @@ describe('JmapMailProvider', () => {
 
     it('When draft creation fails, then it throws', async () => {
       const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
 
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [draftsMailbox] }),
       );
