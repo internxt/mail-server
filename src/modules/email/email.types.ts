@@ -20,6 +20,11 @@ export interface Mailbox {
   unreadEmails: number;
 }
 
+export interface EncryptedSummaryFields {
+  encryptedPreview: string;
+  wrappedKeys: EncryptedWrappedKey[];
+}
+
 export interface EmailSummary {
   id: string;
   threadId: string;
@@ -33,6 +38,7 @@ export interface EmailSummary {
   isFlagged: boolean;
   hasAttachment: boolean;
   size: number;
+  encryption?: EncryptedSummaryFields | null;
 }
 
 export interface Email extends EmailSummary {
@@ -60,9 +66,9 @@ export interface EncryptedWrappedKey {
 
 export interface EncryptionBlock {
   version: 'v1';
-  encryptedSubject: string;
+  encryptedPreview: string;
   encryptedText: string;
-  wrappedKeys: Record<string, EncryptedWrappedKey>;
+  wrappedKeys: EncryptedWrappedKey[];
 }
 
 export interface SendEmailDto {

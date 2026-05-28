@@ -13,6 +13,10 @@ export abstract class MailProvider {
   abstract getMailboxes(userEmail: string): Promise<Mailbox[]>;
   abstract listEmails(params: ListEmails): Promise<EmailListResponse>;
   abstract getEmail(userEmail: string, id: string): Promise<Email | null>;
+  abstract getTextBodies(
+    userEmail: string,
+    ids: string[],
+  ): Promise<Map<string, string | null>>;
   abstract sendEmail(
     userEmail: string,
     dto: SendEmailDto,

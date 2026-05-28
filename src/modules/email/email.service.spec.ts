@@ -13,7 +13,9 @@ import {
   newDraftEmailDto,
   newSearchEmailDto,
   newEncryptionBlock,
+  newEncryptedWrappedKey,
 } from '../../../test/fixtures.js';
+import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
 
 describe('EmailService', () => {
   let service: EmailService;
@@ -86,6 +88,107 @@ describe('EmailService', () => {
 
       expect(provider.listEmails).toHaveBeenCalledWith(params);
       expect(result).toBe(response);
+    });
+
+    it('when page has no encrypted rows, then it does not fetch bodies', async () => {
+      provider.listEmails.mockResolvedValue({
+        emails: [newEmailSummary({ preview: 'plain preview' })],
+        total: 1,
+        hasMoreMails: false,
+      });
+
+      await service.listEmails({ userEmail, limit: 20, position: 0 });
+
+      expect(provider.getTextBodies).not.toHaveBeenCalled();
+    });
+
+    it('when page has encrypted rows, then it enriches those with the preview and wrapped keys', async () => {
+      const envelope = newEncryptionBlock({
+        wrappedKeys: [newEncryptedWrappedKey(), newEncryptedWrappedKey()],
+      });
+      const encrypted = newEmailSummary({
+        preview: `${ENCRYPTED_PREFIX} truncated…`,
+      });
+      const plain = newEmailSummary({ preview: 'plain preview' });
+
+      provider.listEmails.mockResolvedValue({
+        emails: [encrypted, plain],
+        total: 2,
+        hasMoreMails: false,
+      });
+      provider.getTextBodies.mockResolvedValue(
+        new Map([[encrypted.id, packEnvelope(envelope)]]),
+      );
+
+      const result = await service.listEmails({
+        userEmail,
+        limit: 20,
+        position: 0,
+      });
+
+      expect(provider.getTextBodies).toHaveBeenCalledWith(userEmail, [
+        encrypted.id,
+      ]);
+      expect(result.emails[0]!.encryption).toEqual({
+        encryptedPreview: envelope.encryptedPreview,
+        wrappedKeys: envelope.wrappedKeys,
+      });
+      expect(result.emails[0]!.preview).toBe('');
+      expect(result.emails[1]!.encryption).toBeUndefined();
+      expect(result.emails[1]!.preview).toBe('plain preview');
+    });
+
+    it('when an encrypted preview has leading whitespace, then it is still detected and enriched', async () => {
+      const envelope = newEncryptionBlock();
+      const encrypted = newEmailSummary({
+        preview: `\n  ${ENCRYPTED_PREFIX} truncated…`,
+      });
+
+      provider.listEmails.mockResolvedValue({
+        emails: [encrypted],
+        total: 1,
+        hasMoreMails: false,
+      });
+      provider.getTextBodies.mockResolvedValue(
+        new Map([[encrypted.id, packEnvelope(envelope)]]),
+      );
+
+      const result = await service.listEmails({
+        userEmail,
+        limit: 20,
+        position: 0,
+      });
+
+      expect(provider.getTextBodies).toHaveBeenCalledWith(userEmail, [
+        encrypted.id,
+      ]);
+      expect(result.emails[0]!.encryption).toEqual({
+        encryptedPreview: envelope.encryptedPreview,
+        wrappedKeys: envelope.wrappedKeys,
+      });
+      expect(result.emails[0]!.preview).toBe('');
+    });
+
+    it('when an encrypted row body is missing, then encryption is null', async () => {
+      const encrypted = newEmailSummary({
+        preview: `${ENCRYPTED_PREFIX} truncated…`,
+      });
+
+      provider.listEmails.mockResolvedValue({
+        emails: [encrypted],
+        total: 1,
+        hasMoreMails: false,
+      });
+      provider.getTextBodies.mockResolvedValue(new Map());
+
+      const result = await service.listEmails({
+        userEmail,
+        limit: 20,
+        position: 0,
+      });
+
+      expect(result.emails[0]!.encryption).toBeNull();
+      expect(result.emails[0]!.preview).toBe('');
     });
   });
 

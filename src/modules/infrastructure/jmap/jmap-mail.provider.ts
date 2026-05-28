@@ -68,7 +68,7 @@ export class JmapMailProvider extends MailProvider {
     string,
     TimedCache<Map<MailboxType, string>>
   >();
-  private readonly identityCache = new Map<string, TimedCache<string>>();
+  private readonly identityCache = new Map<string, TimedCache<Identity>>();
 
   constructor(private readonly jmap: JmapService) {
     super();
@@ -193,6 +193,42 @@ export class JmapMailProvider extends MailProvider {
     return email ? mapJmapEmailToDetail(email) : null;
   }
 
+  async getTextBodies(
+    userEmail: string,
+    ids: string[],
+  ): Promise<Map<string, string | null>> {
+    const bodies = new Map<string, string | null>();
+    if (ids.length === 0) return bodies;
+
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
+      userEmail,
+      [
+        [
+          'Email/get',
+          {
+            accountId,
+            ids,
+            properties: ['id', 'textBody', 'bodyValues'],
+            fetchTextBodyValues: true,
+          },
+          'r0',
+        ],
+      ],
+    );
+
+    for (const email of response.methodResponses[0]![1].list) {
+      const partId = email.textBody?.[0]?.partId;
+      bodies.set(
+        email.id,
+        partId ? (email.bodyValues?.[partId]?.value ?? null) : null,
+      );
+    }
+
+    return bodies;
+  }
+
   async search({
     userEmail,
     limit,
@@ -220,13 +256,16 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     dto: SendEmailDto,
   ): Promise<{ id: string }> {
-    const [accountId, identityId, sentMailboxId] = await Promise.all([
+    const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
-      this.resolveIdentityId(userEmail),
+      this.resolveIdentity(userEmail),
       this.resolveMailboxId(userEmail, 'sent'),
     ]);
 
-    const emailCreate = mapSendDtoToJmapCreate(dto, sentMailboxId);
+    const emailCreate = mapSendDtoToJmapCreate(dto, sentMailboxId, {
+      name: identity.name,
+      email: identity.email,
+    });
 
     const response = await this.jmap.request(userEmail, [
       [
@@ -243,7 +282,7 @@ export class JmapMailProvider extends MailProvider {
           accountId,
           create: {
             submission: {
-              identityId,
+              identityId: identity.id,
               emailId: '#draft',
             },
           },
@@ -267,12 +306,16 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     dto: DraftEmailDto,
   ): Promise<{ id: string }> {
-    const [accountId, draftsMailboxId] = await Promise.all([
+    const [accountId, identity, draftsMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
+      this.resolveIdentity(userEmail),
       this.resolveMailboxId(userEmail, 'drafts'),
     ]);
 
-    const emailCreate = mapDraftDtoToJmapCreate(dto, draftsMailboxId);
+    const emailCreate = mapDraftDtoToJmapCreate(dto, draftsMailboxId, {
+      name: identity.name,
+      email: identity.email,
+    });
 
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
@@ -423,7 +466,7 @@ export class JmapMailProvider extends MailProvider {
     return id;
   }
 
-  private async resolveIdentityId(userEmail: string): Promise<string> {
+  private async resolveIdentity(userEmail: string): Promise<Identity> {
     const cached = this.identityCache.get(userEmail);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.value;
@@ -442,11 +485,11 @@ export class JmapMailProvider extends MailProvider {
     }
 
     this.identityCache.set(userEmail, {
-      value: identity.id,
+      value: identity,
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
 
-    return identity.id;
+    return identity;
   }
 
   private updateMailboxCache(

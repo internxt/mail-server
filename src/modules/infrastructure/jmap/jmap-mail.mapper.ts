@@ -1,5 +1,6 @@
 import type {
   Email as DomainEmail,
+  EmailAddress,
   EmailSummary,
   Mailbox as DomainMailbox,
   MailboxType,
@@ -147,9 +148,11 @@ function applyBodyParts(
 export function mapSendDtoToJmapCreate(
   dto: SendEmailDto,
   mailboxId: string,
+  from: EmailAddress,
 ): JmapEmailCreate {
   const email: JmapEmailCreate = {
     mailboxIds: { [mailboxId]: true },
+    from: [from],
     to: dto.to,
     subject: dto.subject,
     keywords: { $seen: true },
@@ -165,9 +168,11 @@ export function mapSendDtoToJmapCreate(
 export function mapDraftDtoToJmapCreate(
   dto: DraftEmailDto,
   mailboxId: string,
+  from: EmailAddress,
 ): JmapEmailCreate {
   const email: JmapEmailCreate = {
     mailboxIds: { [mailboxId]: true },
+    from: [from],
     keywords: { $draft: true },
   };
 

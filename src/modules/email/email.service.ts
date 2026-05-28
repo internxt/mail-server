@@ -9,14 +9,19 @@ import type {
   DraftEmailDto,
   Email,
   EmailListResponse,
+  EmailSummary,
   ListEmails,
   Mailbox,
   MailboxType,
   SearchEmailDto,
   SendEmailDto,
 } from './email.types.js';
-
-const ENCRYPTED_PREFIX = 'INTERNXT-ENCRYPTED-EMAIL-v1';
+import {
+  isEncryptedBody,
+  packEnvelope,
+  parseEnvelope,
+  projectForCaller,
+} from './email-encryption.js';
 
 @Injectable()
 export class EmailService {
@@ -29,8 +34,10 @@ export class EmailService {
     return this.mail.getMailboxes(userEmail);
   }
 
-  listEmails(params: ListEmails): Promise<EmailListResponse> {
-    return this.mail.listEmails(params);
+  async listEmails(params: ListEmails): Promise<EmailListResponse> {
+    const result = await this.mail.listEmails(params);
+    await this.enrichEncryptedSummaries(params.userEmail, result.emails);
+    return result;
   }
 
   async getEmail(userEmail: string, id: string): Promise<Email> {
@@ -41,13 +48,38 @@ export class EmailService {
     return email;
   }
 
-  search(params: SearchEmailDto) {
+  async search(params: SearchEmailDto): Promise<EmailListResponse> {
     const hasFilter = Object.values(params.filter).some(
       (v) => v !== undefined && v !== '' && (!Array.isArray(v) || v.length > 0),
     );
 
-    if (!hasFilter) return [];
-    return this.mail.search(params);
+    if (!hasFilter) {
+      return { emails: [], total: 0, hasMoreMails: false };
+    }
+
+    const result = await this.mail.search(params);
+    await this.enrichEncryptedSummaries(params.userEmail, result.emails);
+    return result;
+  }
+
+  private async enrichEncryptedSummaries(
+    userEmail: string,
+    summaries: EmailSummary[],
+  ): Promise<void> {
+    const encrypted = summaries.filter((s) => isEncryptedBody(s.preview));
+    if (encrypted.length === 0) return;
+
+    const bodies = await this.mail.getTextBodies(
+      userEmail,
+      encrypted.map((s) => s.id),
+    );
+
+    for (const summary of encrypted) {
+      const body = bodies.get(summary.id);
+      const envelope = body ? parseEnvelope(body) : null;
+      summary.encryption = envelope ? projectForCaller(envelope) : null;
+      summary.preview = '';
+    }
   }
 
   async lookupRecipientKeys(addresses: string[]): Promise<{
@@ -67,12 +99,9 @@ export class EmailService {
     }
 
     if (dto.encryption) {
-      const bundle = Buffer.from(JSON.stringify(dto.encryption)).toString(
-        'base64',
-      );
       dto = {
         ...dto,
-        textBody: `${ENCRYPTED_PREFIX}\n${bundle}`,
+        textBody: packEnvelope(dto.encryption),
         htmlBody: undefined,
       };
     }
