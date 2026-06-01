@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, test } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { EmailController } from './email.controller.js';
@@ -287,6 +287,45 @@ describe('EmailController', () => {
         anchorId: undefined,
         unread: undefined,
       });
+    });
+  });
+
+  describe('Uploading an attachment', () => {
+    const file = {
+      originalname: 'photo.jpg',
+      mimetype: 'image/jpeg',
+      buffer: Buffer.from('binary'),
+      size: 6,
+    } as Express.Multer.File;
+
+    test('when a user attaches a file, then the file is stored and its details are returned along with the original filename', async () => {
+      emailService.uploadAttachment.mockResolvedValue({
+        accountId: 'account-1',
+        blobId: 'blob-1',
+        size: 6,
+        type: 'image/jpeg',
+      });
+
+      const result = await controller.uploadAttachment([file], userEmail);
+
+      expect(emailService.uploadAttachment).toHaveBeenCalledWith({
+        userEmail,
+        blob: { buffer: file.buffer, mimeType: file.mimetype },
+      });
+      expect(result).toEqual({
+        accountId: 'account-1',
+        blobId: 'blob-1',
+        size: 6,
+        type: 'image/jpeg',
+        name: 'photo.jpg',
+      });
+    });
+
+    test('when the request does not include any file, then the upload is rejected', async () => {
+      await expect(controller.uploadAttachment([], userEmail)).rejects.toThrow(
+        'No files uploaded',
+      );
+      expect(emailService.uploadAttachment).not.toHaveBeenCalled();
     });
   });
 });
