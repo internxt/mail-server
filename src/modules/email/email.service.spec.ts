@@ -14,7 +14,11 @@ import {
   newSearchEmailDto,
   newEncryptionBlock,
   newEncryptedWrappedKey,
+  newMailQuota,
+  newMailAccountAttributes,
+  newMailAddressAttributes,
 } from '../../../test/fixtures.js';
+import { MailAccount } from '../account/domain/mail-account.domain.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
 
 describe('EmailService', () => {
@@ -359,6 +363,46 @@ describe('EmailService', () => {
         userEmail,
         'email-id',
         false,
+      );
+    });
+  });
+
+  describe('getQuotaByUuid', () => {
+    it('when account exists with a default address, then returns quota for that address', async () => {
+      const addressAttrs = newMailAddressAttributes({
+        isDefault: true,
+        address: 'alice@internxt.me',
+      });
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [addressAttrs] }),
+      );
+      const quota = newMailQuota({ used: 512, limit: 1073741824 });
+      accountService.findAccount.mockResolvedValue(account);
+      provider.getQuota.mockResolvedValue(quota);
+
+      const result = await service.getQuotaByUuid(account.userId);
+
+      expect(accountService.findAccount).toHaveBeenCalledWith(account.userId);
+      expect(provider.getQuota).toHaveBeenCalledWith('alice@internxt.me');
+      expect(result).toEqual(quota);
+    });
+
+    it('when account does not exist, then throws NotFoundException', async () => {
+      accountService.findAccount.mockResolvedValue(null);
+
+      await expect(service.getQuotaByUuid('unknown')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('when account has no default address, then throws NotFoundException', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [] }),
+      );
+      accountService.findAccount.mockResolvedValue(account);
+
+      await expect(service.getQuotaByUuid(account.userId)).rejects.toThrow(
+        NotFoundException,
       );
     });
   });

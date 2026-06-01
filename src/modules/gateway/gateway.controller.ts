@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -6,12 +7,21 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { IsInt, Min } from 'class-validator';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AccountService } from '../account/account.service.js';
+import { EmailService } from '../email/email.service.js';
 import { GatewayAuthGuard } from './gateway.guard.js';
+
+class UpdateQuotaDto {
+  @IsInt()
+  @Min(0)
+  quotaBytes!: number;
+}
 
 @ApiTags('Gateway')
 @ApiBearerAuth('gateway')
@@ -19,7 +29,10 @@ import { GatewayAuthGuard } from './gateway.guard.js';
 @UseGuards(GatewayAuthGuard)
 @Controller('gateway')
 export class GatewayController {
-  constructor(private readonly accountService: AccountService) {}
+  constructor(
+    private readonly accountService: AccountService,
+    private readonly emailService: EmailService,
+  ) {}
 
   @Get('addresses/:address')
   @ApiOperation({
@@ -34,6 +47,22 @@ export class GatewayController {
     }
 
     return { address: normalized, userId };
+  }
+
+  @Get('quota/:uuid')
+  @ApiOperation({ summary: 'Get mail quota usage for a user' })
+  getQuota(@Param('uuid') uuid: string) {
+    return this.emailService.getQuotaByUuid(uuid);
+  }
+
+  @Put('accounts/:uuid/quota')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Set mail quota for a user' })
+  async updateQuota(
+    @Param('uuid') uuid: string,
+    @Body() dto: UpdateQuotaDto,
+  ): Promise<void> {
+    await this.accountService.updateQuota(uuid, dto.quotaBytes);
   }
 
   @Post('accounts/:uuid/suspend')

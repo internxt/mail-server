@@ -790,4 +790,43 @@ describe('AccountService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('updateQuota', () => {
+    it('when account has a default address, then calls provider with provider external id', async () => {
+      const addressAttrs = newMailAddressAttributes({
+        isDefault: true,
+        providerExternalId: 'alice@internxt.me',
+      });
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [addressAttrs] }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.updateQuota(account.userId, 5368709120);
+
+      expect(provider.updateQuota).toHaveBeenCalledWith(
+        'alice@internxt.me',
+        5368709120,
+      );
+    });
+
+    it('when account has no default address, then throws NotFoundException', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [] }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await expect(service.updateQuota(account.userId, 0)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('when account does not exist, then throws NotFoundException', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.updateQuota('unknown', 0)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
 });

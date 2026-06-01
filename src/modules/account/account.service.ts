@@ -217,6 +217,19 @@ export class AccountService {
     return this.getAccountOrFail(params.userId);
   }
 
+  async updateQuota(userId: string, quotaBytes: number): Promise<void> {
+    const account = await this.getAccountOrFail(userId);
+
+    if (!account.defaultAddress) {
+      throw new NotFoundException(`No default address for account '${userId}'`);
+    }
+
+    await this.provider.updateQuota(
+      account.defaultAddress.providerExternalId,
+      quotaBytes,
+    );
+  }
+
   async deleteAccount(driveUserUuid: string): Promise<void> {
     const account = await this.getAccountOrFail(driveUserUuid);
 

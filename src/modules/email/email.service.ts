@@ -134,7 +134,13 @@ export class EmailService {
     return this.mail.markAsFlagged(userEmail, id, flagged);
   }
 
-  getQuota(userEmail: string): Promise<MailQuota> {
-    return this.mail.getQuota(userEmail);
+  async getQuotaByUuid(userId: string): Promise<MailQuota> {
+    const account = await this.accountService.findAccount(userId);
+
+    if (!account?.defaultAddress) {
+      throw new NotFoundException(`No mail account for user '${userId}'`);
+    }
+
+    return this.mail.getQuota(account.defaultAddress.address);
   }
 }
