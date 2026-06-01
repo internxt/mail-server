@@ -13,6 +13,8 @@ import type {
   JmapRequest,
   JmapResponse,
   JmapSession,
+  UploadAttachmentPayload,
+  UploadAttachmentResponse,
 } from './jmap.types.js';
 
 const JMAP_CAPABILITY_CORE = 'urn:ietf:params:jmap:core';
@@ -40,6 +42,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   private readonly masterPassword: string;
   private readonly sessionCache = new Map<string, CachedSession>(); // TODO: Implement cache ?
   private httpClient!: Client;
+  private uploadClient!: Client;
 
   constructor(private readonly configService: ConfigService) {
     this.stalwartUrl = this.configService.getOrThrow<string>('stalwart.url');
@@ -57,11 +60,18 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       keepAliveTimeout: 30_000,
       pipelining: 1,
     });
+    this.uploadClient = new Client(this.stalwartUrl, {
+      allowH2: false,
+      keepAliveTimeout: 60_000,
+      pipelining: 1,
+      bodyTimeout: 60_000,
+      headersTimeout: 60_000,
+    });
     this.logger.log(`JMAP client initialized targeting ${this.stalwartUrl}`);
   }
 
   async onModuleDestroy() {
-    await this.httpClient.close();
+    await Promise.all([this.httpClient.close(), this.uploadClient.close()]);
   }
 
   private buildAuthHeader(userEmail: string): string {
@@ -161,6 +171,54 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     }
 
     return accountId;
+  }
+
+  async uploadAttachment({
+    userEmail,
+    blob,
+  }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
+    const accountId = await this.getPrimaryAccountId(userEmail);
+    const { buffer, mimeType } = blob;
+
+    const session = await this.getSession(userEmail);
+
+    const uploadUrl = session.uploadUrl
+      .replace('{accountId}', encodeURIComponent(accountId))
+      .replace('{name}', 'attachment');
+
+    const uploadPath = new URL(uploadUrl).pathname;
+
+    const { statusCode, body } = await this.uploadClient.request({
+      method: 'POST',
+      path: uploadPath,
+      headers: {
+        authorization: this.buildAuthHeader(userEmail),
+        'content-type': mimeType,
+        'content-length': String(buffer.length),
+        accept: 'application/json',
+      },
+      body: buffer,
+    });
+
+    const text = await body.text();
+
+    if (statusCode !== 200 && statusCode !== 201) {
+      throw new JmapError(`Blob upload failed: HTTP ${statusCode}`, text);
+    }
+
+    const data = JSON.parse(text) as {
+      accountId: string;
+      blobId: string;
+      type: string;
+      size: number;
+    };
+
+    return {
+      accountId: data.accountId,
+      blobId: data.blobId,
+      size: data.size,
+      type: data.type,
+    };
   }
 }
 

@@ -18,6 +18,8 @@ import type {
   JmapGetResponse,
   JmapQueryResponse,
   JmapSetResponse,
+  UploadAttachmentPayload,
+  UploadAttachmentResponse,
 } from './jmap.types.js';
 import {
   mapJmapMailbox,
@@ -415,6 +417,19 @@ export class JmapMailProvider extends MailProvider {
     flagged: boolean,
   ): Promise<void> {
     return this.setKeyword(userEmail, id, '$flagged', flagged);
+  }
+
+  async uploadAttachment({
+    userEmail,
+    blob,
+  }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
+    return this.jmap.uploadAttachment({
+      userEmail,
+      blob: {
+        buffer: blob.buffer,
+        mimeType: blob.mimeType,
+      },
+    });
   }
 
   private async setKeyword(

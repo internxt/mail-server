@@ -169,6 +169,21 @@ export type EmailCreate = Partial<
   >
 >;
 
+export interface UploadAttachmentResponse {
+  accountId: string;
+  blobId: string;
+  size: number;
+  type: string;
+}
+
+export interface UploadAttachmentPayload {
+  userEmail: string;
+  blob: {
+    buffer: Buffer;
+    mimeType: string;
+  };
+}
+
 export interface EmailFilterCondition {
   inMailbox?: ID;
   inMailboxOtherThan?: ID[];

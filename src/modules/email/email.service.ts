@@ -22,6 +22,10 @@ import {
   parseEnvelope,
   projectForCaller,
 } from './email-encryption.js';
+import {
+  UploadAttachmentPayload,
+  UploadAttachmentResponse,
+} from '../infrastructure/jmap/jmap.types.js';
 
 @Injectable()
 export class EmailService {
@@ -131,5 +135,11 @@ export class EmailService {
     flagged: boolean,
   ): Promise<void> {
     return this.mail.markAsFlagged(userEmail, id, flagged);
+  }
+
+  uploadAttachment(
+    payload: UploadAttachmentPayload,
+  ): Promise<UploadAttachmentResponse> {
+    return this.mail.uploadAttachment(payload);
   }
 }
