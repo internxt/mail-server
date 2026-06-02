@@ -247,6 +247,20 @@ export class EmailSummaryResponseDto {
   encryption?: EncryptedSummaryDto | null;
 }
 
+export class EmailAttachmentDto {
+  @ApiProperty({ example: 'T1a2b3c…' })
+  blobId!: string;
+
+  @ApiProperty({ example: 'photo.jpg' })
+  name!: string;
+
+  @ApiProperty({ example: 'image/jpeg' })
+  type!: string;
+
+  @ApiProperty({ example: 4096, description: 'Size in bytes' })
+  size!: number;
+}
+
 export class EmailResponseDto extends EmailSummaryResponseDto {
   @ApiProperty({ type: [EmailAddressDto] })
   cc!: EmailAddressDto[];
@@ -277,6 +291,9 @@ export class EmailResponseDto extends EmailSummaryResponseDto {
     type: String,
   })
   htmlBody!: string | null;
+
+  @ApiProperty({ type: [EmailAttachmentDto] })
+  attachments!: EmailAttachmentDto[];
 }
 
 export class EmailListResponseDto {
