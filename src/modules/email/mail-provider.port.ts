@@ -1,4 +1,6 @@
 import {
+  type DownloadAttachmentPayload,
+  type DownloadAttachmentResponse,
   type UploadAttachmentPayload,
   type UploadAttachmentResponse,
 } from '../infrastructure/jmap/jmap.types.js';
@@ -49,4 +51,7 @@ export abstract class MailProvider {
   abstract uploadAttachment(
     payload: UploadAttachmentPayload,
   ): Promise<UploadAttachmentResponse>;
+  abstract downloadAttachment(
+    payload: DownloadAttachmentPayload,
+  ): Promise<DownloadAttachmentResponse>;
 }

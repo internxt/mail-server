@@ -163,4 +163,116 @@ describe('JMAP service', () => {
       ).rejects.toBeInstanceOf(JmapError);
     });
   });
+
+  describe('Downloading attachments', () => {
+    const userEmail = 'user@test.com';
+
+    beforeEach(() => {
+      mockRequest.mockResolvedValueOnce(httpResponse(200, sessionPayload));
+    });
+
+    function downloadResponse(
+      statusCode: number,
+      headers: Record<string, string>,
+      body: NodeJS.ReadableStream,
+    ) {
+      return { statusCode, headers, body };
+    }
+
+    test('when an attachment is downloaded, then its bytes are returned with the stored content type and size', async () => {
+      const fakeStream = {
+        on: vi.fn(),
+      } as unknown as NodeJS.ReadableStream;
+      mockRequest.mockResolvedValueOnce(
+        downloadResponse(
+          200,
+          { 'content-type': 'image/jpeg', 'content-length': '1234' },
+          fakeStream,
+        ),
+      );
+
+      const result = await service.downloadAttachment({
+        userEmail,
+        blobId: 'blob-1',
+      });
+
+      expect(result.contentType).toBe('image/jpeg');
+      expect(result.contentLength).toBe(1234);
+      expect(result.stream).toBe(fakeStream);
+    });
+
+    test('when an attachment is requested with a desired name and type, then those are forwarded to the storage', async () => {
+      const fakeStream = {
+        on: vi.fn(),
+      } as unknown as NodeJS.ReadableStream;
+      mockRequest.mockResolvedValueOnce(
+        downloadResponse(200, { 'content-type': 'image/jpeg' }, fakeStream),
+      );
+
+      await service.downloadAttachment({
+        userEmail,
+        blobId: 'blob-1',
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      });
+
+      // index 0 is the session GET, index 1 is the download GET
+      const downloadCall = mockRequest.mock.calls[1]![0];
+
+      expect(downloadCall.method).toBe('GET');
+      expect(downloadCall.path).toBe(
+        '/jmap/download/acc-1/blob-1/photo.jpg?accept=image%2Fjpeg',
+      );
+      expect(downloadCall.headers.authorization).toMatch(/^Basic /);
+    });
+
+    test('when the response does not include a content type, then a safe default is used', async () => {
+      const fakeStream = {
+        on: vi.fn(),
+      } as unknown as NodeJS.ReadableStream;
+      mockRequest.mockResolvedValueOnce(
+        downloadResponse(200, {}, fakeStream),
+      );
+
+      const result = await service.downloadAttachment({
+        userEmail,
+        blobId: 'blob-1',
+      });
+
+      expect(result.contentType).toBe('application/octet-stream');
+      expect(result.contentLength).toBeUndefined();
+    });
+
+    it('when the attachment cannot be retrieved, then the download fails with an error', async () => {
+      mockRequest.mockResolvedValueOnce({
+        statusCode: 404,
+        headers: {},
+        body: { text: vi.fn().mockResolvedValue('not found') },
+      });
+
+      await expect(
+        service.downloadAttachment({
+          userEmail,
+          blobId: 'missing',
+        }),
+      ).rejects.toBeInstanceOf(JmapError);
+    });
+
+    it('when the user does not have a mail account, then the download fails with an error', async () => {
+      mockRequest.mockReset();
+      mockRequest.mockResolvedValueOnce(
+        httpResponse(200, {
+          ...sessionPayload,
+          primaryAccounts: {},
+        }),
+      );
+
+      await expect(
+        service.downloadAttachment({
+          userEmail,
+          blobId: 'blob-1',
+        }),
+      ).rejects.toBeInstanceOf(JmapError);
+    });
+  });
 });

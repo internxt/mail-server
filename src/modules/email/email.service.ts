@@ -23,6 +23,8 @@ import {
   projectForCaller,
 } from './email-encryption.js';
 import {
+  DownloadAttachmentPayload,
+  DownloadAttachmentResponse,
   UploadAttachmentPayload,
   UploadAttachmentResponse,
 } from '../infrastructure/jmap/jmap.types.js';
@@ -141,5 +143,11 @@ export class EmailService {
     payload: UploadAttachmentPayload,
   ): Promise<UploadAttachmentResponse> {
     return this.mail.uploadAttachment(payload);
+  }
+
+  downloadAttachment(
+    payload: DownloadAttachmentPayload,
+  ): Promise<DownloadAttachmentResponse> {
+    return this.mail.downloadAttachment(payload);
   }
 }
