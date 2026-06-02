@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -297,6 +298,12 @@ export class EmailController {
   ): Promise<StreamableFile> {
     const safeName = sanitizeFilename(name);
     const safeType = sanitizeMimeType(type);
+
+    const mail = await this.emailService.getEmail(email, _id);
+    if (!mail) throw new NotFoundException('Email not found');
+
+    const attachment = mail.attachments.find((a) => a.blobId === blobId);
+    if (!attachment) throw new NotFoundException('Attachment not found');
 
     const result = await this.emailService.downloadAttachment({
       userEmail: email,
