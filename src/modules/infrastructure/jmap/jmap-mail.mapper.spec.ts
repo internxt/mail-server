@@ -326,6 +326,92 @@ describe('jmap-mail.mapper', () => {
 
       expect(result.sentAt).toBeNull();
     });
+
+    it('when an email has files attached, then it returns the list of attached files with their details', () => {
+      const jmapEmail = newJmapEmail({
+        attachments: [
+          {
+            blobId: 'blob-1',
+            name: 'invoice.pdf',
+            type: 'application/pdf',
+            size: 12345,
+            disposition: 'attachment',
+          },
+          {
+            blobId: 'blob-2',
+            name: 'photo.jpg',
+            type: 'image/jpeg',
+            size: 67890,
+            disposition: 'attachment',
+          },
+        ],
+      });
+
+      const result = mapJmapEmailToDetail(jmapEmail);
+
+      expect(result.attachments).toEqual([
+        {
+          blobId: 'blob-1',
+          name: 'invoice.pdf',
+          type: 'application/pdf',
+          size: 12345,
+        },
+        {
+          blobId: 'blob-2',
+          name: 'photo.jpg',
+          type: 'image/jpeg',
+          size: 67890,
+        },
+      ]);
+    });
+
+    it('when an email has inline images, then they are not reported as attached files', () => {
+      const jmapEmail = newJmapEmail({
+        attachments: [
+          {
+            blobId: 'blob-inline',
+            name: 'logo.png',
+            type: 'image/png',
+            size: 100,
+            disposition: 'inline',
+          },
+        ],
+      });
+
+      const result = mapJmapEmailToDetail(jmapEmail);
+
+      expect(result.attachments).toEqual([]);
+    });
+
+    it('when an attached file has missing details, then they are filled in with safe defaults', () => {
+      const jmapEmail = newJmapEmail({
+        attachments: [
+          {
+            blobId: 'blob-1',
+            disposition: 'attachment',
+          },
+        ],
+      });
+
+      const result = mapJmapEmailToDetail(jmapEmail);
+
+      expect(result.attachments).toEqual([
+        {
+          blobId: 'blob-1',
+          name: '',
+          type: 'application/octet-stream',
+          size: 0,
+        },
+      ]);
+    });
+
+    it('when an email has no attached files, then the attachments list is empty', () => {
+      const jmapEmail = newJmapEmail({ attachments: undefined });
+
+      const result = mapJmapEmailToDetail(jmapEmail);
+
+      expect(result.attachments).toEqual([]);
+    });
   });
 
   describe('mapSendDtoToJmapCreate', () => {

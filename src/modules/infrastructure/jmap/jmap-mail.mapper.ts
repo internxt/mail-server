@@ -1,6 +1,7 @@
 import type {
   Email as DomainEmail,
   EmailAddress,
+  EmailAttachment,
   EmailSummary,
   Mailbox as DomainMailbox,
   MailboxType,
@@ -10,6 +11,7 @@ import type {
 } from '../../email/email.types.js';
 import type {
   Email as JmapEmail,
+  EmailBodyPart,
   EmailCreate as JmapEmailCreate,
   Mailbox as JmapMailbox,
   MailboxRole,
@@ -72,6 +74,18 @@ export function mapJmapEmailToSummary(e: JmapEmail): EmailSummary {
   };
 }
 
+function mapJmapAttachments(parts?: EmailBodyPart[]): EmailAttachment[] {
+  if (!parts) return [];
+  return parts
+    .filter((p) => p.blobId && p.disposition === 'attachment')
+    .map((p) => ({
+      blobId: p.blobId!,
+      name: p.name ?? '',
+      type: p.type ?? 'application/octet-stream',
+      size: p.size ?? 0,
+    }));
+}
+
 export function mapJmapEmailToDetail(e: JmapEmail): DomainEmail {
   const summary = mapJmapEmailToSummary(e);
 
@@ -98,6 +112,7 @@ export function mapJmapEmailToDetail(e: JmapEmail): DomainEmail {
     sentAt: e.sentAt ?? null,
     textBody,
     htmlBody,
+    attachments: mapJmapAttachments(e.attachments),
   };
 }
 
