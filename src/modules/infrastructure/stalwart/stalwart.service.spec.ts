@@ -2,12 +2,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { type ConfigService } from '@nestjs/config';
 import { StalwartService, StalwartApiError } from './stalwart.service.js';
 
-const mockRequest = vi.fn();
+const { mockRequest } = vi.hoisted(() => ({
+  mockRequest: vi.fn(),
+}));
+
 vi.mock('undici', () => ({
-  Client: vi.fn().mockImplementation(() => ({
-    request: mockRequest,
-    close: vi.fn(),
-  })),
+  Client: class MockClient {
+    request = mockRequest;
+    close = vi.fn();
+  },
 }));
 
 function createConfigService(): ConfigService {
