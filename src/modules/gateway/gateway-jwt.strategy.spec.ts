@@ -25,7 +25,9 @@ describe('GatewayJwtStrategy', () => {
   });
 
   it('when constructed, then reads gateway secret from config', () => {
-    expect(configService.getOrThrow).toHaveBeenCalledWith('secrets.gateway');
+    expect(configService.getOrThrow).toHaveBeenCalledWith(
+      'secrets.drivePublicGateway',
+    );
   });
 
   it('when validate is called, then returns true', () => {
