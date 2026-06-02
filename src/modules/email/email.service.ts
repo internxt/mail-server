@@ -12,6 +12,7 @@ import type {
   EmailListResponse,
   EmailSummary,
   ListEmails,
+  MailQuota,
   Mailbox,
   MailboxType,
   SearchEmailDto,
@@ -161,5 +162,9 @@ export class EmailService {
     payload: DownloadAttachmentPayload,
   ): Promise<DownloadAttachmentResponse> {
     return this.mail.downloadAttachment(payload);
+  }
+
+  getQuota(userEmail: string): Promise<MailQuota> {
+    return this.mail.getQuota(userEmail);
   }
 }

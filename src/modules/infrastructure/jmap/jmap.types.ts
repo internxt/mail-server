@@ -242,3 +242,15 @@ export interface DeliveryStatus {
   delivered: 'queued' | 'yes' | 'no' | 'unknown';
   displayed: 'yes' | 'unknown';
 }
+
+export interface JmapQuota {
+  id: ID;
+  resourceType: string;
+  used: number;
+  hardLimit: number;
+  scope: string;
+  name: string;
+  description?: string;
+  warnLimit?: number;
+  softLimit?: number;
+}

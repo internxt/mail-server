@@ -23,11 +23,17 @@ import type {
 const JMAP_CAPABILITY_CORE = 'urn:ietf:params:jmap:core';
 const JMAP_CAPABILITY_MAIL = 'urn:ietf:params:jmap:mail';
 const JMAP_CAPABILITY_SUBMISSION = 'urn:ietf:params:jmap:submission';
+export const JMAP_CAPABILITY_QUOTA = 'urn:ietf:params:jmap:quota';
 
 const JMAP_MAIL_CAPABILITIES = [
   JMAP_CAPABILITY_CORE,
   JMAP_CAPABILITY_MAIL,
   JMAP_CAPABILITY_SUBMISSION,
+] as const;
+
+export const JMAP_QUOTA_CAPABILITIES = [
+  JMAP_CAPABILITY_CORE,
+  JMAP_CAPABILITY_QUOTA,
 ] as const;
 
 const SESSION_TTL_MS = 30_000;
