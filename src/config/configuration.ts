@@ -36,12 +36,16 @@ export default () => ({
 
   secrets: {
     jwt: process.env.JWT_SECRET,
-    gateway: process.env.GATEWAY_PUBLIC_SECRET,
+    drivePublicGateway: process.env.GATEWAY_PUBLIC_SECRET,
+    bridgePrivateGateway: process.env.BRIDGE_PRIVATE_GATEWAY_SECRET,
   },
 
   apis: {
     payments: {
       url: process.env.PAYMENTS_API_URL ?? '',
+    },
+    bridge: {
+      url: process.env.BRIDGE_API_URL ?? '',
     },
   },
 });
