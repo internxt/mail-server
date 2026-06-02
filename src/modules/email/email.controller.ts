@@ -242,7 +242,7 @@ export class EmailController {
   })
   @UseInterceptors(
     FilesInterceptor('attachments', 1, {
-      storage: memoryStorage(),
+      storage: memoryStorage(), // NOSONAR — 25MB matches Gmail's attachment cap; enforced by Multer
       limits: {
         fileSize: MAX_TOTAL_BYTES,
         fieldSize: MAX_TOTAL_BYTES,
