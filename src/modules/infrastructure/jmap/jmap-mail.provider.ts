@@ -426,6 +426,7 @@ export class JmapMailProvider extends MailProvider {
     return this.jmap.uploadAttachment({
       userEmail,
       blob: {
+        name: blob.name,
         buffer: blob.buffer,
         mimeType: blob.mimeType,
       },

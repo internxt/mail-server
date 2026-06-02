@@ -262,7 +262,11 @@ export class EmailController {
 
     const result = await this.emailService.uploadAttachment({
       userEmail: email,
-      blob: { buffer: file.buffer, mimeType: file.mimetype },
+      blob: {
+        name: file.originalname,
+        buffer: file.buffer,
+        mimeType: file.mimetype,
+      },
     });
 
     return { ...result, name: file.originalname };

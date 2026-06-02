@@ -542,6 +542,7 @@ describe('JmapMailProvider', () => {
       const payload = {
         userEmail: 'user@test.com',
         blob: {
+          name: 'image.jpg',
           buffer: Buffer.from('binary'),
           mimeType: 'image/jpeg',
         },

@@ -178,13 +178,14 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     blob,
   }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
     const accountId = await this.getPrimaryAccountId(userEmail);
-    const { buffer, mimeType } = blob;
+    const { name, buffer, mimeType } = blob;
 
     const session = await this.getSession(userEmail);
+    const fileName = name ?? 'attachment';
 
     const uploadUrl = session.uploadUrl
       .replace('{accountId}', encodeURIComponent(accountId))
-      .replace('{name}', 'attachment');
+      .replace('{name}', fileName);
 
     const uploadPath = new URL(uploadUrl).pathname;
 
@@ -207,7 +208,6 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     }
 
     const data = JSON.parse(text) as {
-      accountId: string;
       blobId: string;
       type: string;
       size: number;

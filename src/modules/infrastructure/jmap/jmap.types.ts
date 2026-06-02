@@ -178,6 +178,7 @@ export interface UploadAttachmentResponse {
 export interface UploadAttachmentPayload {
   userEmail: string;
   blob: {
+    name: string;
     buffer: Buffer;
     mimeType: string;
   };
