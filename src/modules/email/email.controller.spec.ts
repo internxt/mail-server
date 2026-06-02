@@ -300,7 +300,6 @@ describe('EmailController', () => {
 
     test('when a user attaches a file, then the file is stored and its details are returned along with the original filename', async () => {
       emailService.uploadAttachment.mockResolvedValue({
-        accountId: 'account-1',
         blobId: 'blob-1',
         size: 6,
         type: 'image/jpeg',

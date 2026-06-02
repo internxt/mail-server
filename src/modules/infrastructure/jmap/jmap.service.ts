@@ -214,7 +214,6 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     };
 
     return {
-      accountId: data.accountId,
       blobId: data.blobId,
       size: data.size,
       type: data.type,
