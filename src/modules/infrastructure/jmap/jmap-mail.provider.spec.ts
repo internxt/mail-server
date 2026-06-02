@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { Readable } from 'node:stream';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { JmapMailProvider } from './jmap-mail.provider.js';
@@ -558,6 +559,28 @@ describe('JmapMailProvider', () => {
 
       expect(jmapService.uploadAttachment).toHaveBeenCalledWith(payload);
       expect(result).toBe(storedBlob);
+    });
+  });
+
+  describe('Downloading an attachment', () => {
+    it('when a user downloads an attachment, then the request is forwarded and the stored bytes are returned', async () => {
+      const payload = {
+        userEmail: 'user@test.com',
+        blobId: 'blob-1',
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      };
+      const stored = {
+        stream: Readable.from(Buffer.from('binary')),
+        contentType: 'image/jpeg',
+        contentLength: 1234,
+      };
+      jmapService.downloadAttachment.mockResolvedValue(stored);
+
+      const result = await provider.downloadAttachment(payload);
+
+      expect(jmapService.downloadAttachment).toHaveBeenCalledWith(payload);
+      expect(result).toBe(stored);
     });
   });
 });
