@@ -256,7 +256,7 @@ export class EmailController {
   async uploadAttachment(
     @UploadedFiles() files: Express.Multer.File[],
     @MailAddress('address') email: string,
-  ) {
+  ): Promise<UploadAttachmentResponseDto> {
     const [file] = files;
     if (!file) throw new BadRequestException('No files uploaded');
 
