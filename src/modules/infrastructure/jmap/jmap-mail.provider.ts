@@ -52,6 +52,7 @@ const EMAIL_DETAIL_PROPERTIES = [
   'textBody',
   'htmlBody',
   'bodyValues',
+  'attachments',
 ] as const;
 
 interface TimedCache<T> {

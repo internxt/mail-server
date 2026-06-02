@@ -41,6 +41,13 @@ export interface EmailSummary {
   encryption?: EncryptedSummaryFields | null;
 }
 
+export interface EmailAttachment {
+  blobId: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
 export interface Email extends EmailSummary {
   cc: EmailAddress[];
   bcc: EmailAddress[];
@@ -48,6 +55,7 @@ export interface Email extends EmailSummary {
   sentAt: string | null;
   textBody: string | null;
   htmlBody: string | null;
+  attachments: EmailAttachment[];
 }
 
 export interface ListEmails {
