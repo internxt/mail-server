@@ -17,7 +17,7 @@ export class GatewayJwtStrategy extends PassportStrategy(
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: Buffer.from(
-        configService.getOrThrow<string>('secrets.gateway'),
+        configService.getOrThrow<string>('secrets.drivePublicGateway'),
         'base64',
       ).toString('utf8'),
       algorithms: ['RS256'],
