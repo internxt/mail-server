@@ -87,7 +87,6 @@ describe('JMAP service', () => {
       const buffer = Buffer.from('hello world');
       mockRequest.mockResolvedValueOnce(
         httpResponse(200, {
-          accountId: 'acc-1',
           blobId: 'blob-1',
           type: 'text/plain',
           size: buffer.length,
@@ -96,7 +95,7 @@ describe('JMAP service', () => {
 
       await service.uploadAttachment({
         userEmail,
-        blob: { buffer, mimeType: 'text/plain' },
+        blob: { name: 'hello.txt', buffer, mimeType: 'text/plain' },
       });
 
       expect(mockRequest).toHaveBeenLastCalledWith(
@@ -116,7 +115,6 @@ describe('JMAP service', () => {
     test('when an attachment is accepted as newly created, then the upload still completes successfully', async () => {
       mockRequest.mockResolvedValueOnce(
         httpResponse(201, {
-          accountId: 'acc-1',
           blobId: 'blob-2',
           type: 'application/pdf',
           size: 42,
@@ -125,7 +123,11 @@ describe('JMAP service', () => {
 
       const result = await service.uploadAttachment({
         userEmail,
-        blob: { buffer: Buffer.from('x'), mimeType: 'application/pdf' },
+        blob: {
+          name: 'hello.pdf',
+          buffer: Buffer.from('x'),
+          mimeType: 'application/pdf',
+        },
       });
 
       expect(result.blobId).toBe('blob-2');
@@ -137,7 +139,11 @@ describe('JMAP service', () => {
       await expect(
         service.uploadAttachment({
           userEmail,
-          blob: { buffer: Buffer.from('x'), mimeType: 'image/png' },
+          blob: {
+            name: 'hello.pdf',
+            buffer: Buffer.from('x'),
+            mimeType: 'image/png',
+          },
         }),
       ).rejects.toBeInstanceOf(JmapError);
     });
@@ -155,7 +161,11 @@ describe('JMAP service', () => {
       await expect(
         service.uploadAttachment({
           userEmail,
-          blob: { buffer: Buffer.from('x'), mimeType: 'image/png' },
+          blob: {
+            name: 'hello.pdf',
+            buffer: Buffer.from('x'),
+            mimeType: 'image/png',
+          },
         }),
       ).rejects.toBeInstanceOf(JmapError);
     });
@@ -213,23 +223,22 @@ describe('JMAP service', () => {
         type: 'image/jpeg',
       });
 
-      // index 0 is the session GET, index 1 is the download GET
-      const downloadCall = mockRequest.mock.calls[1]![0];
-
-      expect(downloadCall.method).toBe('GET');
-      expect(downloadCall.path).toBe(
-        '/jmap/download/acc-1/blob-1/photo.jpg?accept=image%2Fjpeg',
+      expect(mockRequest).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          method: 'GET',
+          path: '/jmap/download/acc-1/blob-1/photo.jpg?accept=image%2Fjpeg',
+          headers: expect.objectContaining({
+            authorization: expect.stringMatching(/^Basic /) as string,
+          }) as Record<string, string>,
+        }),
       );
-      expect(downloadCall.headers.authorization).toMatch(/^Basic /);
     });
 
     test('when the response does not include a content type, then a safe default is used', async () => {
       const fakeStream = {
         on: vi.fn(),
       } as unknown as NodeJS.ReadableStream;
-      mockRequest.mockResolvedValueOnce(
-        downloadResponse(200, {}, fakeStream),
-      );
+      mockRequest.mockResolvedValueOnce(downloadResponse(200, {}, fakeStream));
 
       const result = await service.downloadAttachment({
         userEmail,
