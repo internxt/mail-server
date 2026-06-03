@@ -504,6 +504,52 @@ describe('jmap-mail.mapper', () => {
       expect(result.htmlBody).toBeUndefined();
       expect(result.bodyValues).toBeUndefined();
     });
+
+    it('when DTO has attachments, then maps them with disposition attachment', () => {
+      const dto = newSendEmailDto({
+        attachments: [
+          {
+            blobId: 'blob-1',
+            name: 'photo.jpg',
+            type: 'image/jpeg',
+            size: 1024,
+          },
+          {
+            blobId: 'blob-2',
+            name: 'doc.pdf',
+            type: 'application/pdf',
+            size: 2048,
+          },
+        ],
+      });
+
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
+
+      expect(result.attachments).toEqual([
+        {
+          blobId: 'blob-1',
+          name: 'photo.jpg',
+          type: 'image/jpeg',
+          size: 1024,
+          disposition: 'attachment',
+        },
+        {
+          blobId: 'blob-2',
+          name: 'doc.pdf',
+          type: 'application/pdf',
+          size: 2048,
+          disposition: 'attachment',
+        },
+      ]);
+    });
+
+    it('when DTO has no attachments, then omits the attachments field', () => {
+      const dto = newSendEmailDto({ attachments: undefined });
+
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
+
+      expect(result.attachments).toBeUndefined();
+    });
   });
 
   describe('mapDraftDtoToJmapCreate', () => {
@@ -555,6 +601,39 @@ describe('jmap-mail.mapper', () => {
       expect(result.cc).toEqual(cc);
       expect(result.subject).toBe('Draft subject');
       expect(result.bodyValues?.['text']?.value).toBe('Draft text');
+    });
+
+    it('when draft DTO has attachments, then maps them with disposition attachment', () => {
+      const dto = newDraftEmailDto({
+        attachments: [
+          {
+            blobId: 'blob-1',
+            name: 'photo.jpg',
+            type: 'image/jpeg',
+            size: 1024,
+          },
+        ],
+      });
+
+      const result = mapDraftDtoToJmapCreate(dto, 'mid', newEmailAddress());
+
+      expect(result.attachments).toEqual([
+        {
+          blobId: 'blob-1',
+          name: 'photo.jpg',
+          type: 'image/jpeg',
+          size: 1024,
+          disposition: 'attachment',
+        },
+      ]);
+    });
+
+    it('when draft DTO has no attachments, then omits the attachments field', () => {
+      const dto = newDraftEmailDto({ attachments: undefined });
+
+      const result = mapDraftDtoToJmapCreate(dto, 'mid', newEmailAddress());
+
+      expect(result.attachments).toBeUndefined();
     });
   });
 

@@ -139,6 +139,7 @@ export function newEmail(attrs?: Partial<Email>): Email {
     textBody: random.paragraph(),
     htmlBody: `<p>${random.paragraph()}</p>`,
     ...attrs,
+    attachments: attrs?.attachments ?? [],
   };
 }
 

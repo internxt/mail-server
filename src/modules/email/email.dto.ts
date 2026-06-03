@@ -61,6 +61,20 @@ export class EncryptionBlockDto {
   wrappedKeys!: EncryptedWrappedKeyDto[];
 }
 
+export class AttachmentRefDto {
+  @ApiProperty({ example: 'T1a2b3c…' })
+  blobId!: string;
+
+  @ApiProperty({ example: 'photo.jpg' })
+  name!: string;
+
+  @ApiProperty({ example: 'image/jpeg' })
+  type!: string;
+
+  @ApiProperty({ example: 4096, description: 'Size in bytes' })
+  size!: number;
+}
+
 export class SendEmailRequestDto {
   @ApiProperty({
     type: [EmailAddressDto],
@@ -91,6 +105,9 @@ export class SendEmailRequestDto {
 
   @ApiPropertyOptional({ type: EncryptionBlockDto })
   encryption?: EncryptionBlockDto;
+
+  @ApiPropertyOptional({ type: [AttachmentRefDto] })
+  attachments?: AttachmentRefDto[];
 }
 
 export class LookupRecipientKeysRequestDto {
@@ -141,6 +158,9 @@ export class DraftEmailRequestDto {
 
   @ApiPropertyOptional({ example: '<p>Still working on this…</p>' })
   htmlBody?: string;
+
+  @ApiPropertyOptional({ type: [AttachmentRefDto] })
+  attachments?: AttachmentRefDto[];
 }
 
 export class UpdateEmailRequestDto {
