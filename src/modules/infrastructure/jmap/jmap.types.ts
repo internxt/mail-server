@@ -172,7 +172,6 @@ export type EmailCreate = Partial<
 >;
 
 export interface UploadAttachmentResponse {
-  accountId: string;
   blobId: string;
   size: number;
   type: string;
@@ -181,6 +180,7 @@ export interface UploadAttachmentResponse {
 export interface UploadAttachmentPayload {
   userEmail: string;
   blob: {
+    name: string;
     buffer: Buffer;
     mimeType: string;
   };

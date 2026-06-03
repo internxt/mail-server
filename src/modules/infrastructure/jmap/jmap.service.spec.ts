@@ -77,7 +77,6 @@ describe('JMAP service', () => {
       });
 
       expect(result).toEqual({
-        accountId: 'acc-1',
         blobId: 'blob-xyz',
         size: 1234,
         type: 'image/jpeg',
@@ -100,20 +99,18 @@ describe('JMAP service', () => {
         blob: { buffer, mimeType: 'text/plain' },
       });
 
-      // index 0 is the session GET, index 1 is the upload POST
-      const uploadCall = mockRequest.mock.calls[1]![0] as {
-        method: string;
-        path: string;
-        headers: Record<string, string>;
-        body: Buffer;
-      };
-
-      expect(uploadCall.method).toBe('POST');
-      expect(uploadCall.path).toBe('/jmap/upload/acc-1/');
-      expect(uploadCall.headers['content-type']).toBe('text/plain');
-      expect(uploadCall.headers['content-length']).toBe(String(buffer.length));
-      expect(uploadCall.headers.authorization).toMatch(/^Basic /);
-      expect(uploadCall.body).toBe(buffer);
+      expect(mockRequest).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          method: 'POST',
+          path: '/jmap/upload/acc-1/',
+          body: buffer,
+          headers: expect.objectContaining({
+            'content-type': 'text/plain',
+            'content-length': String(buffer.length),
+            authorization: expect.stringMatching(/^Basic /) as string,
+          }) as Record<string, string>,
+        }),
+      );
     });
 
     test('when an attachment is accepted as newly created, then the upload still completes successfully', async () => {

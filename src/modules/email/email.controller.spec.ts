@@ -308,24 +308,26 @@ describe('EmailController', () => {
 
     test('when a user attaches a file, then the file is stored and its details are returned along with the original filename', async () => {
       emailService.uploadAttachment.mockResolvedValue({
-        accountId: 'account-1',
         blobId: 'blob-1',
-        size: 6,
-        type: 'image/jpeg',
+        size: file.size,
+        type: file.mimetype,
       });
 
       const result = await controller.uploadAttachment([file], userEmail);
 
       expect(emailService.uploadAttachment).toHaveBeenCalledWith({
         userEmail,
-        blob: { buffer: file.buffer, mimeType: file.mimetype },
+        blob: {
+          name: file.originalname,
+          buffer: file.buffer,
+          mimeType: file.mimetype,
+        },
       });
       expect(result).toEqual({
-        accountId: 'account-1',
         blobId: 'blob-1',
-        size: 6,
-        type: 'image/jpeg',
-        name: 'photo.jpg',
+        size: file.size,
+        type: file.mimetype,
+        name: file.originalname,
       });
     });
 
