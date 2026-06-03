@@ -10,10 +10,13 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -48,6 +51,11 @@ import { AccountService } from '../account/account.service.js';
 import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.decorator.js';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import {
+  buildContentDisposition,
+  sanitizeFilename,
+  sanitizeMimeType,
+} from './attachment-headers.js';
 
 export const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 
@@ -270,6 +278,51 @@ export class EmailController {
     });
 
     return { ...result, name: file.originalname };
+  }
+
+  @Get(':id/attachment/:blobId')
+  @ApiOperation({
+    summary: 'Download an attachment',
+    description:
+      'Streams the bytes of an attachment from the given email. ' +
+      'Optional `name` and `type` query params set the response filename and content-type.',
+  })
+  @ApiParam({ name: 'id', description: 'Email ID' })
+  @ApiParam({ name: 'blobId', description: 'Attachment blob ID' })
+  @ApiQuery({ name: 'name', required: false, example: 'photo.jpg' })
+  @ApiQuery({ name: 'type', required: false, example: 'image/jpeg' })
+  async downloadAttachment(
+    @MailAddress('address') email: string,
+    @Param('id') emailId: string,
+    @Param('blobId') blobId: string,
+    @Query('name') name: string | undefined,
+    @Query('type') type: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const safeType = sanitizeMimeType(type);
+
+    const attachment = await this.emailService.getAttachment(
+      email,
+      emailId,
+      blobId,
+    );
+    const resolvedName = sanitizeFilename(name ?? attachment.name);
+
+    const result = await this.emailService.downloadAttachment({
+      userEmail: email,
+      blobId,
+      name: resolvedName,
+      type: safeType ?? undefined,
+    });
+
+    const resolvedType = safeType ?? result.contentType;
+
+    res.setHeader('Content-Type', resolvedType);
+    res.setHeader('Content-Disposition', buildContentDisposition(resolvedName));
+    if (result.contentLength !== undefined)
+      res.setHeader('Content-Length', result.contentLength);
+
+    return new StreamableFile(result.stream);
   }
 
   @Patch(':id')

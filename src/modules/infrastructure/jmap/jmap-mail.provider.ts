@@ -12,6 +12,8 @@ import type {
 } from '../../email/email.types.js';
 import { JmapService } from './jmap.service.js';
 import type {
+  DownloadAttachmentPayload,
+  DownloadAttachmentResponse,
   Email as JmapEmail,
   Identity,
   Mailbox as JmapMailbox,
@@ -432,6 +434,12 @@ export class JmapMailProvider extends MailProvider {
         mimeType: blob.mimeType,
       },
     });
+  }
+
+  async downloadAttachment(
+    payload: DownloadAttachmentPayload,
+  ): Promise<DownloadAttachmentResponse> {
+    return this.jmap.downloadAttachment(payload);
   }
 
   private async setKeyword(

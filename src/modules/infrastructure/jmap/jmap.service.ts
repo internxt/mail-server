@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from 'undici';
+import type { Readable } from 'node:stream';
 import type {
+  DownloadAttachmentPayload,
+  DownloadAttachmentResponse,
   ID,
   JmapInvocation,
   JmapMethodCall,
@@ -42,7 +45,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   private readonly masterPassword: string;
   private readonly sessionCache = new Map<string, CachedSession>(); // TODO: Implement cache ?
   private httpClient!: Client;
-  private uploadClient!: Client;
+  private blobClient!: Client;
 
   constructor(private readonly configService: ConfigService) {
     this.stalwartUrl = this.configService.getOrThrow<string>('stalwart.url');
@@ -60,7 +63,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       keepAliveTimeout: 30_000,
       pipelining: 1,
     });
-    this.uploadClient = new Client(this.stalwartUrl, {
+    this.blobClient = new Client(this.stalwartUrl, {
       allowH2: false,
       keepAliveTimeout: 60_000,
       pipelining: 1,
@@ -71,7 +74,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await Promise.all([this.httpClient.close(), this.uploadClient.close()]);
+    await Promise.all([this.httpClient.close(), this.blobClient.close()]);
   }
 
   private buildAuthHeader(userEmail: string): string {
@@ -189,7 +192,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
 
     const uploadPath = new URL(uploadUrl).pathname;
 
-    const { statusCode, body } = await this.uploadClient.request({
+    const { statusCode, body } = await this.blobClient.request({
       method: 'POST',
       path: uploadPath,
       headers: {
@@ -217,6 +220,45 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       blobId: data.blobId,
       size: data.size,
       type: data.type,
+    };
+  }
+
+  async downloadAttachment({
+    userEmail,
+    blobId,
+    name,
+    type,
+  }: DownloadAttachmentPayload): Promise<DownloadAttachmentResponse> {
+    const accountId = await this.getPrimaryAccountId(userEmail);
+
+    const namePart = encodeURIComponent(name ?? 'attachment');
+    const acceptQuery = type ? `?accept=${encodeURIComponent(type)}` : '';
+
+    const { statusCode, headers, body } = await this.blobClient.request({
+      method: 'GET',
+      path: `/jmap/download/${encodeURIComponent(accountId)}/${encodeURIComponent(blobId)}/${namePart}${acceptQuery}`,
+      headers: {
+        authorization: this.buildAuthHeader(userEmail),
+      },
+    });
+
+    if (statusCode !== 200) {
+      const text = await body.text();
+      throw new JmapError(`Blob download failed: HTTP ${statusCode}`, text);
+    }
+
+    const contentType =
+      (headers['content-type'] as string | undefined) ??
+      'application/octet-stream';
+    const contentLengthRaw = headers['content-length'] as string | undefined;
+    const contentLength = contentLengthRaw
+      ? Number.parseInt(contentLengthRaw, 10)
+      : undefined;
+
+    return {
+      stream: body as unknown as Readable,
+      contentType,
+      contentLength: Number.isFinite(contentLength) ? contentLength : undefined,
     };
   }
 }

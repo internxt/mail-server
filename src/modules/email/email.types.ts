@@ -87,6 +87,7 @@ export interface SendEmailDto {
   textBody?: string;
   htmlBody?: string;
   encryption?: EncryptionBlock;
+  attachments?: EmailAttachment[];
 }
 
 export interface DraftEmailDto {
@@ -96,6 +97,7 @@ export interface DraftEmailDto {
   subject?: string;
   textBody?: string;
   htmlBody?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface SearchEmailDto {

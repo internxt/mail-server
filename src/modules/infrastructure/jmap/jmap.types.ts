@@ -4,6 +4,8 @@
  * with the package shipping raw .ts source files.
  */
 
+import type { Readable } from 'node:stream';
+
 export type ID = string;
 
 // ── Session ─────────────────────────────────────────────────────────
@@ -182,6 +184,19 @@ export interface UploadAttachmentPayload {
     buffer: Buffer;
     mimeType: string;
   };
+}
+
+export interface DownloadAttachmentPayload {
+  userEmail: string;
+  blobId: string;
+  name?: string;
+  type?: string;
+}
+
+export interface DownloadAttachmentResponse {
+  stream: Readable;
+  contentType: string;
+  contentLength?: number;
 }
 
 export interface EmailFilterCondition {

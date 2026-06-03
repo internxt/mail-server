@@ -131,6 +131,16 @@ export function mapSearchFilterToJmap(
   };
 }
 
+function mapAttachmentsToJmap(attachments: EmailAttachment[]): EmailBodyPart[] {
+  return attachments.map((a) => ({
+    blobId: a.blobId,
+    name: a.name,
+    type: a.type,
+    size: a.size,
+    disposition: 'attachment',
+  }));
+}
+
 function applyBodyParts(
   email: JmapEmailCreate,
   textBody?: string,
@@ -175,6 +185,8 @@ export function mapSendDtoToJmapCreate(
 
   if (dto.cc) email.cc = dto.cc;
   if (dto.bcc) email.bcc = dto.bcc;
+  if (dto.attachments?.length)
+    email.attachments = mapAttachmentsToJmap(dto.attachments);
   applyBodyParts(email, dto.textBody, dto.htmlBody);
 
   return email;
@@ -195,6 +207,8 @@ export function mapDraftDtoToJmapCreate(
   if (dto.cc) email.cc = dto.cc;
   if (dto.bcc) email.bcc = dto.bcc;
   if (dto.subject) email.subject = dto.subject;
+  if (dto.attachments?.length)
+    email.attachments = mapAttachmentsToJmap(dto.attachments);
   applyBodyParts(email, dto.textBody, dto.htmlBody);
 
   return email;
