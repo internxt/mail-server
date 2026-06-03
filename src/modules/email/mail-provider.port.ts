@@ -1,3 +1,7 @@
+import {
+  type UploadAttachmentPayload,
+  type UploadAttachmentResponse,
+} from '../infrastructure/jmap/jmap.types.js';
 import type {
   DraftEmailDto,
   Email,
@@ -42,4 +46,7 @@ export abstract class MailProvider {
     id: string,
     flagged: boolean,
   ): Promise<void>;
+  abstract uploadAttachment(
+    payload: UploadAttachmentPayload,
+  ): Promise<UploadAttachmentResponse>;
 }

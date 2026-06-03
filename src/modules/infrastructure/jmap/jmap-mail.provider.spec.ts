@@ -536,4 +536,29 @@ describe('JmapMailProvider', () => {
       expect(update['email-1']).toEqual({ 'keywords/$flagged': true });
     });
   });
+
+  describe('Uploading an attachment', () => {
+    it('when a user uploads an attachment, then the file is forwarded for storage and the stored details are returned', async () => {
+      const payload = {
+        userEmail: 'user@test.com',
+        blob: {
+          name: 'image.jpg',
+          buffer: Buffer.from('binary'),
+          mimeType: 'image/jpeg',
+        },
+      };
+      const storedBlob = {
+        accountId: 'acc-1',
+        blobId: 'blob-1',
+        size: 6,
+        type: 'image/jpeg',
+      };
+      jmapService.uploadAttachment.mockResolvedValue(storedBlob);
+
+      const result = await provider.uploadAttachment(payload);
+
+      expect(jmapService.uploadAttachment).toHaveBeenCalledWith(payload);
+      expect(result).toBe(storedBlob);
+    });
+  });
 });

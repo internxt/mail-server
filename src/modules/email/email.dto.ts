@@ -359,3 +359,17 @@ export class EmailCreatedResponseDto {
   })
   id!: string;
 }
+
+export class UploadAttachmentResponseDto {
+  @ApiProperty({ example: 'T1a2b3c…' })
+  blobId!: string;
+
+  @ApiProperty({ example: 4096, description: 'Size in bytes' })
+  size!: number;
+
+  @ApiProperty({ example: 'image/jpeg' })
+  type!: string;
+
+  @ApiProperty({ example: 'photo.jpg' })
+  name!: string;
+}

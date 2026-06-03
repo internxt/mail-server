@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,7 +10,9 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -38,10 +41,15 @@ import {
   MailDomainDto,
   SendEmailRequestDto,
   UpdateEmailRequestDto,
+  UploadAttachmentResponseDto,
 } from './email.dto.js';
 import type { MailboxType } from './email.types.js';
 import { AccountService } from '../account/account.service.js';
 import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.decorator.js';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+
+export const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 
 @ApiBearerAuth()
 @ApiTags('Email')
@@ -224,6 +232,44 @@ export class EmailController {
     @Body() dto: DraftEmailRequestDto,
   ) {
     return this.emailService.saveDraft(email, dto);
+  }
+
+  @Post('attachment')
+  @ApiOperation({
+    summary: 'Upload an attachment',
+    description:
+      'Uploads an attachment and get the info to attach it to an user email.',
+  })
+  @UseInterceptors(
+    FilesInterceptor('attachments', 1, {
+      storage: memoryStorage(), // NOSONAR — 25MB matches Gmail's attachment cap; enforced by Multer
+      limits: {
+        fileSize: MAX_TOTAL_BYTES,
+        fieldSize: MAX_TOTAL_BYTES,
+      },
+    }),
+  )
+  @ApiOkResponse({
+    type: UploadAttachmentResponseDto,
+    description: 'Upload attachment successfully',
+  })
+  async uploadAttachment(
+    @UploadedFiles() files: Express.Multer.File[],
+    @MailAddress('address') email: string,
+  ): Promise<UploadAttachmentResponseDto> {
+    const [file] = files;
+    if (!file) throw new BadRequestException('No files uploaded');
+
+    const result = await this.emailService.uploadAttachment({
+      userEmail: email,
+      blob: {
+        name: file.originalname,
+        buffer: file.buffer,
+        mimeType: file.mimetype,
+      },
+    });
+
+    return { ...result, name: file.originalname };
   }
 
   @Patch(':id')
