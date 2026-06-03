@@ -1,3 +1,5 @@
+import type { Response } from 'express';
+
 const MIME_TYPE_REGEX = /^[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+$/;
 
 export function sanitizeFilename(name: string | undefined): string {
@@ -15,4 +17,14 @@ export function sanitizeMimeType(type: string | undefined): string | null {
 export function buildContentDisposition(filename: string): string {
   const encoded = encodeURIComponent(filename);
   return `attachment; filename="${filename}"; filename*=UTF-8''${encoded}`;
+}
+
+export function applyDownloadHeaders(
+  res: Response,
+  opts: { contentType: string; filename: string; contentLength?: number },
+): void {
+  res.setHeader('Content-Type', opts.contentType);
+  res.setHeader('Content-Disposition', buildContentDisposition(opts.filename));
+  if (opts.contentLength !== undefined)
+    res.setHeader('Content-Length', opts.contentLength);
 }

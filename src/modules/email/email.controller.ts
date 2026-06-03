@@ -53,7 +53,7 @@ import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.de
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import {
-  buildContentDisposition,
+  applyDownloadHeaders,
   sanitizeFilename,
   sanitizeMimeType,
 } from './attachment-headers.js';
@@ -316,12 +316,11 @@ export class EmailController {
       type: safeType ?? undefined,
     });
 
-    const resolvedType = safeType ?? result.contentType;
-
-    res.setHeader('Content-Type', resolvedType);
-    res.setHeader('Content-Disposition', buildContentDisposition(safeName));
-    if (result.contentLength !== undefined)
-      res.setHeader('Content-Length', result.contentLength);
+    applyDownloadHeaders(res, {
+      contentType: safeType ?? result.contentType,
+      filename: safeName,
+      contentLength: result.contentLength,
+    });
 
     return new StreamableFile(result.stream);
   }

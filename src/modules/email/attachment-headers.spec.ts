@@ -1,9 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import type { Response } from 'express';
 import {
+  applyDownloadHeaders,
   buildContentDisposition,
   sanitizeFilename,
   sanitizeMimeType,
 } from './attachment-headers.js';
+
+function makeResponse(): Response {
+  return { setHeader: vi.fn() } as unknown as Response;
+}
 
 describe('attachment-headers', () => {
   describe('sanitizeFilename', () => {
@@ -60,6 +66,49 @@ describe('attachment-headers', () => {
     it('when the content type contains suspicious characters, then it is rejected', () => {
       expect(sanitizeMimeType('image/jpeg\r\nX-Injected: yes')).toBeNull();
       expect(sanitizeMimeType('image/jpeg;charset=utf-8')).toBeNull();
+    });
+  });
+
+  describe('applyDownloadHeaders', () => {
+    it('when called with a content type and filename, then sets Content-Type and Content-Disposition', () => {
+      const res = makeResponse();
+
+      applyDownloadHeaders(res, {
+        contentType: 'image/jpeg',
+        filename: 'photo.jpg',
+      });
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
+      expect(res.setHeader).toHaveBeenCalledWith(
+        'Content-Disposition',
+        buildContentDisposition('photo.jpg'),
+      );
+    });
+
+    it('when a content length is provided, then it is set as a header', () => {
+      const res = makeResponse();
+
+      applyDownloadHeaders(res, {
+        contentType: 'application/pdf',
+        filename: 'doc.pdf',
+        contentLength: 4096,
+      });
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Length', 4096);
+    });
+
+    it('when no content length is provided, then Content-Length is not set', () => {
+      const res = makeResponse();
+
+      applyDownloadHeaders(res, {
+        contentType: 'application/pdf',
+        filename: 'doc.pdf',
+      });
+
+      expect(res.setHeader).not.toHaveBeenCalledWith(
+        'Content-Length',
+        expect.anything(),
+      );
     });
   });
 
