@@ -8,6 +8,7 @@ import { MailProvider } from './mail-provider.port.js';
 import type {
   DraftEmailDto,
   Email,
+  EmailAttachment,
   EmailListResponse,
   EmailSummary,
   ListEmails,
@@ -52,6 +53,17 @@ export class EmailService {
       throw new NotFoundException(`Email ${id} not found`);
     }
     return email;
+  }
+
+  async getAttachment(
+    userEmail: string,
+    emailId: string,
+    blobId: string,
+  ): Promise<EmailAttachment> {
+    const email = await this.getEmail(userEmail, emailId);
+    const attachment = email.attachments.find((a) => a.blobId === blobId);
+    if (!attachment) throw new NotFoundException('Attachment not found');
+    return attachment;
   }
 
   async search(params: SearchEmailDto): Promise<EmailListResponse> {

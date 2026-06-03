@@ -6,7 +6,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -53,7 +52,7 @@ import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.de
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import {
-  applyDownloadHeaders,
+  buildContentDisposition,
   sanitizeFilename,
   sanitizeMimeType,
 } from './attachment-headers.js';
@@ -294,33 +293,34 @@ export class EmailController {
   @ApiQuery({ name: 'type', required: false, example: 'image/jpeg' })
   async downloadAttachment(
     @MailAddress('address') email: string,
-    @Param('id') _id: string,
+    @Param('id') emailId: string,
     @Param('blobId') blobId: string,
     @Query('name') name: string | undefined,
     @Query('type') type: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const safeName = sanitizeFilename(name);
     const safeType = sanitizeMimeType(type);
 
-    const mail = await this.emailService.getEmail(email, _id);
-    if (!mail) throw new NotFoundException('Email not found');
-
-    const attachment = mail.attachments.find((a) => a.blobId === blobId);
-    if (!attachment) throw new NotFoundException('Attachment not found');
+    const attachment = await this.emailService.getAttachment(
+      email,
+      emailId,
+      blobId,
+    );
+    const resolvedName = sanitizeFilename(name ?? attachment.name);
 
     const result = await this.emailService.downloadAttachment({
       userEmail: email,
       blobId,
-      name: safeName,
+      name: resolvedName,
       type: safeType ?? undefined,
     });
 
-    applyDownloadHeaders(res, {
-      contentType: safeType ?? result.contentType,
-      filename: safeName,
-      contentLength: result.contentLength,
-    });
+    const resolvedType = safeType ?? result.contentType;
+
+    res.setHeader('Content-Type', resolvedType);
+    res.setHeader('Content-Disposition', buildContentDisposition(resolvedName));
+    if (result.contentLength !== undefined)
+      res.setHeader('Content-Length', result.contentLength);
 
     return new StreamableFile(result.stream);
   }
