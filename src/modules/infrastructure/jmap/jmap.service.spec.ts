@@ -4,10 +4,9 @@ import { JmapService, JmapError } from './jmap.service.js';
 
 const mockRequest = vi.fn();
 vi.mock('undici', () => ({
-  Client: vi.fn().mockImplementation(() => ({
-    request: mockRequest,
-    close: vi.fn(),
-  })),
+  Client: vi.fn().mockImplementation(function () {
+    return { request: mockRequest, close: vi.fn() };
+  }),
 }));
 
 function createConfigService(): ConfigService {
