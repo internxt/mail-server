@@ -28,6 +28,11 @@ export default () => ({
     ),
   },
 
+  mtaHooks: {
+    username: process.env.MTA_HOOKS_USERNAME ?? 'stalwart',
+    secret: process.env.MTA_HOOKS_SECRET ?? '',
+  },
+
   secrets: {
     jwt: process.env.JWT_SECRET,
     drivePublicGateway: process.env.GATEWAY_PUBLIC_SECRET,
