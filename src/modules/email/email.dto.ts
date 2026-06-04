@@ -64,7 +64,7 @@ export class EncryptionBlockDto {
     type: [EncryptedWrappedKeyDto],
     description: 'De-identified attachment wrapped keys, one per recipient',
   })
-  attachmentWrappedKey!: EncryptedWrappedKeyDto;
+  attachmentWrappedKeys!: EncryptedWrappedKeyDto[];
 }
 
 export class AttachmentRefDto {
@@ -231,7 +231,7 @@ export class EncryptedSummaryDto {
       'De-identified wrapped keys for the symmetric key that encrypts the ' +
       "email's attachments. Present only when the email has encrypted attachments.",
   })
-  attachmentWrappedKey?: EncryptedWrappedKeyDto;
+  attachmentWrappedKeys?: EncryptedWrappedKeyDto[];
 }
 
 export class EmailSummaryResponseDto {

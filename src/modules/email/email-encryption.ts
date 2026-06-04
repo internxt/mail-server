@@ -45,8 +45,8 @@ export function projectForCaller(
   return {
     encryptedPreview: envelope.encryptedPreview,
     wrappedKeys: envelope.wrappedKeys,
-    ...(envelope.attachmentWrappedKey && {
-      attachmentWrappedKey: envelope.attachmentWrappedKey,
+    ...(envelope.attachmentWrappedKeys && {
+      attachmentWrappedKeys: envelope.attachmentWrappedKeys,
     }),
   };
 }
