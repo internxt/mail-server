@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { JmapMailProvider } from './jmap-mail.provider.js';
-import { JmapService } from './jmap.service.js';
+import { JmapService, JMAP_QUOTA_CAPABILITIES } from './jmap.service.js';
 import {
   newJmapMailbox,
   newJmapEmail,
@@ -587,12 +587,17 @@ describe('JmapMailProvider', () => {
   });
 
   describe('getQuota', () => {
-    it('when quota exists, then returns used and limit from octets quota', async () => {
+    it('when quota exists, then calls Quota/get with quota capabilities and returns mapped result', async () => {
       const quota = newJmapQuota({ used: 500_000, hardLimit: 1_000_000 });
       jmapService.request.mockResolvedValue(jmapResponse({ list: [quota] }));
 
       const result = await provider.getQuota('user@test.com');
 
+      expect(jmapService.request).toHaveBeenCalledWith(
+        'user@test.com',
+        [['Quota/get', { accountId }, 'r0']],
+        JMAP_QUOTA_CAPABILITIES,
+      );
       expect(result).toEqual({ used: 500_000, limit: 1_000_000 });
     });
 
