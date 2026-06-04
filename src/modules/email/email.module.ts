@@ -9,5 +9,6 @@ import { Reflector } from '@nestjs/core';
   imports: [JmapModule, ProvisioningModule],
   controllers: [EmailController],
   providers: [EmailService, Reflector],
+  exports: [EmailService],
 })
 export class EmailModule {}

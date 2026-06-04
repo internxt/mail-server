@@ -12,6 +12,7 @@ import { EmailModule } from './modules/email/email.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AccountModule } from './modules/account/account.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { MtaHooksModule } from './modules/mta-hooks/mta-hooks.module';
 import { HttpGlobalExceptionFilter } from './common/filters/http-global-exception.filter';
 import { AddressesModule } from './modules/addresses/addresses.module';
 
@@ -87,6 +88,7 @@ import { AddressesModule } from './modules/addresses/addresses.module';
     AccountModule,
     AddressesModule,
     GatewayModule,
+    MtaHooksModule,
   ],
   controllers: [],
   providers: [
