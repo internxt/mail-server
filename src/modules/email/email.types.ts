@@ -23,6 +23,7 @@ export interface Mailbox {
 export interface EncryptedSummaryFields {
   encryptedPreview: string;
   wrappedKeys: EncryptedWrappedKey[];
+  attachmentWrappedKey?: EncryptedWrappedKey;
 }
 
 export interface EmailSummary {
@@ -77,6 +78,7 @@ export interface EncryptionBlock {
   encryptedPreview: string;
   encryptedText: string;
   wrappedKeys: EncryptedWrappedKey[];
+  attachmentWrappedKey?: EncryptedWrappedKey;
 }
 
 export interface SendEmailDto {
