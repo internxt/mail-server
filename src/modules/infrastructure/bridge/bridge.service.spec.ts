@@ -66,16 +66,32 @@ describe('BridgeClient', () => {
       );
     });
 
-    it('when Bridge returns a non-200 status, then throws BridgeApiError', async () => {
+    it('when Bridge returns a non-200 status, then throws BridgeApiError with statusCode and details', async () => {
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
         statusCode: 500,
-        body: { text: () => Promise.resolve('boom') },
+        body: { text: () => Promise.resolve('internal error') },
       });
 
-      await expect(
-        service.reportMailUsage('user-1', 512),
-      ).rejects.toBeInstanceOf(BridgeApiError);
+      const error: unknown = await service
+        .reportMailUsage('user-1', 512)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BridgeApiError);
+      if (!(error instanceof BridgeApiError)) {
+        throw new Error('expected BridgeApiError');
+      }
+      expect(error.statusCode).toBe(500);
+      expect(error.details).toBe('internal error');
+    });
+
+    it('when the HTTP request throws, then the error propagates', async () => {
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockRejectedValue(new Error('network failure'));
+
+      await expect(service.reportMailUsage('user-1', 512)).rejects.toThrow(
+        'network failure',
+      );
     });
   });
 });

@@ -14,6 +14,7 @@ import {
   newSearchEmailDto,
   newEncryptionBlock,
   newEncryptedWrappedKey,
+  newMailQuota,
 } from '../../../test/fixtures.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
 
@@ -360,6 +361,18 @@ describe('EmailService', () => {
         'email-id',
         false,
       );
+    });
+  });
+
+  describe('getQuota', () => {
+    it('when called, then delegates to mail provider and returns result', async () => {
+      const quota = newMailQuota();
+      provider.getQuota.mockResolvedValue(quota);
+
+      const result = await service.getQuota(userEmail);
+
+      expect(provider.getQuota).toHaveBeenCalledWith(userEmail);
+      expect(result).toBe(quota);
     });
   });
 });
