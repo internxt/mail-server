@@ -241,6 +241,19 @@ export class AccountService {
       }),
     );
 
+    if (account.networkBucketId) {
+      try {
+        await this.bridge.deleteMailBucket(
+          driveUserUuid,
+          account.networkBucketId,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to delete network bucket '${account.networkBucketId}' for '${driveUserUuid}': ${(error as Error).message}`,
+        );
+      }
+    }
+
     await this.accounts.delete(account.id);
     this.logger.log(`Deleted account for user '${driveUserUuid}'`);
   }
