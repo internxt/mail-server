@@ -72,7 +72,11 @@ describe('JMAP service', () => {
 
       const result = await service.uploadAttachment({
         userEmail,
-        blob: { buffer: Buffer.from('binary'), mimeType: 'image/jpeg' },
+        blob: {
+          name: 'image.jpg',
+          buffer: Buffer.from('binary'),
+          mimeType: 'image/jpeg',
+        },
       });
 
       expect(result).toEqual({
