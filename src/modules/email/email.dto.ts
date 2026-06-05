@@ -59,6 +59,12 @@ export class EncryptionBlockDto {
     description: 'De-identified wrapped keys, one per recipient',
   })
   wrappedKeys!: EncryptedWrappedKeyDto[];
+
+  @ApiProperty({
+    type: [EncryptedWrappedKeyDto],
+    description: 'De-identified attachment wrapped keys, one per recipient',
+  })
+  attachmentWrappedKeys!: EncryptedWrappedKeyDto[];
 }
 
 export class AttachmentRefDto {
@@ -218,6 +224,14 @@ export class EncryptedSummaryDto {
       'De-identified wrapped keys; the client trial-decrypts to read',
   })
   wrappedKeys!: EncryptedWrappedKeyDto[];
+
+  @ApiPropertyOptional({
+    type: [EncryptedWrappedKeyDto],
+    description:
+      'De-identified wrapped keys for the symmetric key that encrypts the ' +
+      "email's attachments. Present only when the email has encrypted attachments.",
+  })
+  attachmentWrappedKeys?: EncryptedWrappedKeyDto[];
 }
 
 export class EmailSummaryResponseDto {
