@@ -16,6 +16,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   private readonly origin: string;
   private readonly basePath: string;
   private readonly signingKey: string;
+  private readonly isProduction: boolean;
   private httpClient!: Client;
 
   constructor(
@@ -27,6 +28,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       this.configService.getOrThrow<string>('secrets.bridgePrivateGateway'),
       'base64',
     ).toString('utf8');
+    this.isProduction = this.configService.getOrThrow<boolean>('isProduction');
     const parsed = new URL(this.baseUrl);
     this.origin = parsed.origin;
     this.basePath =
@@ -79,7 +81,12 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   private signGatewayToken(userUuid: string): string {
     return this.jwtService.sign(
       { payload: { uuid: userUuid } },
-      { secret: this.signingKey, algorithm: 'RS256', expiresIn: '1m' },
+      {
+        secret: this.signingKey,
+        algorithm: 'RS256',
+        expiresIn: '1m',
+        ...(this.isProduction ? null : { allowInsecureKeySizes: true }),
+      },
     );
   }
 }

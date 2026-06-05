@@ -18,6 +18,7 @@ describe('BridgeClient', () => {
       if (key === 'apis.bridge.url') return 'http://bridge.test';
       if (key === 'secrets.bridgePrivateGateway')
         return Buffer.from('test-key').toString('base64');
+      if (key === 'isProduction') return false;
       throw new Error(`unknown key: ${key}`);
     });
 
@@ -52,7 +53,12 @@ describe('BridgeClient', () => {
       expect(result).toStrictEqual(storage);
       expect(jwtService.sign).toHaveBeenCalledWith(
         { payload: { uuid: 'user-1' } },
-        { secret: 'test-key', algorithm: 'RS256', expiresIn: '1m' },
+        {
+          secret: 'test-key',
+          algorithm: 'RS256',
+          expiresIn: '1m',
+          allowInsecureKeySizes: true,
+        },
       );
       expect(httpRequest).toHaveBeenCalledWith(
         expect.objectContaining({
