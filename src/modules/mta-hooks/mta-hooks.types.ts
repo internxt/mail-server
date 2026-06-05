@@ -30,11 +30,16 @@ export interface MtaHookEnvelope {
   to: MtaHookAddress[];
 }
 
+export interface MtaHookMessage {
+  size: number;
+}
+
 export interface MtaHookRequest {
   context: {
     stage: MtaHookStage;
   };
   envelope?: MtaHookEnvelope;
+  message?: MtaHookMessage;
 }
 
 export type MtaHookAction = 'accept' | 'reject';

@@ -6,6 +6,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { type NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from 'nestjs-pino';
+import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import {
   DocumentBuilder,
@@ -17,6 +18,8 @@ import configuration from './config/configuration';
 
 const config = configuration();
 const APP_PORT = config.port || 3100;
+
+const MTA_HOOKS_BODY_LIMIT = '128mb';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -33,10 +36,15 @@ async function bootstrap() {
       preflightContinue: false,
     },
     bufferLogs: true,
+    bodyParser: false,
   });
 
   app.useLogger(app.get(Logger));
   const logger = app.get(Logger);
+
+  app.use('/mta-hooks', json({ limit: MTA_HOOKS_BODY_LIMIT }));
+  app.use(json());
+  app.use(urlencoded({ extended: true }));
 
   const enableTrustProxy = config.isProduction;
   app.set('trust proxy', enableTrustProxy);

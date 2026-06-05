@@ -2,11 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../account/account.service.js';
 import { EmailService } from '../email/email.service.js';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
-import type {
-  MtaHookEnvelope,
-  MtaHookRequest,
-  MtaHookResponse,
-} from './mta-hooks.types.js';
+import type { MtaHookRequest, MtaHookResponse } from './mta-hooks.types.js';
 
 const ACCEPT: MtaHookResponse = { action: 'accept' };
 
@@ -29,24 +25,30 @@ export class MtaHooksService {
     private readonly bridgeClient: BridgeClient,
   ) {}
 
-  async handleRcpt(request: MtaHookRequest): Promise<MtaHookResponse> {
+  async handleData(request: MtaHookRequest): Promise<MtaHookResponse> {
     const recipients = request.envelope?.to ?? [];
-    const recipient = recipients.at(-1);
-    if (!recipient) {
+    if (recipients.length === 0) {
       return ACCEPT;
     }
 
-    const declaredSize = this.parseDeclaredSize(request.envelope);
+    const messageSize = request.message?.size ?? 0;
+    this.logger.log({ messageSize }, 'Message size');
 
     try {
-      const overQuota = await this.isRecipientOverQuota(
-        recipient.address,
-        declaredSize,
-      );
-      return overQuota ? REJECT_OVER_QUOTA : ACCEPT;
+      for (const recipient of recipients) {
+        const overQuota = await this.isRecipientOverQuota(
+          recipient.address,
+          messageSize,
+        );
+        if (overQuota) {
+          return REJECT_OVER_QUOTA;
+        }
+      }
+      this.logger.log('Message accepted');
+      return ACCEPT;
     } catch (error) {
       this.logger.error(
-        `MTA hook quota check failed, accepting recipient (fail-open): ${
+        `MTA hook quota check failed, accepting message (fail-open): ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -71,6 +73,8 @@ export class MtaHooksService {
       mailUsed,
     );
 
+    this.logger.log({ driveUsed, mailUsed, incomingSize }, 'Reported usage');
+
     const projectedUsage = driveUsed + mailUsed + incomingSize;
     if (projectedUsage > planQuota) {
       this.logger.warn(
@@ -81,14 +85,5 @@ export class MtaHooksService {
     }
 
     return false;
-  }
-
-  private parseDeclaredSize(envelope?: MtaHookEnvelope): number {
-    const raw = envelope?.from.parameters?.size;
-    if (!raw) {
-      return 0;
-    }
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
   }
 }
