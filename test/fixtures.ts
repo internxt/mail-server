@@ -252,6 +252,7 @@ export function newMailAccountAttributes(
     userId: randomUuid(),
     status: MailAccountState.Active,
     suspendedAt: null,
+    networkBucketId: null,
     addresses: [address],
     createdAt: new Date(),
     updatedAt: new Date(),

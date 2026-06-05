@@ -13,6 +13,7 @@ export interface MailAccountAttributes {
   userId: string;
   status: MailAccountState;
   suspendedAt: Date | null;
+  networkBucketId: string | null;
   addresses: MailAddressAttributes[];
   createdAt: Date;
   updatedAt: Date;
@@ -23,6 +24,7 @@ export class MailAccount {
   readonly userId!: string;
   readonly status!: MailAccountState;
   readonly suspendedAt!: Date | null;
+  readonly networkBucketId!: string | null;
   readonly addresses!: MailAddress[];
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
