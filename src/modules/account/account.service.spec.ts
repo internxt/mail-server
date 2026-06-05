@@ -16,6 +16,7 @@ import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
+import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
 import {
   newMailAccountAttributes,
   newMailAddressKeyBundle,
@@ -33,6 +34,7 @@ describe('AccountService', () => {
   let addresses: DeepMocked<AddressRepository>;
   let domains: DeepMocked<DomainRepository>;
   let keys: DeepMocked<MailAddressKeysRepository>;
+  let bridge: DeepMocked<BridgeClient>;
   let config: DeepMocked<ConfigService>;
 
   beforeEach(async () => {
@@ -48,6 +50,7 @@ describe('AccountService', () => {
     addresses = module.get(AddressRepository);
     domains = module.get(DomainRepository);
     keys = module.get(MailAddressKeysRepository);
+    bridge = module.get(BridgeClient);
     config = module.get(ConfigService);
   });
 
@@ -364,6 +367,7 @@ describe('AccountService', () => {
         }),
       );
 
+      const bucket = { id: 'bucket-1', name: createdAccount.id };
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       accounts.findByUserId
@@ -371,6 +375,7 @@ describe('AccountService', () => {
         .mockResolvedValueOnce(provisionedAccount);
       accounts.create.mockResolvedValue(createdAccount);
       addresses.create.mockResolvedValue(createdAddressId);
+      bridge.createMailBucket.mockResolvedValue(bucket);
 
       const result = await service.provisionAccount(params);
 
@@ -378,6 +383,14 @@ describe('AccountService', () => {
       expect(accounts.create).toHaveBeenCalledWith({
         userId: params.userId,
       });
+      expect(bridge.createMailBucket).toHaveBeenCalledWith(
+        params.userId,
+        createdAccount.id,
+      );
+      expect(accounts.setNetworkBucketId).toHaveBeenCalledWith(
+        createdAccount.id,
+        bucket.id,
+      );
       expect(addresses.create).toHaveBeenCalledWith({
         mailAccountId: createdAccount.id,
         address: params.address,
@@ -463,6 +476,29 @@ describe('AccountService', () => {
       expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
     });
 
+    it('when bucket creation fails, then deletes the principal and account (undo) and rethrows', async () => {
+      const createdAccount = MailAccount.build(
+        newMailAccountAttributes({
+          userId: params.userId,
+          addresses: [],
+        }),
+      );
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+      accounts.create.mockResolvedValue(createdAccount);
+      addresses.create.mockResolvedValue('addr-id');
+      bridge.createMailBucket.mockRejectedValue(new Error('Bridge down'));
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        'Bridge down',
+      );
+      expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(accounts.setNetworkBucketId).not.toHaveBeenCalled();
+    });
+
     it('when concurrent provisioning race occurs, then returns the existing account', async () => {
       const existingAccount = MailAccount.build(
         newMailAccountAttributes({ userId: params.userId }),
@@ -503,6 +539,44 @@ describe('AccountService', () => {
       );
       expect(addresses.deleteProviderLink).toHaveBeenCalledWith(addr1.id);
       expect(addresses.deleteProviderLink).toHaveBeenCalledWith(addr2.id);
+      expect(accounts.delete).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account has a network bucket, then deletes it via the bridge', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ networkBucketId: 'bucket-1' }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.deleteAccount(account.userId);
+
+      expect(bridge.deleteMailBucket).toHaveBeenCalledWith(
+        account.userId,
+        'bucket-1',
+      );
+      expect(accounts.delete).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account has no network bucket, then does not call the bridge', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ networkBucketId: null }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.deleteAccount(account.userId);
+
+      expect(bridge.deleteMailBucket).not.toHaveBeenCalled();
+    });
+
+    it('when bridge bucket deletion fails, then logs a warning and still deletes the account', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ networkBucketId: 'bucket-1' }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+      bridge.deleteMailBucket.mockRejectedValue(new Error('Bridge down'));
+
+      await service.deleteAccount(account.userId);
+
       expect(accounts.delete).toHaveBeenCalledWith(account.id);
     });
 

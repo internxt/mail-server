@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Client } from 'undici';
-import type { UserStorage } from './bridge.types.js';
+import type { MailBucket, UserStorage } from './bridge.types.js';
 
 @Injectable()
 export class BridgeClient implements OnModuleInit, OnModuleDestroy {
@@ -76,6 +76,56 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
     }
 
     return JSON.parse(text) as UserStorage;
+  }
+
+  async createMailBucket(userUuid: string, name: string): Promise<MailBucket> {
+    const token = this.signGatewayToken(userUuid);
+
+    const { statusCode, body } = await this.httpClient.request({
+      method: 'POST',
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets`,
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    const text = await body.text();
+
+    if (statusCode !== 200) {
+      throw new BridgeApiError(
+        `Failed to create mail bucket for user '${userUuid}': HTTP ${statusCode}`,
+        statusCode,
+        text,
+      );
+    }
+
+    return JSON.parse(text) as MailBucket;
+  }
+
+  async deleteMailBucket(userUuid: string, bucketId: string): Promise<void> {
+    const token = this.signGatewayToken(userUuid);
+
+    const { statusCode, body } = await this.httpClient.request({
+      method: 'DELETE',
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}`,
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    const text = await body.text();
+
+    if (statusCode !== 204) {
+      throw new BridgeApiError(
+        `Failed to delete mail bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
+        statusCode,
+        text,
+      );
+    }
   }
 
   private signGatewayToken(userUuid: string): string {

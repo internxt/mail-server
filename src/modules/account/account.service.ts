@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import dayjs from 'dayjs';
+import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
 import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
@@ -41,6 +42,7 @@ export class AccountService {
     private readonly addresses: AddressRepository,
     private readonly domains: DomainRepository,
     private readonly keys: MailAddressKeysRepository,
+    private readonly bridge: BridgeClient,
     private readonly config: ConfigService,
   ) {}
 
@@ -214,6 +216,19 @@ export class AccountService {
       throw error;
     }
 
+    try {
+      const bucket = await this.bridge.createMailBucket(
+        params.userId,
+        account.id,
+      );
+      await this.accounts.setNetworkBucketId(account.id, bucket.id);
+    } catch (error) {
+      // The principal already exists at this point, so roll it back too.
+      await this.provider.deleteAccount(params.address);
+      await this.accounts.delete(account.id);
+      throw error;
+    }
+
     return this.getAccountOrFail(params.userId);
   }
 
@@ -226,6 +241,19 @@ export class AccountService {
         await this.addresses.deleteProviderLink(a.id);
       }),
     );
+
+    if (account.networkBucketId) {
+      try {
+        await this.bridge.deleteMailBucket(
+          driveUserUuid,
+          account.networkBucketId,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Failed to delete network bucket '${account.networkBucketId}' for '${driveUserUuid}': ${(error as Error).message}`,
+        );
+      }
+    }
 
     await this.accounts.delete(account.id);
     this.logger.log(`Deleted account for user '${driveUserUuid}'`);
