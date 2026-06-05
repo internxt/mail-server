@@ -36,6 +36,10 @@ export class MailAccountModel extends Model {
   @Column(DataType.DATE)
   declare suspendedAt: Date | null;
 
+  @AllowNull(true)
+  @Column({ field: 'network_bucket_id', type: DataType.UUID })
+  declare networkBucketId: string | null;
+
   @Column(DataType.DATE)
   declare deletedAt: Date | null;
 
