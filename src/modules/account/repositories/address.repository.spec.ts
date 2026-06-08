@@ -123,4 +123,15 @@ describe('AddressRepository', () => {
       );
     });
   });
+
+  describe('setNetworkBucketId', () => {
+    it('when given an id and bucket id, then updates the address row', async () => {
+      await repository.setNetworkBucketId('addr-1', 'bucket-1');
+
+      expect(addressModel.update).toHaveBeenCalledWith(
+        { networkBucketId: 'bucket-1' },
+        { where: { id: 'addr-1' } },
+      );
+    });
+  });
 });

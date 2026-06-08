@@ -27,6 +27,7 @@ export function toAddressAttributes(
     domainId: model.domainId,
     isDefault: model.isDefault,
     providerExternalId,
+    networkBucketId: model.networkBucketId,
     createdAt: model.createdAt as Date,
     updatedAt: model.updatedAt as Date,
   };
@@ -125,6 +126,10 @@ export class AddressRepository {
 
   async delete(id: string): Promise<void> {
     await this.addressModel.destroy({ where: { id } });
+  }
+
+  async setNetworkBucketId(id: string, networkBucketId: string): Promise<void> {
+    await this.addressModel.update({ networkBucketId }, { where: { id } });
   }
 
   async setDefault(addressId: string, mailAccountId: string): Promise<void> {
