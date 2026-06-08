@@ -50,6 +50,10 @@ export class MailAddressModel extends Model {
   @Column(DataType.BOOLEAN)
   declare isDefault: boolean;
 
+  @AllowNull(true)
+  @Column({ field: 'network_bucket_id', type: DataType.STRING(24) })
+  declare networkBucketId: string | null;
+
   @Column(DataType.DATE)
   declare deletedAt: Date | null;
 

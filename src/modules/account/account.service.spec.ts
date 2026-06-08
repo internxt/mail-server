@@ -367,7 +367,7 @@ describe('AccountService', () => {
         }),
       );
 
-      const bucket = { id: 'bucket-1', name: createdAccount.id };
+      const bucket = { id: 'bucket-1', name: createdAddressId };
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       accounts.findByUserId
@@ -385,10 +385,10 @@ describe('AccountService', () => {
       });
       expect(bridge.createMailBucket).toHaveBeenCalledWith(
         params.userId,
-        createdAccount.id,
+        createdAddressId,
       );
-      expect(accounts.setNetworkBucketId).toHaveBeenCalledWith(
-        createdAccount.id,
+      expect(addresses.setNetworkBucketId).toHaveBeenCalledWith(
+        createdAddressId,
         bucket.id,
       );
       expect(addresses.create).toHaveBeenCalledWith({
@@ -496,7 +496,7 @@ describe('AccountService', () => {
       );
       expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
       expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
-      expect(accounts.setNetworkBucketId).not.toHaveBeenCalled();
+      expect(addresses.setNetworkBucketId).not.toHaveBeenCalled();
     });
 
     it('when concurrent provisioning race occurs, then returns the existing account', async () => {
@@ -542,9 +542,10 @@ describe('AccountService', () => {
       expect(accounts.delete).toHaveBeenCalledWith(account.id);
     });
 
-    it('when account has a network bucket, then deletes it via the bridge', async () => {
+    it('when an address has a network bucket, then deletes it via the bridge', async () => {
+      const addr = newMailAddressAttributes({ networkBucketId: 'bucket-1' });
       const account = MailAccount.build(
-        newMailAccountAttributes({ networkBucketId: 'bucket-1' }),
+        newMailAccountAttributes({ addresses: [addr] }),
       );
       accounts.findByUserId.mockResolvedValue(account);
 
@@ -557,9 +558,10 @@ describe('AccountService', () => {
       expect(accounts.delete).toHaveBeenCalledWith(account.id);
     });
 
-    it('when account has no network bucket, then does not call the bridge', async () => {
+    it('when addresses have no network bucket, then does not call the bridge', async () => {
+      const addr = newMailAddressAttributes({ networkBucketId: null });
       const account = MailAccount.build(
-        newMailAccountAttributes({ networkBucketId: null }),
+        newMailAccountAttributes({ addresses: [addr] }),
       );
       accounts.findByUserId.mockResolvedValue(account);
 
@@ -569,8 +571,9 @@ describe('AccountService', () => {
     });
 
     it('when bridge bucket deletion fails, then logs a warning and still deletes the account', async () => {
+      const addr = newMailAddressAttributes({ networkBucketId: 'bucket-1' });
       const account = MailAccount.build(
-        newMailAccountAttributes({ networkBucketId: 'bucket-1' }),
+        newMailAccountAttributes({ addresses: [addr] }),
       );
       accounts.findByUserId.mockResolvedValue(account);
       bridge.deleteMailBucket.mockRejectedValue(new Error('Bridge down'));
@@ -602,6 +605,10 @@ describe('AccountService', () => {
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       addresses.create.mockResolvedValue(newAddressId);
+      bridge.createMailBucket.mockResolvedValue({
+        id: 'bucket-1',
+        name: newAddressId,
+      });
 
       await service.addAddress(
         accountAttrs.userId,
@@ -628,6 +635,36 @@ describe('AccountService', () => {
         provider: 'stalwart',
         externalId: newAddr,
       });
+      expect(bridge.createMailBucket).toHaveBeenCalledWith(
+        accountAttrs.userId,
+        newAddressId,
+      );
+      expect(addresses.setNetworkBucketId).toHaveBeenCalledWith(
+        newAddressId,
+        'bucket-1',
+      );
+    });
+
+    it('when bucket creation fails, then rolls back principal, link, and address', async () => {
+      const account = MailAccount.build(newMailAccountAttributes());
+      const domain = MailDomain.build(newMailDomainAttributes());
+      const newAddr = 'new@example.com';
+      const newAddressId = 'new-address-id';
+
+      accounts.findByUserId.mockResolvedValue(account);
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      addresses.create.mockResolvedValue(newAddressId);
+      bridge.createMailBucket.mockRejectedValue(new Error('Bridge down'));
+
+      await expect(
+        service.addAddress(account.userId, newAddr, domain.domain, 'pass'),
+      ).rejects.toThrow('Bridge down');
+
+      expect(provider.deleteAccount).toHaveBeenCalledWith(newAddr);
+      expect(addresses.deleteProviderLink).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.setNetworkBucketId).not.toHaveBeenCalled();
     });
 
     it('when account not found, then throws NotFoundException', async () => {
@@ -699,7 +736,10 @@ describe('AccountService', () => {
 
   describe('removeAddress', () => {
     it('when address exists and is not default, then deletes principal and address', async () => {
-      const nonDefaultAddr = newMailAddressAttributes({ isDefault: false });
+      const nonDefaultAddr = newMailAddressAttributes({
+        isDefault: false,
+        networkBucketId: 'bucket-1',
+      });
       const account = MailAccount.build(
         newMailAccountAttributes({
           addresses: [
@@ -719,6 +759,10 @@ describe('AccountService', () => {
         nonDefaultAddr.id,
       );
       expect(addresses.delete).toHaveBeenCalledWith(nonDefaultAddr.id);
+      expect(bridge.deleteMailBucket).toHaveBeenCalledWith(
+        account.userId,
+        'bucket-1',
+      );
     });
 
     it('when address is default, then throws UnprocessableEntityException', async () => {

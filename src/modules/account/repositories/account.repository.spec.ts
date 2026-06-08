@@ -34,7 +34,6 @@ describe('AccountRepository', () => {
       userId: 'user-1',
       status: 'active',
       suspendedAt: null,
-      networkBucketId: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-02T00:00:00.000Z'),
       addresses: [],
@@ -128,17 +127,6 @@ describe('AccountRepository', () => {
       expect(accountModel.destroy).toHaveBeenCalledWith({
         where: { id: 'acc-1' },
       });
-    });
-  });
-
-  describe('setNetworkBucketId', () => {
-    it('when given an id and bucket id, then updates the account row', async () => {
-      await repository.setNetworkBucketId('acc-1', 'bucket-1');
-
-      expect(accountModel.update).toHaveBeenCalledWith(
-        { networkBucketId: 'bucket-1' },
-        { where: { id: 'acc-1' } },
-      );
     });
   });
 });
