@@ -46,17 +46,12 @@ export class AccountRepository {
     await this.accountModel.destroy({ where: { id } });
   }
 
-  async setNetworkBucketId(id: string, networkBucketId: string): Promise<void> {
-    await this.accountModel.update({ networkBucketId }, { where: { id } });
-  }
-
   private toDomain(model: MailAccountModel): MailAccount {
     return MailAccount.build({
       id: model.id,
       userId: model.userId,
       status: model.status as MailAccountState,
       suspendedAt: model.suspendedAt,
-      networkBucketId: model.networkBucketId,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,
       addresses: (model.addresses ?? []).map(toAddressAttributes),

@@ -5,6 +5,7 @@ export interface MailAddressAttributes {
   domainId: string;
   isDefault: boolean;
   providerExternalId: string;
+  networkBucketId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,6 +17,7 @@ export class MailAddress {
   readonly domainId!: string;
   readonly isDefault!: boolean;
   readonly providerExternalId!: string;
+  readonly networkBucketId!: string | null;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
 
