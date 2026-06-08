@@ -13,6 +13,7 @@ import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.
 import { AccountProvider } from './account-provider.port.js';
 import type { CreateAccountResult } from './account.types.js';
 import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
+import { MailAddress } from './domain/mail-address.domain.js';
 import { MailDomain } from './domain/mail-domain.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
@@ -219,12 +220,7 @@ export class AccountService {
         externalId: created.externalId,
         providerInternalId: created.internalId,
       });
-
-      const bucket = await this.bridge.createMailBucket(
-        params.userId,
-        account.id,
-      );
-      await this.accounts.setNetworkBucketId(account.id, bucket.id);
+      await this.createNetworkBucket(params.userId, addressId);
     } catch (error) {
       await this.provider.deleteAccount(created.externalId);
       await this.accounts.delete(account.id);
@@ -241,21 +237,9 @@ export class AccountService {
       account.addresses.map(async (a) => {
         await this.provider.deleteAccount(a.providerExternalId);
         await this.addresses.deleteProviderLink(a.id);
+        await this.deleteNetworkBucket(driveUserUuid, a);
       }),
     );
-
-    if (account.networkBucketId) {
-      try {
-        await this.bridge.deleteMailBucket(
-          driveUserUuid,
-          account.networkBucketId,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Failed to delete network bucket '${account.networkBucketId}' for '${driveUserUuid}': ${(error as Error).message}`,
-        );
-      }
-    }
 
     await this.accounts.delete(account.id);
     this.logger.log(`Deleted account for user '${driveUserUuid}'`);
@@ -317,6 +301,15 @@ export class AccountService {
       throw error;
     }
 
+    try {
+      await this.createNetworkBucket(userId, newAddressId);
+    } catch (error) {
+      await this.provider.deleteAccount(address);
+      await this.addresses.deleteProviderLink(newAddressId);
+      await this.addresses.delete(newAddressId);
+      throw error;
+    }
+
     this.logger.log(`Added address '${address}' to account '${userId}'`);
   }
 
@@ -341,6 +334,7 @@ export class AccountService {
       this.addresses.deleteProviderLink(addressRecord.id),
       this.addresses.delete(addressRecord.id),
     ]);
+    await this.deleteNetworkBucket(userId, addressRecord);
 
     this.logger.log(`Removed address '${address}' from account '${userId}'`);
   }
@@ -405,6 +399,29 @@ export class AccountService {
       return { available: false, suggestion };
     } else {
       return { available: false, suggestion: null };
+    }
+  }
+
+  private async createNetworkBucket(
+    userUuid: string,
+    addressId: string,
+  ): Promise<void> {
+    const bucket = await this.bridge.createMailBucket(userUuid, addressId);
+    await this.addresses.setNetworkBucketId(addressId, bucket.id);
+  }
+
+  private async deleteNetworkBucket(
+    userUuid: string,
+    address: MailAddress,
+  ): Promise<void> {
+    if (!address.networkBucketId) return;
+
+    try {
+      await this.bridge.deleteMailBucket(userUuid, address.networkBucketId);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to delete network bucket '${address.networkBucketId}' for '${userUuid}': ${(error as Error).message}`,
+      );
     }
   }
 

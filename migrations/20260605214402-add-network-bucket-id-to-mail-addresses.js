@@ -1,6 +1,6 @@
 'use strict';
 
-const TABLE_NAME = 'mail_accounts';
+const TABLE_NAME = 'mail_addresses';
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
