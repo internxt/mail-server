@@ -1,10 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Test } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
+import { Readable } from 'node:stream';
 import { EmailService } from './email.service.js';
 import { MailProvider } from './mail-provider.port.js';
 import { AccountService } from '../account/account.service.js';
+import { StalwartSmtpService } from '../infrastructure/smtp/stalwart-smtp.service.js';
 import {
   newMailbox,
   newEmail,
@@ -16,14 +20,28 @@ import {
   newEncryptedWrappedKey,
 } from '../../../test/fixtures.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
+import {
+  unwrapAttachmentKey,
+  decryptAttachment,
+  decryptBody,
+} from './server-crypto.js';
+
+vi.mock('./server-crypto.js', () => ({
+  unwrapAttachmentKey: vi.fn(),
+  decryptAttachment: vi.fn(),
+  decryptBody: vi.fn(),
+}));
 
 describe('EmailService', () => {
   let service: EmailService;
   let provider: DeepMocked<MailProvider>;
   let accountService: DeepMocked<AccountService>;
+  let smtp: DeepMocked<StalwartSmtpService>;
+  let configService: DeepMocked<ConfigService>;
   const userEmail = 'test@example.com';
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     const module = await Test.createTestingModule({
       providers: [EmailService],
     })
@@ -33,6 +51,8 @@ describe('EmailService', () => {
     service = module.get(EmailService);
     provider = module.get<DeepMocked<MailProvider>>(MailProvider);
     accountService = module.get<DeepMocked<AccountService>>(AccountService);
+    smtp = module.get<DeepMocked<StalwartSmtpService>>(StalwartSmtpService);
+    configService = module.get<DeepMocked<ConfigService>>(ConfigService);
   });
 
   describe('getMailboxes', () => {
@@ -275,6 +295,115 @@ describe('EmailService', () => {
       await service.sendEmail(userEmail, dto);
 
       expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto);
+    });
+  });
+
+  describe('sendExternalEmail', () => {
+    const mockedUnwrap = vi.mocked(unwrapAttachmentKey);
+    const mockedDecrypt = vi.mocked(decryptAttachment);
+    const mockedDecryptBody = vi.mocked(decryptBody);
+
+    it('when DTO has empty recipients, then throws BadRequestException', async () => {
+      const dto = newSendEmailDto({ to: [] });
+
+      await expect(service.sendExternalEmail(userEmail, dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(smtp.sendRaw).not.toHaveBeenCalled();
+    });
+
+    it('when DTO has no attachments and no encryption, then sends through SMTP and saves to Sent', async () => {
+      const dto = newSendEmailDto({
+        attachments: undefined,
+        encryption: undefined,
+        textBody: 'hello',
+      });
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      smtp.sendRaw.mockResolvedValue({ messageId: 'msg-1' });
+      provider.saveToSent.mockResolvedValue({ id: 'sent-1' });
+
+      const result = await service.sendExternalEmail(userEmail, dto);
+
+      expect(smtp.sendRaw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userEmail,
+          to: dto.to,
+          subject: dto.subject,
+          text: 'hello',
+          attachments: undefined,
+        }),
+      );
+      expect(provider.saveToSent).toHaveBeenCalled();
+      expect(result).toEqual({ id: 'msg-1' });
+    });
+
+    it('when DTO has attachments but no wrapped keys, then throws BadRequestException', async () => {
+      const dto = newSendEmailDto({
+        attachments: [
+          { blobId: 'b1', name: 'f.txt', type: 'text/plain', size: 10 },
+        ],
+        encryption: undefined,
+      });
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+
+      await expect(service.sendExternalEmail(userEmail, dto)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(smtp.sendRaw).not.toHaveBeenCalled();
+    });
+
+    it('when DTO has encrypted body and attachments, then decrypts both, sends plain via SMTP and saves cipher to Sent', async () => {
+      const wrappedKey = newEncryptedWrappedKey();
+      const encryption = newEncryptionBlock({
+        attachmentWrappedKeys: [wrappedKey],
+      });
+      const dto = newSendEmailDto({
+        attachments: [
+          { blobId: 'b1', name: 'photo.jpg', type: 'image/jpeg', size: 1024 },
+        ],
+        encryption,
+        textBody: 'check the attachment',
+      });
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      mockedDecryptBody.mockResolvedValue('plain body text');
+      const attachmentKey = new Uint8Array([1, 2, 3, 4]);
+      mockedUnwrap.mockResolvedValue(attachmentKey);
+      provider.downloadAttachment.mockResolvedValue({
+        stream: Readable.from([Buffer.from('cipher-bytes')]),
+        contentType: 'image/jpeg',
+        contentLength: 12,
+      });
+      mockedDecrypt.mockResolvedValue(new Uint8Array([9, 9, 9]));
+      smtp.sendRaw.mockResolvedValue({ messageId: 'msg-2' });
+      provider.saveToSent.mockResolvedValue({ id: 'sent-2' });
+
+      const result = await service.sendExternalEmail(userEmail, dto);
+
+      expect(smtp.sendRaw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: 'plain body text',
+          attachments: [
+            {
+              filename: 'photo.jpg',
+              content: Buffer.from([9, 9, 9]),
+              contentType: 'image/jpeg',
+            },
+          ],
+        }),
+      );
+      expect(provider.saveToSent).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({
+          textBody: expect.stringContaining('INTERNXT-ENCRYPTED-EMAIL-v1'),
+        }),
+      );
+      expect(result).toEqual({ id: 'msg-2' });
     });
   });
 

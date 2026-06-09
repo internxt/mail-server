@@ -19,6 +19,12 @@ export default () => ({
     adminSecret: process.env.STALWART_ADMIN_SECRET ?? '',
     masterUser: process.env.STALWART_MASTER_USER ?? 'master',
     masterPassword: process.env.STALWART_MASTER_PASSWORD ?? '',
+    smtpHost: process.env.STALWART_SMTP_HOST ?? 'localhost',
+    smtpPort: Number.parseInt(process.env.STALWART_SMTP_PORT ?? '465', 10),
+  },
+
+  crypto: {
+    serverPrivateKey: process.env.SERVER_PRIVATE_KEY ?? '',
   },
 
   accounts: {

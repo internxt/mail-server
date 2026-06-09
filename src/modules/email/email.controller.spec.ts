@@ -59,6 +59,51 @@ describe('EmailController', () => {
     });
   });
 
+  describe('send', () => {
+    const baseDto = {
+      to: [{ email: 'alice@internxt.me' }],
+      subject: 'hi',
+    };
+
+    it('when deliveryMode is EXTERNAL with attachments, then sends an email to an external source', async () => {
+      const dto = {
+        ...baseDto,
+        deliveryMode: 'EXTERNAL' as const,
+        attachments: [
+          { blobId: 'b1', name: 'f.txt', type: 'text/plain', size: 10 },
+        ],
+      };
+      emailService.sendExternalEmail.mockResolvedValue({ id: 'mixed-id' });
+
+      await controller.send(userEmail, dto);
+
+      expect(emailService.sendExternalEmail).toHaveBeenCalledWith(
+        userEmail,
+        dto,
+      );
+      expect(emailService.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('when deliveryMode is INTERNXT, then routes to sendEmail', async () => {
+      const dto = { ...baseDto, deliveryMode: 'INTERNXT' as const };
+      emailService.sendEmail.mockResolvedValue({ id: 'internal-id' });
+
+      await controller.send(userEmail, dto);
+
+      expect(emailService.sendEmail).toHaveBeenCalledWith(userEmail, dto);
+      expect(emailService.sendExternalEmail).not.toHaveBeenCalled();
+    });
+
+    it('when deliveryMode is missing, then routes to sendEmail', async () => {
+      emailService.sendEmail.mockResolvedValue({ id: 'default-id' });
+
+      await controller.send(userEmail, baseDto);
+
+      expect(emailService.sendEmail).toHaveBeenCalledWith(userEmail, baseDto);
+      expect(emailService.sendExternalEmail).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getDomains', () => {
     it('when getDomains is called, then it returns the active domains', async () => {
       const domains = [
