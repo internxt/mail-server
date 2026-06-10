@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import dayjs from 'dayjs';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { PaymentsService } from '../infrastructure/payments/payments.service.js';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
 import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
@@ -49,6 +51,7 @@ export class AccountService {
     private readonly domains: DomainRepository,
     private readonly keys: MailAddressKeysRepository,
     private readonly bridge: BridgeClient,
+    private readonly payments: PaymentsService,
     private readonly config: ConfigService,
   ) {}
 
@@ -184,12 +187,19 @@ export class AccountService {
     displayName: string;
     keys: MailAddressKeyBundle;
   }): Promise<MailAccount> {
-    const [domainRecord, existingAddress, existingAccount] = await Promise.all([
-      this.domains.findByDomain(params.domain),
-      this.addresses.findByAddress(params.address),
-      this.accounts.findByUserId(params.userId),
-    ]);
+    const [tier, domainRecord, existingAddress, existingAccount] =
+      await Promise.all([
+        this.payments.getUserTier(params.userId),
+        this.domains.findByDomain(params.domain),
+        this.addresses.findByAddress(params.address),
+        this.accounts.findByUserId(params.userId),
+      ]);
 
+    if (!tier.featuresPerService.mail?.enabled) {
+      throw new ForbiddenException(
+        'Mail access is not available for your current plan',
+      );
+    }
     if (!domainRecord) {
       throw new NotFoundException(`Domain '${params.domain}' not found`);
     }
@@ -199,6 +209,13 @@ export class AccountService {
     if (existingAddress) {
       throw new ConflictException(
         `Address '${params.address}' is already in use`,
+      );
+    }
+
+    const quota = tier.featuresPerService.drive?.maxSpaceBytes;
+    if (!quota || quota <= 0) {
+      throw new UnprocessableEntityException(
+        `Cannot provision mail account for '${params.userId}': plan has no drive storage allowance`,
       );
     }
 
@@ -246,6 +263,7 @@ export class AccountService {
         primaryAddress: params.address,
         displayName: params.displayName,
         password,
+        quota,
       });
     } catch (error) {
       await this.accounts.delete(account.id);
