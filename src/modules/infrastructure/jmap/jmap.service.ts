@@ -5,7 +5,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Client } from 'undici';
+import { Client, Pool } from 'undici';
 import type { Readable } from 'node:stream';
 import type {
   DownloadAttachmentPayload,
@@ -50,7 +50,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   private readonly masterUser: string;
   private readonly masterPassword: string;
   private readonly sessionCache = new Map<string, CachedSession>(); // TODO: Implement cache ?
-  private httpClient!: Client;
+  private httpClient!: Pool;
   private blobClient!: Client;
 
   constructor(private readonly configService: ConfigService) {
@@ -64,10 +64,13 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
-    this.httpClient = new Client(this.stalwartUrl, {
-      allowH2: true,
+    this.httpClient = new Pool(this.stalwartUrl, {
+      connections: 16,
+      allowH2: false,
       keepAliveTimeout: 30_000,
       pipelining: 1,
+      headersTimeout: 10_000,
+      bodyTimeout: 10_000,
     });
     this.blobClient = new Client(this.stalwartUrl, {
       allowH2: false,

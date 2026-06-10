@@ -59,24 +59,23 @@ export class MtaHooksService {
     incomingSize: number,
   ): Promise<boolean> {
     const address = rawAddress.toLowerCase();
-    const userUuid = await this.accountService.findUserIdByAddress(address);
-    if (!userUuid) {
+    const context = await this.accountService.findRecipientContext(address);
+    if (!context) {
       return false;
     }
+    const { userUuid, networkBucketId } = context;
 
     const { used: mailUsed } = await this.emailService.getQuota(address);
 
-    const { driveUsed, planQuota } = await this.bridgeClient.reportMailUsage(
-      userUuid,
-      mailUsed,
-    );
-
-    const projectedUsage = driveUsed + mailUsed + incomingSize;
-    if (projectedUsage > planQuota) {
-      this.logger.warn(
-        `Rejecting recipient '${address}' (user '${userUuid}'): ` +
-          `projected ${projectedUsage} > quota ${planQuota}`,
+    const { maxSpaceBytes, totalUsedSpaceBytes } =
+      await this.bridgeClient.reportBucketUsage(
+        userUuid,
+        networkBucketId,
+        mailUsed,
       );
+
+    const projectedUsage = totalUsedSpaceBytes + incomingSize;
+    if (projectedUsage > maxSpaceBytes) {
       return true;
     }
 

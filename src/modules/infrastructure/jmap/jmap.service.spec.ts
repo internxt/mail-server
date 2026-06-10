@@ -7,6 +7,9 @@ vi.mock('undici', () => ({
   Client: vi.fn().mockImplementation(function () {
     return { request: mockRequest, close: vi.fn() };
   }),
+  Pool: vi.fn().mockImplementation(function () {
+    return { request: mockRequest, close: vi.fn() };
+  }),
 }));
 
 function createConfigService(): ConfigService {

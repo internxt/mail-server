@@ -1,6 +1,6 @@
-export interface UserStorage {
-  driveUsed: number;
-  planQuota: number;
+export interface UserSpaceSnapshot {
+  maxSpaceBytes: number;
+  totalUsedSpaceBytes: number;
 }
 
 export interface MailBucket {

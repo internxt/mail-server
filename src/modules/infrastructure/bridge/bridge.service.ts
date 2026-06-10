@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Client } from 'undici';
-import type { MailBucket, UserStorage } from './bridge.types.js';
+import type { MailBucket, UserSpaceSnapshot } from './bridge.types.js';
 
 @Injectable()
 export class BridgeClient implements OnModuleInit, OnModuleDestroy {
@@ -48,34 +48,35 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
     await this.httpClient.close();
   }
 
-  async reportMailUsage(
+  async reportBucketUsage(
     userUuid: string,
-    mailUsedBytes: number,
-  ): Promise<UserStorage> {
+    bucketId: string,
+    usedSpaceBytes: number,
+  ): Promise<UserSpaceSnapshot> {
     const token = this.signGatewayToken(userUuid);
 
     const { statusCode, body } = await this.httpClient.request({
       method: 'PUT',
-      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/mail-usage`,
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}/usage`,
       headers: {
         'content-type': 'application/json',
         accept: 'application/json',
         authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ mailUsedBytes }),
+      body: JSON.stringify({ usedSpaceBytes }),
     });
 
     const text = await body.text();
 
     if (statusCode !== 200) {
       throw new BridgeApiError(
-        `Failed to report mail usage for user '${userUuid}': HTTP ${statusCode}`,
+        `Failed to report bucket usage for user '${userUuid}' bucket '${bucketId}': HTTP ${statusCode}`,
         statusCode,
         text,
       );
     }
 
-    return JSON.parse(text) as UserStorage;
+    return JSON.parse(text) as UserSpaceSnapshot;
   }
 
   async createMailBucket(userUuid: string, name: string): Promise<MailBucket> {

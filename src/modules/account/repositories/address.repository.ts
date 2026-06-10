@@ -94,6 +94,27 @@ export class AddressRepository {
     return model?.account?.userId ?? null;
   }
 
+  async findRecipientContextByAddress(address: string): Promise<{
+    addressId: string;
+    userUuid: string;
+    networkBucketId: string | null;
+  } | null> {
+    const model = await this.addressModel.findOne({
+      where: { address },
+      include: [{ model: MailAccountModel }],
+    });
+
+    if (!model?.account) {
+      return null;
+    }
+
+    return {
+      addressId: model.id,
+      userUuid: model.account.userId,
+      networkBucketId: model.networkBucketId,
+    };
+  }
+
   async findDefaultForAccount(
     mailAccountId: string,
   ): Promise<MailAddress | null> {

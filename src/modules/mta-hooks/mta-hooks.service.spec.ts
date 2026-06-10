@@ -43,11 +43,14 @@ describe('MtaHooksService', () => {
 
   describe('handleRcpt', () => {
     it('when the recipient stays within quota, then accepts', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 1000, limit: 5000 });
-      bridgeClient.reportMailUsage.mockResolvedValue({
-        driveUsed: 2000,
-        planQuota: 5000,
+      bridgeClient.reportBucketUsage.mockResolvedValue({
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 2000,
       });
 
       const result = await service.handleRcpt(
@@ -55,18 +58,25 @@ describe('MtaHooksService', () => {
       );
 
       expect(result).toStrictEqual({ action: 'accept' });
-      expect(accountService.findUserIdByAddress).toHaveBeenCalledWith(
+      expect(accountService.findRecipientContext).toHaveBeenCalledWith(
         'jane@inxt.com',
       );
-      expect(bridgeClient.reportMailUsage).toHaveBeenCalledWith('user-1', 1000);
+      expect(bridgeClient.reportBucketUsage).toHaveBeenCalledWith(
+        'user-1',
+        'bucket-1',
+        1000,
+      );
     });
 
     it('when the declared SIZE pushes the recipient over quota, then rejects with 452 4.2.2', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 1000, limit: 5000 });
-      bridgeClient.reportMailUsage.mockResolvedValue({
-        driveUsed: 3800,
-        planQuota: 5000,
+      bridgeClient.reportBucketUsage.mockResolvedValue({
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 4800,
       });
 
       const result = await service.handleRcpt(
@@ -84,11 +94,14 @@ describe('MtaHooksService', () => {
     });
 
     it('when projected usage exactly equals the quota, then accepts', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 1000, limit: 5000 });
-      bridgeClient.reportMailUsage.mockResolvedValue({
-        driveUsed: 3500,
-        planQuota: 5000,
+      bridgeClient.reportBucketUsage.mockResolvedValue({
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 4500,
       });
 
       const result = await service.handleRcpt(
@@ -98,26 +111,32 @@ describe('MtaHooksService', () => {
       expect(result).toStrictEqual({ action: 'accept' });
     });
 
-    it('when no SIZE is declared, then the incoming bytes are not counted (accepts if not already over)', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+    it('when the snapshot already includes mail usage, then it is not double-counted', async () => {
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 1000, limit: 5000 });
-      bridgeClient.reportMailUsage.mockResolvedValue({
-        driveUsed: 3800,
-        planQuota: 5000,
+
+      bridgeClient.reportBucketUsage.mockResolvedValue({
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 4800,
       });
 
-      // Without SIZE the projected usage is 3800 + 1000 = 4800 <= 5000.
       const result = await service.handleRcpt(buildRequest(['jane@inxt.com']));
 
       expect(result).toStrictEqual({ action: 'accept' });
     });
 
     it('when no SIZE is declared but the mailbox is already over quota, then rejects', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 1000, limit: 5000 });
-      bridgeClient.reportMailUsage.mockResolvedValue({
-        driveUsed: 4500,
-        planQuota: 5000,
+      bridgeClient.reportBucketUsage.mockResolvedValue({
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 5500,
       });
 
       const result = await service.handleRcpt(buildRequest(['jane@inxt.com']));
@@ -126,7 +145,7 @@ describe('MtaHooksService', () => {
     });
 
     it('when the address resolves to no internxt user, then skips it and accepts', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue(null);
+      accountService.findRecipientContext.mockResolvedValue(null);
 
       const result = await service.handleRcpt(
         buildRequest(['external@gmail.com'], { size: 500 }),
@@ -134,45 +153,54 @@ describe('MtaHooksService', () => {
 
       expect(result).toStrictEqual({ action: 'accept' });
       expect(emailService.getQuota).not.toHaveBeenCalled();
-      expect(bridgeClient.reportMailUsage).not.toHaveBeenCalled();
+      expect(bridgeClient.reportBucketUsage).not.toHaveBeenCalled();
     });
 
     it('when the recipient address is upper-cased, then it is lowercased before resolution', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 0, limit: 5000 });
-      bridgeClient.reportMailUsage.mockResolvedValue({
-        driveUsed: 0,
-        planQuota: 5000,
+      bridgeClient.reportBucketUsage.mockResolvedValue({
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 0,
       });
 
       await service.handleRcpt(buildRequest(['Jane@INXT.com'], { size: 10 }));
 
-      expect(accountService.findUserIdByAddress).toHaveBeenCalledWith(
+      expect(accountService.findRecipientContext).toHaveBeenCalledWith(
         'jane@inxt.com',
       );
       expect(emailService.getQuota).toHaveBeenCalledWith('jane@inxt.com');
     });
 
     it('when several recipients are present, then only the current (last) one is evaluated', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 0, limit: 5000 });
-      bridgeClient.reportMailUsage.mockResolvedValue({
-        driveUsed: 0,
-        planQuota: 5000,
+      bridgeClient.reportBucketUsage.mockResolvedValue({
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 0,
       });
 
       await service.handleRcpt(
         buildRequest(['first@inxt.com', 'current@inxt.com']),
       );
 
-      expect(accountService.findUserIdByAddress).toHaveBeenCalledTimes(1);
-      expect(accountService.findUserIdByAddress).toHaveBeenCalledWith(
+      expect(accountService.findRecipientContext).toHaveBeenCalledTimes(1);
+      expect(accountService.findRecipientContext).toHaveBeenCalledWith(
         'current@inxt.com',
       );
     });
 
     it('when quota lookup throws, then fails open and accepts', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockRejectedValue(new Error('JMAP down'));
 
       const result = await service.handleRcpt(buildRequest(['jane@inxt.com']));
@@ -180,10 +208,26 @@ describe('MtaHooksService', () => {
       expect(result).toStrictEqual({ action: 'accept' });
     });
 
+    it('when recipient resolution throws (e.g. bucket provisioning fails), then fails open and accepts', async () => {
+      accountService.findRecipientContext.mockRejectedValue(
+        new Error('bucket provisioning failed'),
+      );
+
+      const result = await service.handleRcpt(buildRequest(['jane@inxt.com']));
+
+      expect(result).toStrictEqual({ action: 'accept' });
+      expect(emailService.getQuota).not.toHaveBeenCalled();
+    });
+
     it('when Bridge reporting throws, then fails open and accepts', async () => {
-      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      accountService.findRecipientContext.mockResolvedValue({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
       emailService.getQuota.mockResolvedValue({ used: 1000, limit: 5000 });
-      bridgeClient.reportMailUsage.mockRejectedValue(new Error('bridge down'));
+      bridgeClient.reportBucketUsage.mockRejectedValue(
+        new Error('bridge down'),
+      );
 
       const result = await service.handleRcpt(buildRequest(['jane@inxt.com']));
 
@@ -196,7 +240,7 @@ describe('MtaHooksService', () => {
       });
 
       expect(result).toStrictEqual({ action: 'accept' });
-      expect(accountService.findUserIdByAddress).not.toHaveBeenCalled();
+      expect(accountService.findRecipientContext).not.toHaveBeenCalled();
     });
   });
 });

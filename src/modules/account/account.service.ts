@@ -25,6 +25,11 @@ export interface MailAddressKeyBundle {
   recoveryPrivateKey: string;
 }
 
+export interface RecipientContext {
+  userUuid: string;
+  networkBucketId: string;
+}
+
 export interface MailAccountStatus {
   id: string;
   defaultAddress: string | null;
@@ -109,6 +114,36 @@ export class AccountService {
 
   async findUserIdByAddress(address: string): Promise<string | null> {
     return this.addresses.findUserIdByAddress(address);
+  }
+
+  async findRecipientContext(
+    address: string,
+  ): Promise<RecipientContext | null> {
+    const context = await this.addresses.findRecipientContextByAddress(address);
+    if (!context) {
+      return null;
+    }
+
+    if (context.networkBucketId) {
+      return {
+        userUuid: context.userUuid,
+        networkBucketId: context.networkBucketId,
+      };
+    }
+
+    this.logger.debug(
+      `Address '${address}' (id '${context.addressId}') has no network bucket, lazily provisioning one`,
+    );
+    const bucket = await this.bridge.createMailBucket(
+      context.userUuid,
+      context.addressId,
+    );
+    await this.addresses.setNetworkBucketId(context.addressId, bucket.id);
+    this.logger.log(
+      `Provisioned network bucket '${bucket.id}' for address '${address}' (user '${context.userUuid}')`,
+    );
+
+    return { userUuid: context.userUuid, networkBucketId: bucket.id };
   }
 
   async getAddressKeys(

@@ -39,18 +39,18 @@ describe('BridgeClient', () => {
     };
   });
 
-  describe('reportMailUsage', () => {
-    it('when Bridge returns 200, then signs a gateway token, PUTs usage, and returns storage', async () => {
-      const storage = { driveUsed: 1024, planQuota: 5368709120 };
+  describe('reportBucketUsage', () => {
+    it('when Bridge returns 200, then signs a gateway token, PUTs usage to the bucket, and returns the space snapshot', async () => {
+      const snapshot = { maxSpaceBytes: 5368709120, totalUsedSpaceBytes: 1024 };
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
         statusCode: 200,
-        body: { text: () => Promise.resolve(JSON.stringify(storage)) },
+        body: { text: () => Promise.resolve(JSON.stringify(snapshot)) },
       });
 
-      const result = await service.reportMailUsage('user-1', 512);
+      const result = await service.reportBucketUsage('user-1', 'bucket-1', 512);
 
-      expect(result).toStrictEqual(storage);
+      expect(result).toStrictEqual(snapshot);
       expect(jwtService.sign).toHaveBeenCalledWith(
         { payload: { uuid: 'user-1' } },
         {
@@ -63,8 +63,8 @@ describe('BridgeClient', () => {
       expect(httpRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'PUT',
-          path: '/v2/gateway/users/user-1/mail-usage',
-          body: JSON.stringify({ mailUsedBytes: 512 }),
+          path: '/v2/gateway/users/user-1/buckets/bucket-1/usage',
+          body: JSON.stringify({ usedSpaceBytes: 512 }),
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
           }) as unknown,
@@ -75,29 +75,29 @@ describe('BridgeClient', () => {
     it('when Bridge returns a non-200 status, then throws BridgeApiError with statusCode and details', async () => {
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
-        statusCode: 500,
-        body: { text: () => Promise.resolve('internal error') },
+        statusCode: 404,
+        body: { text: () => Promise.resolve('bucket not found') },
       });
 
       const error: unknown = await service
-        .reportMailUsage('user-1', 512)
+        .reportBucketUsage('user-1', 'bucket-1', 512)
         .catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(BridgeApiError);
       if (!(error instanceof BridgeApiError)) {
         throw new Error('expected BridgeApiError');
       }
-      expect(error.statusCode).toBe(500);
-      expect(error.details).toBe('internal error');
+      expect(error.statusCode).toBe(404);
+      expect(error.details).toBe('bucket not found');
     });
 
     it('when the HTTP request throws, then the error propagates', async () => {
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockRejectedValue(new Error('network failure'));
 
-      await expect(service.reportMailUsage('user-1', 512)).rejects.toThrow(
-        'network failure',
-      );
+      await expect(
+        service.reportBucketUsage('user-1', 'bucket-1', 512),
+      ).rejects.toThrow('network failure');
     });
   });
 

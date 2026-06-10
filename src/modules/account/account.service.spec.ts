@@ -141,6 +141,75 @@ describe('AccountService', () => {
     });
   });
 
+  describe('findRecipientContext', () => {
+    it('when the address has a bucket, then returns the user and bucket without provisioning', async () => {
+      addresses.findRecipientContextByAddress.mockResolvedValue({
+        addressId: 'address-1',
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
+
+      const result = await service.findRecipientContext('alice@internxt.com');
+
+      expect(result).toEqual({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
+      expect(bridge.createMailBucket).not.toHaveBeenCalled();
+      expect(addresses.setNetworkBucketId).not.toHaveBeenCalled();
+    });
+
+    it('when the address has no bucket, then lazily provisions one and persists it', async () => {
+      addresses.findRecipientContextByAddress.mockResolvedValue({
+        addressId: 'address-1',
+        userUuid: 'user-1',
+        networkBucketId: null,
+      });
+      bridge.createMailBucket.mockResolvedValue({
+        id: 'bucket-new',
+        name: 'address-1',
+      });
+
+      const result = await service.findRecipientContext('alice@internxt.com');
+
+      expect(bridge.createMailBucket).toHaveBeenCalledWith(
+        'user-1',
+        'address-1',
+      );
+      expect(addresses.setNetworkBucketId).toHaveBeenCalledWith(
+        'address-1',
+        'bucket-new',
+      );
+      expect(result).toEqual({
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-new',
+      });
+    });
+
+    it('when lazy provisioning fails, then the error propagates', async () => {
+      addresses.findRecipientContextByAddress.mockResolvedValue({
+        addressId: 'address-1',
+        userUuid: 'user-1',
+        networkBucketId: null,
+      });
+      bridge.createMailBucket.mockRejectedValue(new Error('bridge down'));
+
+      await expect(
+        service.findRecipientContext('alice@internxt.com'),
+      ).rejects.toThrow('bridge down');
+      expect(addresses.setNetworkBucketId).not.toHaveBeenCalled();
+    });
+
+    it('when the address does not exist, then returns null', async () => {
+      addresses.findRecipientContextByAddress.mockResolvedValue(null);
+
+      const result = await service.findRecipientContext('unknown@internxt.com');
+
+      expect(result).toBeNull();
+      expect(bridge.createMailBucket).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getAddressKeys', () => {
     it('when address belongs to user, then returns the key bundle', async () => {
       const addr = newMailAddressAttributes();
