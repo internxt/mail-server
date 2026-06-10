@@ -221,6 +221,9 @@ export class EmailController {
     @MailAddress('address') email: string,
     @Body() dto: SendEmailRequestDto,
   ) {
+    if (dto.deliveryMode === 'EXTERNAL') {
+      return this.emailService.sendExternalEmail(email, dto);
+    }
     return this.emailService.sendEmail(email, dto);
   }
 

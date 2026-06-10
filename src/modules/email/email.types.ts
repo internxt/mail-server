@@ -20,6 +20,8 @@ export interface Mailbox {
   unreadEmails: number;
 }
 
+export type MailDeliveryMode = 'INTERNXT' | 'EXTERNAL';
+
 export interface EncryptedSummaryFields {
   encryptedPreview: string;
   wrappedKeys: EncryptedWrappedKey[];

@@ -28,6 +28,10 @@ export abstract class MailProvider {
     dto: SendEmailDto,
   ): Promise<{ id: string }>;
   abstract search(params: SearchEmailDto): Promise<EmailListResponse>;
+  abstract saveToSent(
+    userEmail: string,
+    dto: SendEmailDto,
+  ): Promise<{ id: string }>;
   abstract saveDraft(
     userEmail: string,
     dto: DraftEmailDto,

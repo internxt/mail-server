@@ -307,6 +307,34 @@ export class JmapMailProvider extends MailProvider {
     return { id: createdId };
   }
 
+  async saveToSent(
+    userEmail: string,
+    dto: SendEmailDto,
+  ): Promise<{ id: string }> {
+    const [accountId, identity, sentMailboxId] = await Promise.all([
+      this.jmap.getPrimaryAccountId(userEmail),
+      this.resolveIdentity(userEmail),
+      this.resolveMailboxId(userEmail, 'sent'),
+    ]);
+
+    const emailCreate = mapSendDtoToJmapCreate(dto, sentMailboxId, {
+      name: identity.name,
+      email: identity.email,
+    });
+
+    const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
+      [['Email/set', { accountId, create: { sent: emailCreate } }, 'r0']],
+    );
+
+    const createdId = response.methodResponses[0]![1].created?.['sent']?.id;
+    if (!createdId) {
+      throw new Error('Failed to save email to Sent');
+    }
+
+    return { id: createdId };
+  }
+
   async saveDraft(
     userEmail: string,
     dto: DraftEmailDto,

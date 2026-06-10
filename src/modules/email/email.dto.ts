@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail } from 'class-validator';
-import type { MailboxType } from './email.types.js';
+import type { MailboxType, MailDeliveryMode } from './email.types.js';
 import { MailDomainStatus } from '../account/domain/mail-domain.domain.js';
 
 export class MailDomainDto {
@@ -114,6 +114,9 @@ export class SendEmailRequestDto {
 
   @ApiPropertyOptional({ type: [AttachmentRefDto] })
   attachments?: AttachmentRefDto[];
+
+  @ApiPropertyOptional({ enum: ['INTERNXT', 'EXTERNAL'], example: 'INTERNXT' })
+  deliveryMode?: MailDeliveryMode;
 }
 
 export class LookupRecipientKeysRequestDto {

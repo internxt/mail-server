@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AccountService } from '../account/account.service.js';
 import { MailProvider } from './mail-provider.port.js';
 import type {
@@ -29,12 +30,32 @@ import {
   UploadAttachmentPayload,
   UploadAttachmentResponse,
 } from '../infrastructure/jmap/jmap.types.js';
+import {
+  StalwartSmtpService,
+  type SmtpAttachment,
+} from '../infrastructure/smtp/stalwart-smtp.service.js';
+import {
+  decryptAttachment,
+  decryptBody,
+  unwrapAttachmentKey,
+} from './server-crypto.js';
+import type { Readable } from 'node:stream';
+
+async function streamToBuffer(stream: Readable): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+  }
+  return Buffer.concat(chunks);
+}
 
 @Injectable()
 export class EmailService {
   constructor(
     private readonly mail: MailProvider,
     private readonly accountService: AccountService,
+    private readonly smtp: StalwartSmtpService,
+    private readonly configService: ConfigService,
   ) {}
 
   getMailboxes(userEmail: string): Promise<Mailbox[]> {
@@ -125,6 +146,98 @@ export class EmailService {
     }
 
     return this.mail.sendEmail(userEmail, dto);
+  }
+
+  async sendExternalEmail(
+    userEmail: string,
+    dto: SendEmailDto,
+  ): Promise<{ id: string }> {
+    if (dto.to.length === 0) {
+      throw new BadRequestException('At least one recipient is required');
+    }
+
+    const serverPrivateKey = Buffer.from(
+      this.configService.getOrThrow<string>('crypto.serverPrivateKey'),
+      'base64',
+    );
+
+    const [plainBody, attachments] = await Promise.all([
+      this.decryptBodyForExternalDelivery(dto, serverPrivateKey),
+      this.decryptAttachmentsForExternalDelivery(
+        userEmail,
+        dto,
+        serverPrivateKey,
+      ),
+    ]);
+
+    const { messageId } = await this.smtp.sendRaw({
+      userEmail,
+      to: dto.to,
+      cc: dto.cc,
+      bcc: dto.bcc,
+      subject: dto.subject,
+      text: plainBody ?? dto.textBody,
+      attachments,
+    });
+
+    // Need to save the mail to Sent manually as the smtp service does not save it for us
+    await this.mail.saveToSent(userEmail, {
+      ...dto,
+      textBody: dto.encryption ? packEnvelope(dto.encryption) : dto.textBody,
+      htmlBody: undefined,
+    });
+
+    return { id: messageId };
+  }
+
+  private async decryptBodyForExternalDelivery(
+    dto: SendEmailDto,
+    serverPrivateKey: Uint8Array,
+  ): Promise<string | undefined> {
+    if (!dto.encryption?.encryptedText || !dto.encryption.wrappedKeys?.length) {
+      return undefined;
+    }
+    return decryptBody(
+      dto.encryption.encryptedText,
+      dto.encryption.wrappedKeys,
+      serverPrivateKey,
+    );
+  }
+
+  private async decryptAttachmentsForExternalDelivery(
+    userEmail: string,
+    dto: SendEmailDto,
+    serverPrivateKey: Uint8Array,
+  ): Promise<SmtpAttachment[] | undefined> {
+    if (!dto.attachments?.length) return undefined;
+
+    const wrappedKeys = dto.encryption?.attachmentWrappedKeys;
+    if (!wrappedKeys?.length) {
+      throw new BadRequestException(
+        'attachmentWrappedKeys are required when sending attachments in MIXED mode',
+      );
+    }
+
+    const attachmentKey = await unwrapAttachmentKey(
+      wrappedKeys,
+      serverPrivateKey,
+    );
+
+    return Promise.all(
+      dto.attachments.map(async (a) => {
+        const { stream } = await this.mail.downloadAttachment({
+          userEmail,
+          blobId: a.blobId,
+        });
+        const ciphertext = await streamToBuffer(stream);
+        const plaintext = await decryptAttachment(ciphertext, attachmentKey);
+        return {
+          filename: a.name,
+          content: Buffer.from(plaintext),
+          contentType: a.type,
+        };
+      }),
+    );
   }
 
   saveDraft(userEmail: string, dto: DraftEmailDto): Promise<{ id: string }> {
