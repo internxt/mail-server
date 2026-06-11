@@ -371,6 +371,7 @@ describe('AccountService', () => {
         .mockResolvedValueOnce(provisionedAccount);
       accounts.create.mockResolvedValue(createdAccount);
       addresses.create.mockResolvedValue(createdAddressId);
+      provider.createAccount.mockResolvedValue({ internalId: 42 });
 
       const result = await service.provisionAccount(params);
 
@@ -388,6 +389,7 @@ describe('AccountService', () => {
         mailAddressId: createdAddressId,
         provider: 'stalwart',
         externalId: params.address,
+        providerInternalId: 42,
       });
       expect(provider.createAccount).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -461,6 +463,28 @@ describe('AccountService', () => {
         'Stalwart down',
       );
       expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(addresses.createProviderLink).not.toHaveBeenCalled();
+    });
+
+    it('when provider link creation fails, then deletes the stalwart account and the account (undo) and rethrows', async () => {
+      const createdAccount = MailAccount.build(
+        newMailAccountAttributes({
+          userId: params.userId,
+          addresses: [],
+        }),
+      );
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+      accounts.create.mockResolvedValue(createdAccount);
+      addresses.create.mockResolvedValue('addr-id');
+      provider.createAccount.mockResolvedValue({ internalId: 42 });
+      addresses.createProviderLink.mockRejectedValue(new Error('DB down'));
+
+      await expect(service.provisionAccount(params)).rejects.toThrow('DB down');
+      expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
     });
 
     it('when concurrent provisioning race occurs, then returns the existing account', async () => {
@@ -528,6 +552,7 @@ describe('AccountService', () => {
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       addresses.create.mockResolvedValue(newAddressId);
+      provider.createAccount.mockResolvedValue({ internalId: 7 });
 
       await service.addAddress(
         accountAttrs.userId,
@@ -553,6 +578,7 @@ describe('AccountService', () => {
         mailAddressId: newAddressId,
         provider: 'stalwart',
         externalId: newAddr,
+        providerInternalId: 7,
       });
     });
 

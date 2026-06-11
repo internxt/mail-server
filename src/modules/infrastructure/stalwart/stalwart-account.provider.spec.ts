@@ -26,6 +26,7 @@ describe('StalwartAccountProvider', () => {
         primaryAddress: 'alice@example.com',
       });
       stalwart.resolveDomainId.mockResolvedValue('dom1');
+      stalwart.createAccount.mockResolvedValue('c');
 
       await provider.createAccount(params);
 
@@ -37,6 +38,18 @@ describe('StalwartAccountProvider', () => {
         password: params.password,
         quotaBytes: params.quota ?? 0,
       });
+    });
+
+    it('when the account is created, then returns the decoded numeric stalwart id', async () => {
+      const params = newCreateAccountParams({
+        primaryAddress: 'alice@example.com',
+      });
+      stalwart.resolveDomainId.mockResolvedValue('dom1');
+      stalwart.createAccount.mockResolvedValue('ba');
+
+      const result = await provider.createAccount(params);
+
+      expect(result).toEqual({ internalId: 32 });
     });
 
     it('when domain is not configured, then throws and does not create', async () => {
@@ -57,6 +70,7 @@ describe('StalwartAccountProvider', () => {
         quota: undefined,
       });
       stalwart.resolveDomainId.mockResolvedValue('dom1');
+      stalwart.createAccount.mockResolvedValue('c');
 
       await provider.createAccount(params);
 

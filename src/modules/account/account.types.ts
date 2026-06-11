@@ -6,6 +6,10 @@ export interface CreateAccountParams {
   quota?: number;
 }
 
+export interface CreateAccountResult {
+  internalId: number;
+}
+
 export interface AccountInfo {
   name: string;
   displayName: string;
