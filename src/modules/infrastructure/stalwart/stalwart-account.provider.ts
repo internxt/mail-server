@@ -44,7 +44,11 @@ export class StalwartAccountProvider extends AccountProvider {
     this.logger.log(
       `Created account '${params.primaryAddress}' (stalwart id ${internalId})`,
     );
-    return { internalId };
+    return {
+      provider: 'stalwart',
+      externalId: params.primaryAddress,
+      internalId: String(internalId),
+    };
   }
 
   async deleteAccount(email: string): Promise<void> {

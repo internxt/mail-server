@@ -371,7 +371,11 @@ describe('AccountService', () => {
         .mockResolvedValueOnce(provisionedAccount);
       accounts.create.mockResolvedValue(createdAccount);
       addresses.create.mockResolvedValue(createdAddressId);
-      provider.createAccount.mockResolvedValue({ internalId: 42 });
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: params.address,
+        internalId: '42',
+      });
 
       const result = await service.provisionAccount(params);
 
@@ -389,7 +393,7 @@ describe('AccountService', () => {
         mailAddressId: createdAddressId,
         provider: 'stalwart',
         externalId: params.address,
-        providerInternalId: 42,
+        providerInternalId: '42',
       });
       expect(provider.createAccount).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -479,7 +483,11 @@ describe('AccountService', () => {
       accounts.findByUserId.mockResolvedValue(null);
       accounts.create.mockResolvedValue(createdAccount);
       addresses.create.mockResolvedValue('addr-id');
-      provider.createAccount.mockResolvedValue({ internalId: 42 });
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: params.address,
+        internalId: '42',
+      });
       addresses.createProviderLink.mockRejectedValue(new Error('DB down'));
 
       await expect(service.provisionAccount(params)).rejects.toThrow('DB down');
@@ -552,7 +560,11 @@ describe('AccountService', () => {
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       addresses.create.mockResolvedValue(newAddressId);
-      provider.createAccount.mockResolvedValue({ internalId: 7 });
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: newAddr,
+        internalId: '7',
+      });
 
       await service.addAddress(
         accountAttrs.userId,
@@ -578,7 +590,7 @@ describe('AccountService', () => {
         mailAddressId: newAddressId,
         provider: 'stalwart',
         externalId: newAddr,
-        providerInternalId: 7,
+        providerInternalId: '7',
       });
     });
 
@@ -646,6 +658,31 @@ describe('AccountService', () => {
 
       expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
       expect(addresses.createProviderLink).not.toHaveBeenCalled();
+    });
+
+    it('when provider link creation fails, then deletes the stalwart account and the address (undo) and rethrows', async () => {
+      const account = MailAccount.build(newMailAccountAttributes());
+      const domain = MailDomain.build(newMailDomainAttributes());
+      const newAddr = 'new@example.com';
+      const newAddressId = 'new-address-id';
+
+      accounts.findByUserId.mockResolvedValue(account);
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      addresses.create.mockResolvedValue(newAddressId);
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: newAddr,
+        internalId: '7',
+      });
+      addresses.createProviderLink.mockRejectedValue(new Error('DB down'));
+
+      await expect(
+        service.addAddress(account.userId, newAddr, domain.domain, 'pass'),
+      ).rejects.toThrow('DB down');
+
+      expect(provider.deleteAccount).toHaveBeenCalledWith(newAddr);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
     });
   });
 

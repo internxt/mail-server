@@ -213,12 +213,12 @@ export class AccountService {
     try {
       await this.addresses.createProviderLink({
         mailAddressId: addressId,
-        provider: 'stalwart',
-        externalId: params.address,
+        provider: created.provider,
+        externalId: created.externalId,
         providerInternalId: created.internalId,
       });
     } catch (error) {
-      await this.provider.deleteAccount(params.address);
+      await this.provider.deleteAccount(created.externalId);
       await this.accounts.delete(account.id);
       throw error;
     }
@@ -283,12 +283,18 @@ export class AccountService {
       throw error;
     }
 
-    await this.addresses.createProviderLink({
-      mailAddressId: newAddressId,
-      provider: 'stalwart',
-      externalId: address,
-      providerInternalId: created.internalId,
-    });
+    try {
+      await this.addresses.createProviderLink({
+        mailAddressId: newAddressId,
+        provider: created.provider,
+        externalId: created.externalId,
+        providerInternalId: created.internalId,
+      });
+    } catch (error) {
+      await this.provider.deleteAccount(created.externalId);
+      await this.addresses.delete(newAddressId);
+      throw error;
+    }
 
     this.logger.log(`Added address '${address}' to account '${userId}'`);
   }
