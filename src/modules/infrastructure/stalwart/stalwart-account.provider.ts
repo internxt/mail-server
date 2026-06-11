@@ -3,7 +3,9 @@ import { AccountProvider } from '../../account/account-provider.port.js';
 import type {
   AccountInfo,
   CreateAccountParams,
+  CreateAccountResult,
 } from '../../account/account.types.js';
+import { decodeStalwartId } from './stalwart-id.codec.js';
 import {
   StalwartApiError,
   StalwartService,
@@ -18,7 +20,9 @@ export class StalwartAccountProvider extends AccountProvider {
     super();
   }
 
-  async createAccount(params: CreateAccountParams): Promise<void> {
+  async createAccount(
+    params: CreateAccountParams,
+  ): Promise<CreateAccountResult> {
     const { local, domain } = splitEmail(params.primaryAddress);
     const domainId = await this.stalwart.resolveDomainId(domain);
     if (!domainId) {
@@ -28,15 +32,19 @@ export class StalwartAccountProvider extends AccountProvider {
       );
     }
 
-    await this.stalwart.createAccount({
+    const id = await this.stalwart.createAccount({
       name: local,
       domainId,
       description: params.displayName,
       password: params.password,
       quotaBytes: params.quota ?? 0,
     });
+    const internalId = decodeStalwartId(id);
 
-    this.logger.log(`Created account '${params.primaryAddress}'`);
+    this.logger.log(
+      `Created account '${params.primaryAddress}' (stalwart id ${internalId})`,
+    );
+    return { internalId };
   }
 
   async deleteAccount(email: string): Promise<void> {

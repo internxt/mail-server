@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import dayjs from 'dayjs';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
+import type { CreateAccountResult } from './account.types.js';
 import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
 import { MailDomain } from './domain/mail-domain.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
@@ -189,12 +190,6 @@ export class AccountService {
       isDefault: true,
     });
 
-    await this.addresses.createProviderLink({
-      mailAddressId: addressId,
-      provider: 'stalwart',
-      externalId: params.address,
-    });
-
     await this.keys.create({
       mailAddressId: addressId,
       ...params.keys,
@@ -202,14 +197,28 @@ export class AccountService {
 
     const password = randomBytes(32).toString('base64url');
 
+    let created: CreateAccountResult;
     try {
-      await this.provider.createAccount({
+      created = await this.provider.createAccount({
         accountId: account.id,
         primaryAddress: params.address,
         displayName: params.displayName,
         password,
       });
     } catch (error) {
+      await this.accounts.delete(account.id);
+      throw error;
+    }
+
+    try {
+      await this.addresses.createProviderLink({
+        mailAddressId: addressId,
+        provider: 'stalwart',
+        externalId: params.address,
+        providerInternalId: created.internalId,
+      });
+    } catch (error) {
+      await this.provider.deleteAccount(params.address);
       await this.accounts.delete(account.id);
       throw error;
     }
@@ -261,8 +270,9 @@ export class AccountService {
       isDefault: false,
     });
 
+    let created: CreateAccountResult;
     try {
-      await this.provider.createAccount({
+      created = await this.provider.createAccount({
         accountId: newAddressId,
         primaryAddress: address,
         displayName: displayName ?? '',
@@ -277,6 +287,7 @@ export class AccountService {
       mailAddressId: newAddressId,
       provider: 'stalwart',
       externalId: address,
+      providerInternalId: created.internalId,
     });
 
     this.logger.log(`Added address '${address}' to account '${userId}'`);

@@ -39,6 +39,10 @@ export class MailProviderAccountModel extends Model {
   @Column(DataType.STRING(255))
   declare externalId: string;
 
+  @AllowNull(false)
+  @Column(DataType.BIGINT)
+  declare providerInternalId: number;
+
   @Column(DataType.DATE)
   declare deletedAt: Date | null;
 
