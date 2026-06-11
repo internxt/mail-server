@@ -7,7 +7,9 @@ export interface CreateAccountParams {
 }
 
 export interface CreateAccountResult {
-  internalId: number;
+  provider: string;
+  externalId: string;
+  internalId: string;
 }
 
 export interface AccountInfo {

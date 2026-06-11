@@ -9,7 +9,7 @@ module.exports = {
       'mail_provider_accounts',
       'provider_internal_id',
       {
-        type: Sequelize.BIGINT,
+        type: Sequelize.STRING(255),
         allowNull: false,
       },
     );

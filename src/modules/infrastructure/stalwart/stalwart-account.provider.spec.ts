@@ -49,7 +49,11 @@ describe('StalwartAccountProvider', () => {
 
       const result = await provider.createAccount(params);
 
-      expect(result).toEqual({ internalId: 32 });
+      expect(result).toEqual({
+        provider: 'stalwart',
+        externalId: 'alice@example.com',
+        internalId: '32',
+      });
     });
 
     it('when domain is not configured, then throws and does not create', async () => {

@@ -138,7 +138,7 @@ export class AddressRepository {
     mailAddressId: string;
     provider: string;
     externalId: string;
-    providerInternalId: number;
+    providerInternalId: string;
   }): Promise<void> {
     await this.providerAccountModel.create(params);
   }
