@@ -48,4 +48,9 @@ export default () => ({
       url: process.env.BRIDGE_API_URL ?? '',
     },
   },
+
+  stalwartWebhook: {
+    username: process.env.STALWART_WEBHOOK_USERNAME ?? 'stalwart',
+    secret: process.env.STALWART_WEBHOOK_SECRET ?? '',
+  },
 });
