@@ -19,6 +19,8 @@ export interface SendRawPayload {
   text?: string;
   html?: string;
   attachments?: SmtpAttachment[];
+  inReplyTo?: string;
+  references?: string[];
 }
 
 @Injectable()
@@ -62,6 +64,8 @@ export class StalwartSmtpService {
         text: payload.text,
         html: payload.html,
         attachments: payload.attachments,
+        inReplyTo: payload.inReplyTo,
+        references: payload.references,
       });
       this.logger.debug(`SMTP sent for ${payload.userEmail}: ${messageId}`);
       return { messageId };

@@ -9,6 +9,7 @@ import type {
   MailboxType,
   SearchEmailFilter,
   SendEmailDto,
+  ThreadingHeaders,
 } from '../../email/email.types.js';
 import { JmapService } from './jmap.service.js';
 import type {
@@ -260,6 +261,7 @@ export class JmapMailProvider extends MailProvider {
   async sendEmail(
     userEmail: string,
     dto: SendEmailDto,
+    threading?: ThreadingHeaders,
   ): Promise<{ id: string }> {
     const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
@@ -267,10 +269,12 @@ export class JmapMailProvider extends MailProvider {
       this.resolveMailboxId(userEmail, 'sent'),
     ]);
 
-    const emailCreate = mapSendDtoToJmapCreate(dto, sentMailboxId, {
-      name: identity.name,
-      email: identity.email,
-    });
+    const emailCreate = mapSendDtoToJmapCreate(
+      dto,
+      sentMailboxId,
+      { name: identity.name, email: identity.email },
+      threading,
+    );
 
     const response = await this.jmap.request(userEmail, [
       [
@@ -310,6 +314,7 @@ export class JmapMailProvider extends MailProvider {
   async saveToSent(
     userEmail: string,
     dto: SendEmailDto,
+    threading?: ThreadingHeaders,
   ): Promise<{ id: string }> {
     const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
@@ -317,10 +322,12 @@ export class JmapMailProvider extends MailProvider {
       this.resolveMailboxId(userEmail, 'sent'),
     ]);
 
-    const emailCreate = mapSendDtoToJmapCreate(dto, sentMailboxId, {
-      name: identity.name,
-      email: identity.email,
-    });
+    const emailCreate = mapSendDtoToJmapCreate(
+      dto,
+      sentMailboxId,
+      { name: identity.name, email: identity.email },
+      threading,
+    );
 
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
@@ -333,6 +340,98 @@ export class JmapMailProvider extends MailProvider {
     }
 
     return { id: createdId };
+  }
+
+  async getThreadingHeaders(
+    userEmail: string,
+    parentId: string,
+  ): Promise<ThreadingHeaders | null> {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
+      userEmail,
+      [
+        [
+          'Email/get',
+          {
+            accountId,
+            ids: [parentId],
+            properties: ['id', 'messageId', 'inReplyTo', 'references'],
+          },
+          'r0',
+        ],
+      ],
+    );
+
+    const parent = response.methodResponses[0]![1].list[0];
+    if (!parent) return null;
+
+    const messageId = parent.messageId ?? [];
+    if (messageId.length === 0) return null;
+
+    const seen = new Set<string>();
+    const references: string[] = [];
+    for (const ref of [
+      ...(parent.references ?? []),
+      ...(parent.inReplyTo ?? []),
+      ...messageId,
+    ]) {
+      if (!seen.has(ref)) {
+        seen.add(ref);
+        references.push(ref);
+      }
+    }
+
+    return { messageId, references };
+  }
+
+  async getThread(userEmail: string, emailId: string): Promise<Email[]> {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    const response = await this.jmap.request(userEmail, [
+      [
+        'Email/get',
+        { accountId, ids: [emailId], properties: ['id', 'threadId'] },
+        'r0',
+      ],
+      [
+        'Thread/get',
+        {
+          accountId,
+          '#ids': {
+            resultOf: 'r0',
+            name: 'Email/get',
+            path: '/list/*/threadId',
+          },
+        },
+        'r1',
+      ],
+      [
+        'Email/get',
+        {
+          accountId,
+          '#ids': {
+            resultOf: 'r1',
+            name: 'Thread/get',
+            path: '/list/*/emailIds',
+          },
+          properties: EMAIL_DETAIL_PROPERTIES,
+          fetchTextBodyValues: true,
+          fetchHTMLBodyValues: true,
+        },
+        'r2',
+      ],
+    ]);
+
+    const firstLookup = response
+      .methodResponses[0]![1] as JmapGetResponse<JmapEmail>;
+    if (firstLookup.list.length === 0) return [];
+
+    const emailsResult = response
+      .methodResponses[2]![1] as JmapGetResponse<JmapEmail>;
+    return emailsResult.list
+      .map(mapJmapEmailToDetail)
+      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
   }
 
   async saveDraft(

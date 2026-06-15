@@ -17,6 +17,7 @@ import type {
   MailboxType,
   SearchEmailDto,
   SendEmailDto,
+  ThreadingHeaders,
 } from './email.types.js';
 import {
   isEncryptedBody,
@@ -74,6 +75,15 @@ export class EmailService {
       throw new NotFoundException(`Email ${id} not found`);
     }
     return email;
+  }
+
+  async getThread(userEmail: string, emailId: string): Promise<Email[]> {
+    const emails = await this.mail.getThread(userEmail, emailId);
+    if (emails.length === 0) {
+      throw new NotFoundException(`Email ${emailId} not found`);
+    }
+    await this.enrichEncryptedSummaries(userEmail, emails);
+    return emails;
   }
 
   async getAttachment(
@@ -137,6 +147,8 @@ export class EmailService {
       throw new BadRequestException('At least one recipient is required');
     }
 
+    const threading = await this.resolveThreading(userEmail, dto);
+
     if (dto.encryption) {
       dto = {
         ...dto,
@@ -145,7 +157,7 @@ export class EmailService {
       };
     }
 
-    return this.mail.sendEmail(userEmail, dto);
+    return this.mail.sendEmail(userEmail, dto, threading);
   }
 
   async sendExternalEmail(
@@ -155,6 +167,8 @@ export class EmailService {
     if (dto.to.length === 0) {
       throw new BadRequestException('At least one recipient is required');
     }
+
+    const threading = await this.resolveThreading(userEmail, dto);
 
     const serverPrivateKey = Buffer.from(
       this.configService.getOrThrow<string>('crypto.serverPrivateKey'),
@@ -178,16 +192,39 @@ export class EmailService {
       subject: dto.subject,
       text: plainBody ?? dto.textBody,
       attachments,
+      inReplyTo: threading?.messageId[0],
+      references: threading?.references,
     });
 
     // Need to save the mail to Sent manually as the smtp service does not save it for us
-    await this.mail.saveToSent(userEmail, {
-      ...dto,
-      textBody: dto.encryption ? packEnvelope(dto.encryption) : dto.textBody,
-      htmlBody: undefined,
-    });
+    await this.mail.saveToSent(
+      userEmail,
+      {
+        ...dto,
+        textBody: dto.encryption ? packEnvelope(dto.encryption) : dto.textBody,
+        htmlBody: undefined,
+      },
+      threading,
+    );
 
     return { id: messageId };
+  }
+
+  private async resolveThreading(
+    userEmail: string,
+    dto: SendEmailDto,
+  ): Promise<ThreadingHeaders | undefined> {
+    if (!dto.inReplyToEmailId) return undefined;
+    const threading = await this.mail.getThreadingHeaders(
+      userEmail,
+      dto.inReplyToEmailId,
+    );
+    if (!threading) {
+      throw new NotFoundException(
+        `Replied email ${dto.inReplyToEmailId} not found`,
+      );
+    }
+    return threading;
   }
 
   private async decryptBodyForExternalDelivery(

@@ -162,6 +162,14 @@ export interface Email {
   htmlBody?: EmailBodyPart[];
   attachments?: EmailBodyPart[];
   bodyValues?: Record<string, EmailBodyValue>;
+  messageId?: string[] | null;
+  inReplyTo?: string[] | null;
+  references?: string[] | null;
+}
+
+export interface Thread {
+  id: ID;
+  emailIds: ID[];
 }
 
 export type EmailCreate = Partial<

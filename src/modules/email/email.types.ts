@@ -92,6 +92,12 @@ export interface SendEmailDto {
   htmlBody?: string;
   encryption?: EncryptionBlock;
   attachments?: EmailAttachment[];
+  inReplyToEmailId?: string;
+}
+
+export interface ThreadingHeaders {
+  messageId: string[];
+  references: string[];
 }
 
 export interface DraftEmailDto {
