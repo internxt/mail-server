@@ -521,6 +521,11 @@ describe('AccountService', () => {
       accounts.findByUserId.mockResolvedValue(null);
       accounts.create.mockResolvedValue(createdAccount);
       addresses.create.mockResolvedValue('addr-id');
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: params.address,
+        internalId: '42',
+      });
       bridge.createMailBucket.mockRejectedValue(new Error('Bridge down'));
 
       await expect(service.provisionAccount(params)).rejects.toThrow(
