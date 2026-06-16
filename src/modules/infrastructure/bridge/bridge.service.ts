@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Client } from 'undici';
-import type { MailBucket } from './bridge.types.js';
+import type { BucketEntry, MailBucket } from './bridge.types.js';
 
 @Injectable()
 export class BridgeClient implements OnModuleInit, OnModuleDestroy {
@@ -96,6 +96,38 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
         text,
       );
     }
+  }
+
+  async createBucketEntry(
+    userUuid: string,
+    bucketId: string,
+    key: string,
+    size: number,
+  ): Promise<BucketEntry> {
+    const token = this.signGatewayToken(userUuid);
+
+    const { statusCode, body } = await this.httpClient.request({
+      method: 'POST',
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}/entries`,
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ key, size }),
+    });
+
+    const text = await body.text();
+
+    if (statusCode !== 200) {
+      throw new BridgeApiError(
+        `Failed to create bucket entry '${key}' on bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
+        statusCode,
+        text,
+      );
+    }
+
+    return JSON.parse(text) as BucketEntry;
   }
 
   private signGatewayToken(userUuid: string): string {

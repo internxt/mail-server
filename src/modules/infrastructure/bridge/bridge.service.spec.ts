@@ -141,4 +141,57 @@ describe('BridgeClient', () => {
       expect(error.details).toBe('not found');
     });
   });
+
+  describe('createBucketEntry', () => {
+    it('when Bridge returns 200, then signs a token, POSTs key and size, and returns the entry', async () => {
+      const entry = {
+        id: 'entry-1',
+        maxSpaceBytes: 1000,
+        totalUsedSpaceBytes: 240,
+      };
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 200,
+        body: { text: () => Promise.resolve(JSON.stringify(entry)) },
+      });
+
+      const result = await service.createBucketEntry(
+        'user-1',
+        'bucket-1',
+        '42:7',
+        240,
+      );
+
+      expect(result).toStrictEqual(entry);
+      expect(httpRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'POST',
+          path: '/v2/gateway/users/user-1/buckets/bucket-1/entries',
+          body: JSON.stringify({ key: '42:7', size: 240 }),
+          headers: expect.objectContaining({
+            authorization: 'Bearer signed-jwt',
+          }) as unknown,
+        }),
+      );
+    });
+
+    it('when Bridge returns a non-200 status, then throws BridgeApiError with statusCode and details', async () => {
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 404,
+        body: { text: () => Promise.resolve('bucket not found') },
+      });
+
+      const error: unknown = await service
+        .createBucketEntry('user-1', 'bucket-1', '42:7', 240)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BridgeApiError);
+      if (!(error instanceof BridgeApiError)) {
+        throw new Error('expected BridgeApiError');
+      }
+      expect(error.statusCode).toBe(404);
+      expect(error.details).toBe('bucket not found');
+    });
+  });
 });

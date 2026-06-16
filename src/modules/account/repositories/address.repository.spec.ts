@@ -6,10 +6,12 @@ import { Op } from 'sequelize';
 import { AddressRepository } from './address.repository.js';
 import { MailAccountModel } from '../models/mail-account.model.js';
 import { MailAddressModel } from '../models/mail-address.model.js';
+import { MailProviderAccountModel } from '../models/mail-provider-account.model.js';
 
 describe('AddressRepository', () => {
   let repository: AddressRepository;
   let addressModel: DeepMocked<typeof MailAddressModel>;
+  let providerAccountModel: DeepMocked<typeof MailProviderAccountModel>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -19,12 +21,16 @@ describe('AddressRepository', () => {
         if (token === getModelToken(MailAddressModel)) {
           return createMock<typeof MailAddressModel>();
         }
+        if (token === getModelToken(MailProviderAccountModel)) {
+          return createMock<typeof MailProviderAccountModel>();
+        }
         return createMock<object>();
       })
       .compile();
 
     repository = module.get(AddressRepository);
     addressModel = module.get(getModelToken(MailAddressModel));
+    providerAccountModel = module.get(getModelToken(MailProviderAccountModel));
   });
 
   describe('findUserIdByAddress', () => {
@@ -121,6 +127,45 @@ describe('AddressRepository', () => {
           ['bob@internxt.me', 'id-2'],
         ]),
       );
+    });
+  });
+
+  describe('findBucketContextByProviderInternalId', () => {
+    it('when a provider link resolves to an account, then returns userUuid and networkBucketId', async () => {
+      const link = {
+        address: {
+          networkBucketId: 'bucket-1',
+          account: { userId: 'user-uuid-1' },
+        },
+      } as unknown as MailProviderAccountModel;
+      providerAccountModel.findOne.mockResolvedValue(link);
+
+      const result =
+        await repository.findBucketContextByProviderInternalId('42');
+
+      expect(providerAccountModel.findOne).toHaveBeenCalledWith({
+        where: { providerInternalId: '42' },
+        include: [
+          {
+            model: MailAddressModel,
+            required: true,
+            include: [{ model: MailAccountModel, required: true }],
+          },
+        ],
+      });
+      expect(result).toEqual({
+        userUuid: 'user-uuid-1',
+        networkBucketId: 'bucket-1',
+      });
+    });
+
+    it('when no provider link matches, then returns null', async () => {
+      providerAccountModel.findOne.mockResolvedValue(null);
+
+      const result =
+        await repository.findBucketContextByProviderInternalId('999');
+
+      expect(result).toBeNull();
     });
   });
 
