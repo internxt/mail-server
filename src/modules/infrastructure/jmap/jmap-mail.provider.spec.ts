@@ -588,11 +588,13 @@ describe('JmapMailProvider', () => {
   });
 
   describe('deleteEmail', () => {
-    it('When email is in trash, then it permanently destroys it', async () => {
+    it('When email is in trash, then it permanently destroys it and returns the quota entry key', async () => {
       const trashMailbox = newJmapMailbox({ role: 'trash' });
       const emailInTrash = newJmapEmail({
+        id: 'c',
         mailboxIds: { [trashMailbox.id]: true },
       });
+      jmapService.getPrimaryAccountId.mockResolvedValue('b');
 
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [emailInTrash] }),
@@ -602,11 +604,15 @@ describe('JmapMailProvider', () => {
       );
       jmapService.request.mockResolvedValueOnce(jmapResponse({}));
 
-      await provider.deleteEmail('user@test.com', emailInTrash.id);
+      const result = await provider.deleteEmail(
+        'user@test.com',
+        emailInTrash.id,
+      );
 
       const lastCall = jmapService.request.mock.calls.at(-1)!;
       const methodArgs = lastCall[1][0]![1];
       expect(methodArgs['destroy']).toEqual([emailInTrash.id]);
+      expect(result).toEqual({ deletedEntryKey: '1:2' });
     });
 
     it('When email is not in trash, then it moves it to trash', async () => {
@@ -623,7 +629,10 @@ describe('JmapMailProvider', () => {
       );
       jmapService.request.mockResolvedValueOnce(jmapResponse({}));
 
-      await provider.deleteEmail('user@test.com', emailNotInTrash.id);
+      const result = await provider.deleteEmail(
+        'user@test.com',
+        emailNotInTrash.id,
+      );
 
       const lastCall = jmapService.request.mock.calls.at(-1)!;
       const methodArgs = lastCall[1][0]![1];
@@ -631,14 +640,15 @@ describe('JmapMailProvider', () => {
       expect(update[emailNotInTrash.id]).toEqual({
         mailboxIds: { [trashMailbox.id]: true },
       });
+      expect(result).toEqual({ deletedEntryKey: null });
     });
 
-    it('When email does not exist, then it returns without error', async () => {
+    it('When email does not exist, then it returns without a quota entry key', async () => {
       jmapService.request.mockResolvedValue(jmapResponse({ list: [] }));
 
       await expect(
         provider.deleteEmail('user@test.com', 'nonexistent'),
-      ).resolves.toBeUndefined();
+      ).resolves.toEqual({ deletedEntryKey: null });
     });
   });
 

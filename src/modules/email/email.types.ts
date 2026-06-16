@@ -22,6 +22,10 @@ export interface Mailbox {
 
 export type MailDeliveryMode = 'INTERNXT' | 'EXTERNAL';
 
+export interface DeleteEmailResult {
+  deletedEntryKey: string | null;
+}
+
 export interface EncryptedSummaryFields {
   encryptedPreview: string;
   wrappedKeys: EncryptedWrappedKey[];

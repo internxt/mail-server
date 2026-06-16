@@ -130,6 +130,33 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
     return JSON.parse(text) as BucketEntry;
   }
 
+  async deleteBucketEntry(
+    userUuid: string,
+    bucketId: string,
+    key: string,
+  ): Promise<void> {
+    const token = this.signGatewayToken(userUuid);
+
+    const { statusCode, body } = await this.httpClient.request({
+      method: 'DELETE',
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}/entries/${encodeURIComponent(key)}`,
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    const text = await body.text();
+
+    if (statusCode !== 200) {
+      throw new BridgeApiError(
+        `Failed to delete bucket entry '${key}' on bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
+        statusCode,
+        text,
+      );
+    }
+  }
+
   private signGatewayToken(userUuid: string): string {
     return this.jwtService.sign(
       { payload: { uuid: userUuid } },
