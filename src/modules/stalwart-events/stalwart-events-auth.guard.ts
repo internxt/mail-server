@@ -22,6 +22,9 @@ export class StalwartEventsAuthGuard implements CanActivate {
 
     const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
     const colonIndex = decoded.indexOf(':');
+    if (colonIndex === -1) {
+      throw new UnauthorizedException();
+    }
     const username = decoded.slice(0, colonIndex);
     const password = decoded.slice(colonIndex + 1);
 

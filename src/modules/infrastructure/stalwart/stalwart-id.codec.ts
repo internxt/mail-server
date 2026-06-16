@@ -7,7 +7,7 @@ const CHAR_VALUES = new Map<string, bigint>(
   [...STALWART_BASE32_ALPHABET].map((char, index) => [char, BigInt(index)]),
 );
 
-export function decodeStalwartId(id: string): number {
+export function decodeStalwartIdBig(id: string): bigint {
   if (id.length === 0) {
     throw new Error('Cannot decode empty Stalwart id');
   }
@@ -20,6 +20,12 @@ export function decodeStalwartId(id: string): number {
     }
     value = value * 32n + digit;
   }
+
+  return value;
+}
+
+export function decodeStalwartId(id: string): number {
+  const value = decodeStalwartIdBig(id);
 
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new Error(`Stalwart id '${id}' exceeds safe integer range`);

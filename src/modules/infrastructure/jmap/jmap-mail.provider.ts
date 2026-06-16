@@ -14,7 +14,7 @@ import type {
   SendEmailDto,
   ThreadingHeaders,
 } from '../../email/email.types.js';
-import { decodeStalwartId } from '../stalwart/stalwart-id.codec.js';
+import { decodeStalwartIdBig } from '../stalwart/stalwart-id.codec.js';
 import { JMAP_QUOTA_CAPABILITIES, JmapService } from './jmap.service.js';
 import type {
   DownloadAttachmentPayload,
@@ -784,8 +784,8 @@ export class JmapMailProvider extends MailProvider {
   }
 
   private buildEntryKey(accountId: string, emailId: string): string {
-    const numericAccountId = decodeStalwartId(accountId);
-    const documentId = decodeStalwartId(emailId) % 2 ** 32;
+    const numericAccountId = decodeStalwartIdBig(accountId);
+    const documentId = decodeStalwartIdBig(emailId) & 0xffffffffn;
     return `${numericAccountId}:${documentId}`;
   }
 
