@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AccountService } from '../account/account.service.js';
+import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
 import { MailProvider } from './mail-provider.port.js';
 import type {
   DraftEmailDto,
@@ -53,11 +55,14 @@ async function streamToBuffer(stream: Readable): Promise<Buffer> {
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
+
   constructor(
     private readonly mail: MailProvider,
     private readonly accountService: AccountService,
     private readonly smtp: StalwartSmtpService,
     private readonly configService: ConfigService,
+    private readonly bridge: BridgeClient,
   ) {}
 
   getMailboxes(userEmail: string): Promise<Mailbox[]> {
@@ -323,8 +328,39 @@ export class EmailService {
     return this.mail.moveEmail(userEmail, id, target);
   }
 
-  deleteEmail(userEmail: string, id: string): Promise<void> {
-    return this.mail.deleteEmail(userEmail, id);
+  async deleteEmail(userEmail: string, id: string): Promise<void> {
+    const { deletedEntryKey } = await this.mail.deleteEmail(userEmail, id);
+    if (!deletedEntryKey) return;
+
+    await this.releaseQuotaEntry(userEmail, deletedEntryKey);
+  }
+
+  private async releaseQuotaEntry(
+    userEmail: string,
+    entryKey: string,
+  ): Promise<void> {
+    const context =
+      await this.accountService.findBucketContextByAddress(userEmail);
+
+    if (!context?.networkBucketId) {
+      this.logger.warn(
+        { userEmail, entryKey },
+        'Destroyed message has no network bucket; skipping quota release',
+      );
+      return;
+    }
+
+    try {
+      await this.bridge.deleteBucketEntry(
+        context.userUuid,
+        context.networkBucketId,
+        entryKey,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to release quota entry '${entryKey}' for '${userEmail}': ${(error as Error).message}`,
+      );
+    }
   }
 
   markAsRead(userEmail: string, id: string, read: boolean): Promise<void> {

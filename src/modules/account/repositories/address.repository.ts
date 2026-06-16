@@ -99,6 +99,22 @@ export class AddressRepository {
     return model?.account?.userId ?? null;
   }
 
+  async findBucketContextByAddress(
+    address: string,
+  ): Promise<ProviderAccountBucketContext | null> {
+    const model = await this.addressModel.findOne({
+      where: { address },
+      include: [{ model: MailAccountModel, required: true }],
+    });
+
+    if (!model?.account) return null;
+
+    return {
+      userUuid: model.account.userId,
+      networkBucketId: model.networkBucketId,
+    };
+  }
+
   async findBucketContextByProviderInternalId(
     providerInternalId: string,
   ): Promise<ProviderAccountBucketContext | null> {
