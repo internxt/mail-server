@@ -16,7 +16,10 @@ import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
 import { MailAddress } from './domain/mail-address.domain.js';
 import { MailDomain } from './domain/mail-domain.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
-import { AddressRepository } from './repositories/address.repository.js';
+import {
+  AddressRepository,
+  type ProviderAccountBucketContext,
+} from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 
@@ -110,6 +113,14 @@ export class AccountService {
 
   async findUserIdByAddress(address: string): Promise<string | null> {
     return this.addresses.findUserIdByAddress(address);
+  }
+
+  async findBucketContextByProviderInternalId(
+    providerInternalId: string,
+  ): Promise<ProviderAccountBucketContext | null> {
+    return this.addresses.findBucketContextByProviderInternalId(
+      providerInternalId,
+    );
   }
 
   async getAddressKeys(

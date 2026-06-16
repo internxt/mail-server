@@ -12,6 +12,11 @@ import { MailProviderAccountModel } from '../models/mail-provider-account.model.
 
 const MAX_BATCH_LOOKUP = 50;
 
+export interface ProviderAccountBucketContext {
+  userUuid: string;
+  networkBucketId: string | null;
+}
+
 export function toAddressAttributes(
   model: MailAddressModel,
 ): MailAddressAttributes {
@@ -92,6 +97,28 @@ export class AddressRepository {
     });
 
     return model?.account?.userId ?? null;
+  }
+
+  async findBucketContextByProviderInternalId(
+    providerInternalId: string,
+  ): Promise<ProviderAccountBucketContext | null> {
+    const link = await this.providerAccountModel.findOne({
+      where: { providerInternalId },
+      include: [
+        {
+          model: MailAddressModel,
+          required: true,
+          include: [{ model: MailAccountModel, required: true }],
+        },
+      ],
+    });
+
+    if (!link?.address?.account) return null;
+
+    return {
+      userUuid: link.address.account.userId,
+      networkBucketId: link.address.networkBucketId,
+    };
   }
 
   async findDefaultForAccount(
