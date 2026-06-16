@@ -9,6 +9,7 @@ import type {
   Email,
   EmailListResponse,
   ListEmails,
+  MailQuota,
   Mailbox,
   MailboxType,
   SearchEmailDto,
@@ -66,4 +67,5 @@ export abstract class MailProvider {
   abstract downloadAttachment(
     payload: DownloadAttachmentPayload,
   ): Promise<DownloadAttachmentResponse>;
+  abstract getQuota(userEmail: string): Promise<MailQuota>;
 }

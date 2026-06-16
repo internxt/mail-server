@@ -5,18 +5,20 @@ import type {
   Email,
   EmailListResponse,
   ListEmails,
+  MailQuota,
   Mailbox,
   MailboxType,
   SearchEmailFilter,
   SendEmailDto,
   ThreadingHeaders,
 } from '../../email/email.types.js';
-import { JmapService } from './jmap.service.js';
+import { JMAP_QUOTA_CAPABILITIES, JmapService } from './jmap.service.js';
 import type {
   DownloadAttachmentPayload,
   DownloadAttachmentResponse,
   Email as JmapEmail,
   Identity,
+  JmapQuota,
   Mailbox as JmapMailbox,
   JmapGetResponse,
   JmapQueryResponse,
@@ -567,6 +569,24 @@ export class JmapMailProvider extends MailProvider {
     payload: DownloadAttachmentPayload,
   ): Promise<DownloadAttachmentResponse> {
     return this.jmap.downloadAttachment(payload);
+  }
+
+  async getQuota(userEmail: string): Promise<MailQuota> {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+
+    const response = await this.jmap.request<JmapGetResponse<JmapQuota>>(
+      userEmail,
+      [['Quota/get', { accountId }, 'r0']],
+      JMAP_QUOTA_CAPABILITIES,
+    );
+
+    const quotas = response.methodResponses[0]![1].list;
+    const bytesQuota = quotas.find((q) => q.resourceType === 'octets');
+
+    return {
+      used: bytesQuota?.used ?? 0,
+      limit: bytesQuota?.hardLimit ?? 0,
+    };
   }
 
   private async setKeyword(

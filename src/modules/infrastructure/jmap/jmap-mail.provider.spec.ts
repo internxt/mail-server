@@ -8,6 +8,7 @@ import {
   newJmapMailbox,
   newJmapEmail,
   newJmapIdentity,
+  newJmapQuota,
   newSendEmailDto,
   newDraftEmailDto,
 } from '../../../../test/fixtures.js';
@@ -585,6 +586,36 @@ describe('JmapMailProvider', () => {
     });
   });
 
+  describe('getQuota', () => {
+    it('when quota exists, then returns used and limit from octets quota', async () => {
+      const quota = newJmapQuota({ used: 500_000, hardLimit: 1_000_000 });
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [quota] }));
+
+      const result = await provider.getQuota('user@test.com');
+
+      expect(result).toEqual({ used: 500_000, limit: 1_000_000 });
+    });
+
+    it('when no octets quota exists, then returns zeros', async () => {
+      const nonOctetsQuota = newJmapQuota({ resourceType: 'count' });
+      jmapService.request.mockResolvedValue(
+        jmapResponse({ list: [nonOctetsQuota] }),
+      );
+
+      const result = await provider.getQuota('user@test.com');
+
+      expect(result).toEqual({ used: 0, limit: 0 });
+    });
+
+    it('when quota list is empty, then returns zeros', async () => {
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [] }));
+
+      const result = await provider.getQuota('user@test.com');
+
+      expect(result).toEqual({ used: 0, limit: 0 });
+    });
+  });
+
   describe('getThreadingHeaders', () => {
     it('when looking up a parent email that exists, then it returns the parent message id together with the full chain of references', async () => {
       const parent = newJmapEmail({
@@ -736,7 +767,11 @@ describe('JmapMailProvider', () => {
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
           { list: [{ id: older.id, threadId: 'thread-1' }] },
-          { list: [{ id: 'thread-1', emailIds: [older.id, middle.id, newer.id] }] },
+          {
+            list: [
+              { id: 'thread-1', emailIds: [older.id, middle.id, newer.id] },
+            ],
+          },
           { list: [older, middle, newer] },
         ),
       );
