@@ -445,7 +445,7 @@ export class JmapMailProvider extends MailProvider {
 
   private buildEntryKey(accountId: string, emailId: string): string {
     const numericAccountId = decodeStalwartId(accountId);
-    const documentId = decodeStalwartId(emailId) % 2 ** 32;
+    const documentId = decodeStalwartIdBig(emailId) & 0xffffffffn;
     return `${numericAccountId}:${documentId}`;
   }
 

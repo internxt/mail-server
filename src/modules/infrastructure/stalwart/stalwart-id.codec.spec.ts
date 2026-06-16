@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { decodeStalwartId } from './stalwart-id.codec.js';
+import { decodeStalwartId, decodeStalwartIdBig } from './stalwart-id.codec.js';
+
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz792013';
+
+function encodeStalwartId(value: bigint): string {
+  if (value === 0n) return ALPHABET.charAt(0);
+  let v = value;
+  let out = '';
+  while (v > 0n) {
+    out = ALPHABET.charAt(Number(v % 32n)) + out;
+    v /= 32n;
+  }
+  return out;
+}
 
 describe('decodeStalwartId', () => {
   it('when given single-character ids, then decodes alphabet positions', () => {
@@ -35,5 +48,30 @@ describe('decodeStalwartId', () => {
     expect(() => decodeStalwartId('3333333333333')).toThrow(
       'exceeds safe integer range',
     );
+  });
+});
+
+describe('decodeStalwartIdBig', () => {
+  it('when given small ids, then returns the value as a bigint', () => {
+    expect(decodeStalwartIdBig('a')).toBe(0n);
+    expect(decodeStalwartIdBig('ba')).toBe(32n);
+  });
+
+  it('when the value exceeds the safe integer range, then decodes without throwing', () => {
+    const threadId = 5_000_000n;
+    const documentId = 13n;
+    const emailId = (threadId << 32n) | documentId;
+    const encoded = encodeStalwartId(emailId);
+
+    expect(emailId > BigInt(Number.MAX_SAFE_INTEGER)).toBe(true);
+    expect(decodeStalwartIdBig(encoded)).toBe(emailId);
+    expect(decodeStalwartIdBig(encoded) & 0xffffffffn).toBe(documentId);
+    expect(() => decodeStalwartId(encoded)).toThrow(
+      'exceeds safe integer range',
+    );
+  });
+
+  it('when given a character outside the alphabet, then throws', () => {
+    expect(() => decodeStalwartIdBig('b4')).toThrow("Invalid character '4'");
   });
 });
