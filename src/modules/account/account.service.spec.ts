@@ -532,6 +532,7 @@ describe('AccountService', () => {
         'Bridge down',
       );
       expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
+      expect(addresses.deleteProviderLink).toHaveBeenCalledWith('addr-id');
       expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
       expect(accounts.setNetworkBucketId).not.toHaveBeenCalled();
     });

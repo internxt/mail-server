@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailProvider } from '../../email/mail-provider.port.js';
 import type {
+  DeleteEmailResult,
   DraftEmailDto,
   Email,
   EmailListResponse,
@@ -10,6 +11,10 @@ import type {
   SearchEmailFilter,
   SendEmailDto,
 } from '../../email/email.types.js';
+import {
+  decodeStalwartId,
+  decodeStalwartIdBig,
+} from '../stalwart/stalwart-id.codec.js';
 import { JmapService } from './jmap.service.js';
 import type {
   DownloadAttachmentPayload,
@@ -396,7 +401,7 @@ export class JmapMailProvider extends MailProvider {
     ]);
   }
 
-  async deleteEmail(userEmail: string, id: string): Promise<void> {
+  async deleteEmail(userEmail: string, id: string): Promise<DeleteEmailResult> {
     const accountId = await this.jmap.getPrimaryAccountId(userEmail);
 
     const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
@@ -411,7 +416,7 @@ export class JmapMailProvider extends MailProvider {
     );
 
     const email = response.methodResponses[0]![1].list[0];
-    if (!email) return;
+    if (!email) return { deletedEntryKey: null };
 
     const trashMailboxId = await this.resolveMailboxId(userEmail, 'trash');
     const isInTrash = !!email.mailboxIds[trashMailboxId];
@@ -420,18 +425,28 @@ export class JmapMailProvider extends MailProvider {
       await this.jmap.request<JmapSetResponse<JmapEmail>>(userEmail, [
         ['Email/set', { accountId, destroy: [id] }, 'r0'],
       ]);
-    } else {
-      await this.jmap.request<JmapSetResponse<JmapEmail>>(userEmail, [
-        [
-          'Email/set',
-          {
-            accountId,
-            update: { [id]: { mailboxIds: { [trashMailboxId]: true } } },
-          },
-          'r0',
-        ],
-      ]);
+
+      return { deletedEntryKey: this.buildEntryKey(accountId, id) };
     }
+
+    await this.jmap.request<JmapSetResponse<JmapEmail>>(userEmail, [
+      [
+        'Email/set',
+        {
+          accountId,
+          update: { [id]: { mailboxIds: { [trashMailboxId]: true } } },
+        },
+        'r0',
+      ],
+    ]);
+
+    return { deletedEntryKey: null };
+  }
+
+  private buildEntryKey(accountId: string, emailId: string): string {
+    const numericAccountId = decodeStalwartId(accountId);
+    const documentId = decodeStalwartId(emailId) % 2 ** 32;
+    return `${numericAccountId}:${documentId}`;
   }
 
   async markAsRead(

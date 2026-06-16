@@ -5,6 +5,7 @@ import {
   type UploadAttachmentResponse,
 } from '../infrastructure/jmap/jmap.types.js';
 import type {
+  DeleteEmailResult,
   DraftEmailDto,
   Email,
   EmailListResponse,
@@ -41,7 +42,10 @@ export abstract class MailProvider {
     id: string,
     target: MailboxType,
   ): Promise<void>;
-  abstract deleteEmail(userEmail: string, id: string): Promise<void>;
+  abstract deleteEmail(
+    userEmail: string,
+    id: string,
+  ): Promise<DeleteEmailResult>;
   abstract markAsRead(
     userEmail: string,
     id: string,
