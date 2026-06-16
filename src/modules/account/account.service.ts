@@ -123,12 +123,6 @@ export class AccountService {
     );
   }
 
-  async findBucketContextByAddress(
-    address: string,
-  ): Promise<ProviderAccountBucketContext | null> {
-    return this.addresses.findBucketContextByAddress(address);
-  }
-
   async getAddressKeys(
     userId: string,
     address: string,
@@ -240,7 +234,6 @@ export class AccountService {
       await this.createNetworkBucket(params.userId, addressId);
     } catch (error) {
       await this.provider.deleteAccount(created.externalId);
-      await this.addresses.deleteProviderLink(addressId);
       await this.accounts.delete(account.id);
       throw error;
     }

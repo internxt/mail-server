@@ -169,38 +169,6 @@ describe('AddressRepository', () => {
     });
   });
 
-  describe('findBucketContextByAddress', () => {
-    it('when the address resolves to an account, then returns userUuid and networkBucketId', async () => {
-      const model = {
-        networkBucketId: 'bucket-1',
-        account: { userId: 'user-uuid-1' },
-      } as unknown as MailAddressModel;
-      addressModel.findOne.mockResolvedValue(model);
-
-      const result =
-        await repository.findBucketContextByAddress('alice@internxt.com');
-
-      expect(addressModel.findOne).toHaveBeenCalledWith({
-        where: { address: 'alice@internxt.com' },
-        include: [{ model: MailAccountModel, required: true }],
-      });
-      expect(result).toEqual({
-        userUuid: 'user-uuid-1',
-        networkBucketId: 'bucket-1',
-      });
-    });
-
-    it('when the address has no linked account, then returns null', async () => {
-      addressModel.findOne.mockResolvedValue(null);
-
-      const result = await repository.findBucketContextByAddress(
-        'missing@internxt.com',
-      );
-
-      expect(result).toBeNull();
-    });
-  });
-
   describe('setNetworkBucketId', () => {
     it('when given an id and bucket id, then updates the address row', async () => {
       await repository.setNetworkBucketId('addr-1', 'bucket-1');

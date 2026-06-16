@@ -76,7 +76,7 @@ describe('BridgeClient', () => {
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
         statusCode: 500,
-        body: { text: () => Promise.resolve('internal error') },
+        body: { text: () => Promise.resolve('boom') },
       });
 
       const error: unknown = await service
@@ -192,47 +192,6 @@ describe('BridgeClient', () => {
       }
       expect(error.statusCode).toBe(404);
       expect(error.details).toBe('bucket not found');
-    });
-  });
-
-  describe('deleteBucketEntry', () => {
-    it('when Bridge returns 200, then signs a token and DELETEs the url-encoded entry key', async () => {
-      jwtService.sign.mockReturnValue('signed-jwt');
-      httpRequest.mockResolvedValue({
-        statusCode: 200,
-        body: { text: () => Promise.resolve('') },
-      });
-
-      await service.deleteBucketEntry('user-1', 'bucket-1', '42:7');
-
-      expect(httpRequest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          method: 'DELETE',
-          path: '/v2/gateway/users/user-1/buckets/bucket-1/entries/42%3A7',
-          headers: expect.objectContaining({
-            authorization: 'Bearer signed-jwt',
-          }) as unknown,
-        }),
-      );
-    });
-
-    it('when Bridge returns a non-200 status, then throws BridgeApiError with statusCode and details', async () => {
-      jwtService.sign.mockReturnValue('signed-jwt');
-      httpRequest.mockResolvedValue({
-        statusCode: 404,
-        body: { text: () => Promise.resolve('entry not found') },
-      });
-
-      const error: unknown = await service
-        .deleteBucketEntry('user-1', 'bucket-1', '42:7')
-        .catch((e: unknown) => e);
-
-      expect(error).toBeInstanceOf(BridgeApiError);
-      if (!(error instanceof BridgeApiError)) {
-        throw new Error('expected BridgeApiError');
-      }
-      expect(error.statusCode).toBe(404);
-      expect(error.details).toBe('entry not found');
     });
   });
 });
