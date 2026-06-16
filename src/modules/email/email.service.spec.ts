@@ -213,7 +213,7 @@ describe('EmailService', () => {
   });
 
   describe('getEmail', () => {
-    it('when email exists, then returns it', async () => {
+    it('when opening an email that exists, then the full email is returned to the caller', async () => {
       const email = newEmail();
       provider.getEmail.mockResolvedValue(email);
 
@@ -222,12 +222,62 @@ describe('EmailService', () => {
       expect(result).toBe(email);
     });
 
-    it('when email does not exist, then throws NotFoundException', async () => {
+    it('when opening an email that does not exist, then the user is told it was not found', async () => {
       provider.getEmail.mockResolvedValue(null);
 
       await expect(service.getEmail(userEmail, 'nonexistent')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('getThread', () => {
+    it('when opening a conversation with several emails, then all messages in the conversation are returned', async () => {
+      const emails = [newEmail(), newEmail(), newEmail()];
+      provider.getThread.mockResolvedValue(emails);
+
+      const result = await service.getThread(userEmail, emails[0]!.id);
+
+      expect(provider.getThread).toHaveBeenCalledWith(userEmail, emails[0]!.id);
+      expect(result).toBe(emails);
+    });
+
+    it('when opening a single-message conversation, then a one-item list is returned', async () => {
+      const email = newEmail();
+      provider.getThread.mockResolvedValue([email]);
+
+      const result = await service.getThread(userEmail, email.id);
+
+      expect(result).toEqual([email]);
+    });
+
+    it('when opening a conversation by an id that does not exist, then the user is told it was not found', async () => {
+      provider.getThread.mockResolvedValue([]);
+
+      await expect(
+        service.getThread(userEmail, 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('when a conversation contains end-to-end encrypted messages, then the encrypted previews and wrapped keys are attached for the client to decrypt', async () => {
+      const envelope = newEncryptionBlock();
+      const encryptedEmail = newEmail({
+        preview: `${ENCRYPTED_PREFIX} truncated…`,
+      });
+      const plainEmail = newEmail({ preview: 'plain preview' });
+      provider.getThread.mockResolvedValue([encryptedEmail, plainEmail]);
+      provider.getTextBodies.mockResolvedValue(
+        new Map([[encryptedEmail.id, packEnvelope(envelope)]]),
+      );
+
+      const result = await service.getThread(userEmail, encryptedEmail.id);
+
+      expect(result[0]!.encryption).toEqual({
+        encryptedPreview: envelope.encryptedPreview,
+        wrappedKeys: envelope.wrappedKeys,
+      });
+      expect(result[0]!.preview).toBe('');
+      expect(result[1]!.encryption).toBeUndefined();
     });
   });
 
@@ -250,17 +300,21 @@ describe('EmailService', () => {
   });
 
   describe('sendEmail', () => {
-    it('when DTO has recipients, then delegates to provider', async () => {
+    it('when sending an email with recipients, then it gets delivered through the mail provider', async () => {
       const dto = newSendEmailDto();
       provider.sendEmail.mockResolvedValue({ id: 'created-id' });
 
       const result = await service.sendEmail(userEmail, dto);
 
-      expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto);
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        dto,
+        undefined,
+      );
       expect(result).toEqual({ id: 'created-id' });
     });
 
-    it('when DTO has empty recipients, then throws BadRequestException', async () => {
+    it('when sending an email with no recipients, then it is rejected before delivery', async () => {
       const dto = newSendEmailDto({ to: [] });
 
       await expect(service.sendEmail(userEmail, dto)).rejects.toThrow(
@@ -269,7 +323,7 @@ describe('EmailService', () => {
       expect(provider.sendEmail).not.toHaveBeenCalled();
     });
 
-    it('when DTO has encryption block, then serializes it into textBody and clears htmlBody', async () => {
+    it('when sending an end-to-end encrypted email, then the encrypted payload is delivered and the plain HTML body is discarded', async () => {
       const encryption = newEncryptionBlock();
       const dto = newSendEmailDto({ encryption, htmlBody: '<p>original</p>' });
       provider.sendEmail.mockResolvedValue({ id: 'enc-id' });
@@ -285,16 +339,54 @@ describe('EmailService', () => {
           textBody: `INTERNXT-ENCRYPTED-EMAIL-v1\n${expectedBundle}`,
           htmlBody: undefined,
         }),
+        undefined,
       );
     });
 
-    it('when DTO has no encryption, then passes body through unchanged', async () => {
+    it('when sending a plain email, then the body is delivered as the user wrote it', async () => {
       const dto = newSendEmailDto({ htmlBody: '<p>hello</p>' });
       provider.sendEmail.mockResolvedValue({ id: 'plain-id' });
 
       await service.sendEmail(userEmail, dto);
 
-      expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto);
+      expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto, undefined);
+    });
+
+    it('when replying to an existing email, then the reply is delivered into the same conversation', async () => {
+      const dto = newSendEmailDto({ inReplyToEmailId: 'parent-id' });
+      const threading = {
+        messageId: ['<parent@example.com>'],
+        references: ['<parent@example.com>'],
+      };
+      provider.getThreadingHeaders.mockResolvedValue(threading);
+      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await service.sendEmail(userEmail, dto);
+
+      expect(provider.getThreadingHeaders).toHaveBeenCalledWith(
+        userEmail,
+        'parent-id',
+      );
+      expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto, threading);
+    });
+
+    it('when replying to an email that no longer exists, then the user is told the original was not found', async () => {
+      const dto = newSendEmailDto({ inReplyToEmailId: 'missing-id' });
+      provider.getThreadingHeaders.mockResolvedValue(null);
+
+      await expect(service.sendEmail(userEmail, dto)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(provider.sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('when sending an email that is not a reply, then no conversation is looked up', async () => {
+      const dto = newSendEmailDto();
+      provider.sendEmail.mockResolvedValue({ id: 'plain-id' });
+
+      await service.sendEmail(userEmail, dto);
+
+      expect(provider.getThreadingHeaders).not.toHaveBeenCalled();
     });
   });
 
@@ -303,7 +395,7 @@ describe('EmailService', () => {
     const mockedDecrypt = vi.mocked(decryptAttachment);
     const mockedDecryptBody = vi.mocked(decryptBody);
 
-    it('when DTO has empty recipients, then throws BadRequestException', async () => {
+    it('when sending an external email with no recipients, then it is rejected before reaching SMTP', async () => {
       const dto = newSendEmailDto({ to: [] });
 
       await expect(service.sendExternalEmail(userEmail, dto)).rejects.toThrow(
@@ -312,7 +404,7 @@ describe('EmailService', () => {
       expect(smtp.sendRaw).not.toHaveBeenCalled();
     });
 
-    it('when DTO has no attachments and no encryption, then sends through SMTP and saves to Sent', async () => {
+    it('when sending a plain external email, then it is delivered over SMTP and a copy is kept in Sent', async () => {
       const dto = newSendEmailDto({
         attachments: undefined,
         encryption: undefined,
@@ -339,7 +431,7 @@ describe('EmailService', () => {
       expect(result).toEqual({ id: 'msg-1' });
     });
 
-    it('when DTO has attachments but no wrapped keys, then throws BadRequestException', async () => {
+    it('when sending an external email with encrypted attachments but no key for the server to decrypt them, then the email is rejected', async () => {
       const dto = newSendEmailDto({
         attachments: [
           { blobId: 'b1', name: 'f.txt', type: 'text/plain', size: 10 },
@@ -356,7 +448,7 @@ describe('EmailService', () => {
       expect(smtp.sendRaw).not.toHaveBeenCalled();
     });
 
-    it('when DTO has encrypted body and attachments, then decrypts both, sends plain via SMTP and saves cipher to Sent', async () => {
+    it('when sending an external email with end-to-end encrypted body and attachments, then the recipient receives them in clear and the user keeps the encrypted copy in Sent', async () => {
       const wrappedKey = newEncryptedWrappedKey();
       const encryption = newEncryptionBlock({
         attachmentWrappedKeys: [wrappedKey],
@@ -402,8 +494,55 @@ describe('EmailService', () => {
         expect.objectContaining({
           textBody: expect.stringContaining('INTERNXT-ENCRYPTED-EMAIL-v1'),
         }),
+        undefined,
       );
       expect(result).toEqual({ id: 'msg-2' });
+    });
+
+    it('when replying to an external recipient, then the conversation thread is carried through SMTP and the saved copy', async () => {
+      const dto = newSendEmailDto({
+        inReplyToEmailId: 'parent-id',
+        textBody: 'replying out',
+        encryption: undefined,
+      });
+      const threading = {
+        messageId: ['<parent@example.com>'],
+        references: ['<grandparent@example.com>', '<parent@example.com>'],
+      };
+      provider.getThreadingHeaders.mockResolvedValue(threading);
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      smtp.sendRaw.mockResolvedValue({ messageId: 'msg-3' });
+      provider.saveToSent.mockResolvedValue({ id: 'sent-3' });
+
+      await service.sendExternalEmail(userEmail, dto);
+
+      expect(smtp.sendRaw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inReplyTo: '<parent@example.com>',
+          references: [
+            '<grandparent@example.com>',
+            '<parent@example.com>',
+          ],
+        }),
+      );
+      expect(provider.saveToSent).toHaveBeenCalledWith(
+        userEmail,
+        expect.any(Object),
+        threading,
+      );
+    });
+
+    it('when replying to an external recipient and the original no longer exists, then the reply is rejected before reaching SMTP', async () => {
+      const dto = newSendEmailDto({ inReplyToEmailId: 'missing-id' });
+      provider.getThreadingHeaders.mockResolvedValue(null);
+
+      await expect(service.sendExternalEmail(userEmail, dto)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(smtp.sendRaw).not.toHaveBeenCalled();
+      expect(provider.saveToSent).not.toHaveBeenCalled();
     });
   });
 

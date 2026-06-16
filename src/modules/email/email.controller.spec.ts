@@ -102,6 +102,31 @@ describe('EmailController', () => {
       expect(emailService.sendEmail).toHaveBeenCalledWith(userEmail, baseDto);
       expect(emailService.sendExternalEmail).not.toHaveBeenCalled();
     });
+
+    it('when the user replies to an existing email, then the original email id is forwarded so the reply joins the same conversation', async () => {
+      const dto = { ...baseDto, inReplyToEmailId: 'parent-id' };
+      emailService.sendEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await controller.send(userEmail, dto);
+
+      expect(emailService.sendEmail).toHaveBeenCalledWith(userEmail, dto);
+    });
+  });
+
+  describe('getThread', () => {
+    it('when the user opens an email, then the entire conversation around it is returned', async () => {
+      const emails = [
+        { id: 'm1' } as never,
+        { id: 'm2' } as never,
+        { id: 'm3' } as never,
+      ];
+      emailService.getThread.mockResolvedValue(emails);
+
+      const result = await controller.getThread(userEmail, 'm2');
+
+      expect(emailService.getThread).toHaveBeenCalledWith(userEmail, 'm2');
+      expect(result).toBe(emails);
+    });
   });
 
   describe('getDomains', () => {

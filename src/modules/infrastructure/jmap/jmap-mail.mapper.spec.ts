@@ -550,6 +550,36 @@ describe('jmap-mail.mapper', () => {
 
       expect(result.attachments).toBeUndefined();
     });
+
+    it('when sending a reply, then the email is created with the in-reply-to and references headers so the receiver groups it in the same conversation', () => {
+      const dto = newSendEmailDto();
+      const threading = {
+        messageId: ['<parent@example.com>'],
+        references: ['<root@example.com>', '<parent@example.com>'],
+      };
+
+      const result = mapSendDtoToJmapCreate(
+        dto,
+        'mid',
+        newEmailAddress(),
+        threading,
+      );
+
+      expect(result.inReplyTo).toEqual(['<parent@example.com>']);
+      expect(result.references).toEqual([
+        '<root@example.com>',
+        '<parent@example.com>',
+      ]);
+    });
+
+    it('when sending a brand-new email, then no reply headers are attached', () => {
+      const dto = newSendEmailDto();
+
+      const result = mapSendDtoToJmapCreate(dto, 'mid', newEmailAddress());
+
+      expect(result.inReplyTo).toBeUndefined();
+      expect(result.references).toBeUndefined();
+    });
   });
 
   describe('mapDraftDtoToJmapCreate', () => {

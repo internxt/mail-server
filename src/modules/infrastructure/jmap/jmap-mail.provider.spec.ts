@@ -584,4 +584,192 @@ describe('JmapMailProvider', () => {
       expect(result).toBe(stored);
     });
   });
+
+  describe('getThreadingHeaders', () => {
+    it('when looking up a parent email that exists, then it returns the parent message id together with the full chain of references', async () => {
+      const parent = newJmapEmail({
+        messageId: ['<parent@example.com>'],
+        inReplyTo: ['<grandparent@example.com>'],
+        references: ['<root@example.com>', '<grandparent@example.com>'],
+      });
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [parent] }));
+
+      const result = await provider.getThreadingHeaders(
+        'user@test.com',
+        parent.id,
+      );
+
+      expect(result).toEqual({
+        messageId: ['<parent@example.com>'],
+        references: [
+          '<root@example.com>',
+          '<grandparent@example.com>',
+          '<parent@example.com>',
+        ],
+      });
+    });
+
+    it('when looking up a parent email that does not exist, then it returns null so the caller can decide what to do', async () => {
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [] }));
+
+      const result = await provider.getThreadingHeaders(
+        'user@test.com',
+        'missing-id',
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('when the parent email has no message id, then it returns null because there is nothing to thread against', async () => {
+      const parent = newJmapEmail({ messageId: null });
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [parent] }));
+
+      const result = await provider.getThreadingHeaders(
+        'user@test.com',
+        parent.id,
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('when the parent email already contains its own id in its references, then duplicates are removed from the resulting reference chain', async () => {
+      const parent = newJmapEmail({
+        messageId: ['<parent@example.com>'],
+        inReplyTo: ['<parent@example.com>'],
+        references: ['<parent@example.com>', '<root@example.com>'],
+      });
+      jmapService.request.mockResolvedValue(jmapResponse({ list: [parent] }));
+
+      const result = await provider.getThreadingHeaders(
+        'user@test.com',
+        parent.id,
+      );
+
+      expect(result?.references).toEqual([
+        '<parent@example.com>',
+        '<root@example.com>',
+      ]);
+    });
+  });
+
+  describe('sendEmail (with threading)', () => {
+    it('when sending a reply, then the threading headers are forwarded to the underlying email creation', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { created: { draft: { id: 'reply-id' } } },
+          { created: { submission: { id: 'sub-id' } } },
+        ),
+      );
+
+      const dto = newSendEmailDto();
+      const threading = {
+        messageId: ['<parent@example.com>'],
+        references: ['<parent@example.com>'],
+      };
+
+      await provider.sendEmail('user@test.com', dto, threading);
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const methodCalls = lastCall[1] as unknown[][];
+      const emailSetArgs = methodCalls[0]![1] as {
+        create: { draft: { inReplyTo: string[]; references: string[] } };
+      };
+      expect(emailSetArgs.create.draft.inReplyTo).toEqual([
+        '<parent@example.com>',
+      ]);
+      expect(emailSetArgs.create.draft.references).toEqual([
+        '<parent@example.com>',
+      ]);
+    });
+  });
+
+  describe('saveToSent (with threading)', () => {
+    it('when archiving a sent reply, then the threading headers are stored alongside the message', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ created: { sent: { id: 'sent-id' } } }),
+      );
+
+      const dto = newSendEmailDto();
+      const threading = {
+        messageId: ['<parent@example.com>'],
+        references: ['<root@example.com>', '<parent@example.com>'],
+      };
+
+      await provider.saveToSent('user@test.com', dto, threading);
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const methodCalls = lastCall[1] as unknown[][];
+      const emailSetArgs = methodCalls[0]![1] as {
+        create: { sent: { inReplyTo: string[]; references: string[] } };
+      };
+      expect(emailSetArgs.create.sent.inReplyTo).toEqual([
+        '<parent@example.com>',
+      ]);
+      expect(emailSetArgs.create.sent.references).toEqual([
+        '<root@example.com>',
+        '<parent@example.com>',
+      ]);
+    });
+  });
+
+  describe('getThread', () => {
+    it('when opening a conversation that contains several messages, then all of them are returned from newest to oldest', async () => {
+      const older = newJmapEmail({ receivedAt: '2025-01-01T10:00:00Z' });
+      const newer = newJmapEmail({ receivedAt: '2025-01-02T10:00:00Z' });
+      const middle = newJmapEmail({ receivedAt: '2025-01-01T15:00:00Z' });
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { list: [{ id: older.id, threadId: 'thread-1' }] },
+          { list: [{ id: 'thread-1', emailIds: [older.id, middle.id, newer.id] }] },
+          { list: [older, middle, newer] },
+        ),
+      );
+
+      const result = await provider.getThread('user@test.com', older.id);
+
+      expect(result.map((e) => e.id)).toEqual([newer.id, middle.id, older.id]);
+    });
+
+    it('when opening a conversation with a single message, then a one-item list is returned', async () => {
+      const only = newJmapEmail();
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { list: [{ id: only.id, threadId: 'thread-1' }] },
+          { list: [{ id: 'thread-1', emailIds: [only.id] }] },
+          { list: [only] },
+        ),
+      );
+
+      const result = await provider.getThread('user@test.com', only.id);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.id).toBe(only.id);
+    });
+
+    it('when opening a conversation by an id that does not exist, then an empty list is returned', async () => {
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse({ list: [] }, { list: [] }, { list: [] }),
+      );
+
+      const result = await provider.getThread('user@test.com', 'missing-id');
+
+      expect(result).toEqual([]);
+    });
+  });
 });
