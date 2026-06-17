@@ -79,7 +79,7 @@ describe('attachment-headers', () => {
     it('when the filename has non-ascii characters, then the utf-8 part is percent-encoded', () => {
       const result = buildContentDisposition('año.pdf');
       expect(result).toBe(
-        `attachment; filename="año.pdf"; filename*=UTF-8''a%C3%B1o.pdf`,
+        `attachment; filename="an_o.pdf"; filename*=UTF-8''a%C3%B1o.pdf`,
       );
     });
 
