@@ -13,6 +13,9 @@ export function sanitizeMimeType(type: string | undefined): string | null {
 }
 
 export function buildContentDisposition(filename: string): string {
-  const encoded = encodeURIComponent(filename);
-  return `attachment; filename="${filename}"; filename*=UTF-8''${encoded}`;
+  const safe = sanitizeFilename(filename).normalize('NFC');
+
+  const fallback = safe.normalize('NFKD').replace(/[^\x20-\x7E]/g, '_');
+
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
 }
