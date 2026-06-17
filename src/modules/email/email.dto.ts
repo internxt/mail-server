@@ -117,6 +117,12 @@ export class SendEmailRequestDto {
 
   @ApiPropertyOptional({ enum: ['INTERNXT', 'EXTERNAL'], example: 'INTERNXT' })
   deliveryMode?: MailDeliveryMode;
+
+  @ApiPropertyOptional({
+    example: 'Ma1f09b…',
+    description: 'JMAP id of the email being replied to (for threading)',
+  })
+  inReplyToEmailId?: string;
 }
 
 export class LookupRecipientKeysRequestDto {

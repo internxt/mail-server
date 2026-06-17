@@ -164,5 +164,24 @@ describe('StalwartSmtpService', () => {
 
       expect(mockClose).toHaveBeenCalled();
     });
+
+    it('when sending a reply, then the message goes out tagged as a reply to the original so the receiver groups them in the same conversation', async () => {
+      mockSendMail.mockResolvedValue({ messageId: 'reply-1' });
+
+      await service.sendRaw({
+        userEmail: 'alice@inxt.me',
+        to: [{ email: 'bob@external.com' }],
+        subject: 'Re: Hello',
+        inReplyTo: '<parent@example.com>',
+        references: ['<root@example.com>', '<parent@example.com>'],
+      });
+
+      expect(mockSendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inReplyTo: '<parent@example.com>',
+          references: ['<root@example.com>', '<parent@example.com>'],
+        }),
+      );
+    });
   });
 });

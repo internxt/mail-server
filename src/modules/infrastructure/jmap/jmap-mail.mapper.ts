@@ -8,6 +8,7 @@ import type {
   SearchEmailFilter,
   SendEmailDto,
   DraftEmailDto,
+  ThreadingHeaders,
 } from '../../email/email.types.js';
 import type {
   Email as JmapEmail,
@@ -174,6 +175,7 @@ export function mapSendDtoToJmapCreate(
   dto: SendEmailDto,
   mailboxId: string,
   from: EmailAddress,
+  threading?: ThreadingHeaders,
 ): JmapEmailCreate {
   const email: JmapEmailCreate = {
     mailboxIds: { [mailboxId]: true },
@@ -187,6 +189,10 @@ export function mapSendDtoToJmapCreate(
   if (dto.bcc) email.bcc = dto.bcc;
   if (dto.attachments?.length)
     email.attachments = mapAttachmentsToJmap(dto.attachments);
+  if (threading) {
+    email.inReplyTo = threading.messageId;
+    email.references = threading.references;
+  }
   applyBodyParts(email, dto.textBody, dto.htmlBody);
 
   return email;

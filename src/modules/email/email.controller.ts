@@ -173,17 +173,18 @@ export class EmailController {
     });
   }
 
-  @Get(':id')
+  @Get('threads/:id')
   @ApiOperation({
-    summary: 'Get email by ID',
+    summary: 'Get email thread by id',
     description:
-      'Returns the full email including body content, headers, and metadata.',
+      'Returns all emails in the same thread as the given id, ordered ' +
+      'chronologically. If the email has no replies, returns a single-element array.',
   })
-  @ApiParam({ name: 'id', description: 'Email ID' })
-  @ApiOkResponse({ type: EmailResponseDto })
+  @ApiParam({ name: 'id', description: 'Any email id in the thread' })
+  @ApiOkResponse({ type: [EmailResponseDto] })
   @ApiNotFoundResponse({ description: 'Email not found' })
-  get(@MailAddress('address') email: string, @Param('id') id: string) {
-    return this.emailService.getEmail(email, id);
+  getThread(@MailAddress('address') email: string, @Param('id') id: string) {
+    return this.emailService.getThread(email, id);
   }
 
   @Post('keys/lookup')
