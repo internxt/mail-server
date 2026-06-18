@@ -123,6 +123,14 @@ export class SendEmailRequestDto {
     description: 'JMAP id of the email being replied to (for threading)',
   })
   inReplyToEmailId?: string;
+
+  @ApiPropertyOptional({
+    example: 'Ma1f09b…',
+    description:
+      'JMAP id of the draft being sent. When present, the draft is destroyed ' +
+      'after the email is sent so it no longer appears in the Drafts folder.',
+  })
+  draftId?: string;
 }
 
 export class LookupRecipientKeysRequestDto {

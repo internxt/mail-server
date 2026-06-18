@@ -305,12 +305,49 @@ export class JmapMailProvider extends MailProvider {
     const emailResult = response
       .methodResponses[0]![1] as JmapSetResponse<JmapEmail>;
 
+    this.logger.debug(
+      `Email/set response: ${JSON.stringify({
+        created: emailResult.created,
+        notCreated: emailResult.notCreated,
+      })}`,
+    );
+
     const createdId = emailResult.created?.['draft']?.id;
     if (!createdId) {
       throw new Error('Failed to create email for sending');
     }
 
+    if (dto.draftId) {
+      await this.destroyDraft(userEmail, accountId, dto.draftId);
+    }
+
     return { id: createdId };
+  }
+
+  private async destroyDraft(
+    userEmail: string,
+    accountId: string,
+    draftId: string,
+  ): Promise<void> {
+    try {
+      const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+        userEmail,
+        [['Email/set', { accountId, destroy: [draftId] }, 'r0']],
+      );
+      const notDestroyed =
+        response.methodResponses[0]![1].notDestroyed?.[draftId];
+      if (notDestroyed) {
+        this.logger.warn(
+          `Could not destroy draft ${draftId} after sending: ${notDestroyed.description ?? notDestroyed.type}`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to destroy draft ${draftId} after sending: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   async saveToSent(
@@ -333,12 +370,25 @@ export class JmapMailProvider extends MailProvider {
 
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
-      [['Email/set', { accountId, create: { sent: emailCreate } }, 'r0']],
+      [
+        [
+          'Email/set',
+          {
+            accountId,
+            create: { sent: emailCreate },
+          },
+          'r0',
+        ],
+      ],
     );
 
     const createdId = response.methodResponses[0]![1].created?.['sent']?.id;
     if (!createdId) {
       throw new Error('Failed to save email to Sent');
+    }
+
+    if (dto.draftId) {
+      await this.destroyDraft(userEmail, accountId, dto.draftId);
     }
 
     return { id: createdId };

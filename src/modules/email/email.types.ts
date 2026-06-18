@@ -94,6 +94,7 @@ export interface SendEmailDto {
   encryption?: EncryptionBlock;
   attachments?: EmailAttachment[];
   inReplyToEmailId?: string;
+  draftId?: string;
 }
 
 export interface ThreadingHeaders {

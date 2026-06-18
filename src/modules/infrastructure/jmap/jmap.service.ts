@@ -165,6 +165,9 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       ([name]) => name === 'error',
     );
     if (errors.length > 0) {
+      this.logger.error(
+        `JMAP method error for ${userEmail}: ${JSON.stringify(errors)}`,
+      );
       throw new JmapError('JMAP method error', errors);
     }
 
