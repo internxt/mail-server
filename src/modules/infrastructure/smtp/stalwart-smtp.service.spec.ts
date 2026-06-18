@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
+import { createMock } from '@golevelup/ts-vitest';
 import { StalwartSmtpService } from './stalwart-smtp.service.js';
 
 const mockSendMail = vi.fn();
@@ -19,7 +19,6 @@ import { createTransport } from 'nodemailer';
 
 describe('StalwartSmtpService', () => {
   let service: StalwartSmtpService;
-  let configService: DeepMocked<ConfigService>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -45,7 +44,6 @@ describe('StalwartSmtpService', () => {
       .compile();
 
     service = module.get(StalwartSmtpService);
-    configService = module.get(ConfigService);
   });
 
   describe('sendRaw', () => {

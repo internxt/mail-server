@@ -279,7 +279,32 @@ export class EmailService {
   }
 
   saveDraft(userEmail: string, dto: DraftEmailDto): Promise<{ id: string }> {
-    return this.mail.saveDraft(userEmail, dto);
+    return this.mail.saveDraft(userEmail, this.packDraftEnvelope(dto));
+  }
+
+  updateDraft(
+    userEmail: string,
+    draftId: string,
+    dto: DraftEmailDto,
+  ): Promise<{ newDraftId: string }> {
+    return this.mail.updateDraft(
+      userEmail,
+      draftId,
+      this.packDraftEnvelope(dto),
+    );
+  }
+
+  private packDraftEnvelope(dto: DraftEmailDto): DraftEmailDto {
+    if (!dto.encryption) return dto;
+    return {
+      ...dto,
+      textBody: packEnvelope(dto.encryption),
+      htmlBody: undefined,
+    };
+  }
+
+  getDraft(userEmail: string, id: string): Promise<Email | null> {
+    return this.mail.getDraft(userEmail, id);
   }
 
   moveEmail(userEmail: string, id: string, target: MailboxType): Promise<void> {

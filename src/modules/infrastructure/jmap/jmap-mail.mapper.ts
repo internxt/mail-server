@@ -70,6 +70,7 @@ export function mapJmapEmailToSummary(e: JmapEmail): EmailSummary {
     preview: e.preview ?? '',
     isRead: !!e.keywords?.['$seen'],
     isFlagged: !!e.keywords?.['$flagged'],
+    isDraft: !!e.keywords?.['$draft'],
     hasAttachment: !!e.hasAttachment,
     size: e.size,
   };

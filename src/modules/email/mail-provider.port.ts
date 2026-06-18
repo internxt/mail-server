@@ -45,6 +45,12 @@ export abstract class MailProvider {
     userEmail: string,
     dto: DraftEmailDto,
   ): Promise<{ id: string }>;
+  abstract updateDraft(
+    userEmail: string,
+    draftId: string,
+    dto: DraftEmailDto,
+  ): Promise<{ newDraftId: string }>;
+  abstract getDraft(userEmail: string, id: string): Promise<Email | null>;
   abstract moveEmail(
     userEmail: string,
     id: string,

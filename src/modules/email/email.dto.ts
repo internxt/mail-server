@@ -174,6 +174,15 @@ export class DraftEmailRequestDto {
   @ApiPropertyOptional({ example: '<p>Still working on this…</p>' })
   htmlBody?: string;
 
+  @ApiPropertyOptional({
+    type: EncryptionBlockDto,
+    description:
+      'When present, the draft body is stored encrypted. Only the sender can ' +
+      'decrypt it later, so wrappedKeys / attachmentWrappedKeys should contain ' +
+      "a single entry built from the sender's own public key.",
+  })
+  encryption?: EncryptionBlockDto;
+
   @ApiPropertyOptional({ type: [AttachmentRefDto] })
   attachments?: AttachmentRefDto[];
 }
@@ -275,6 +284,9 @@ export class EmailSummaryResponseDto {
   isFlagged!: boolean;
 
   @ApiProperty({ example: false })
+  isDraft!: boolean;
+
+  @ApiProperty({ example: false })
   hasAttachment!: boolean;
 
   @ApiProperty({ example: 4096, description: 'Size in bytes' })
@@ -302,6 +314,11 @@ export class EmailAttachmentDto {
 
   @ApiProperty({ example: 4096, description: 'Size in bytes' })
   size!: number;
+}
+
+export class UpdateDraftResponseDto {
+  @ApiProperty({ example: 'f3a1b2c4-…' })
+  newDraftId!: string;
 }
 
 export class EmailResponseDto extends EmailSummaryResponseDto {

@@ -473,6 +473,71 @@ export class JmapMailProvider extends MailProvider {
     return { id: createdId };
   }
 
+  async updateDraft(
+    userEmail: string,
+    draftId: string,
+    dto: DraftEmailDto,
+  ): Promise<{ newDraftId: string }> {
+    const [accountId, identity, draftsMailboxId] = await Promise.all([
+      this.jmap.getPrimaryAccountId(userEmail),
+      this.resolveIdentity(userEmail),
+      this.resolveMailboxId(userEmail, 'drafts'),
+    ]);
+
+    const emailCreate = mapDraftDtoToJmapCreate(dto, draftsMailboxId, {
+      name: identity.name,
+      email: identity.email,
+    });
+
+    const existingDraft = await this.getDraft(userEmail, draftId);
+
+    if (!existingDraft) {
+      throw new Error('Draft not found');
+    }
+
+    const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
+      [
+        [
+          'Email/set',
+          {
+            accountId,
+            destroy: [draftId],
+            create: { draft: emailCreate },
+          },
+          'r0',
+        ],
+      ],
+    );
+
+    const result = response.methodResponses[0]![1];
+
+    if (result.notDestroyed?.[draftId]) {
+      throw new Error(
+        `Failed to update draft: ${result.notDestroyed[draftId].description}`,
+      );
+    }
+
+    if (result.notCreated?.['draft']) {
+      throw new Error(
+        `Failed to update draft: ${result.notCreated['draft'].description}`,
+      );
+    }
+
+    const createdId = result.created?.['draft']?.id;
+    if (!createdId) {
+      throw new Error('Failed to recreate draft after destroy');
+    }
+
+    return { newDraftId: createdId };
+  }
+
+  async getDraft(userEmail: string, id: string): Promise<Email | null> {
+    const email = await this.getEmail(userEmail, id);
+    if (!email?.isDraft) return null;
+    return email;
+  }
+
   async moveEmail(
     userEmail: string,
     id: string,

@@ -577,6 +577,67 @@ describe('EmailService', () => {
       expect(provider.saveDraft).toHaveBeenCalledWith(userEmail, dto);
       expect(result).toEqual({ id: 'draft-id' });
     });
+
+    it('when DTO has encryption block, then serializes it into textBody and clears htmlBody', async () => {
+      const encryption = newEncryptionBlock();
+      const dto = newDraftEmailDto({
+        encryption,
+        htmlBody: '<p>original</p>',
+      });
+      provider.saveDraft.mockResolvedValue({ id: 'enc-draft-id' });
+
+      await service.saveDraft(userEmail, dto);
+
+      const expectedBundle = Buffer.from(JSON.stringify(encryption)).toString(
+        'base64',
+      );
+      expect(provider.saveDraft).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({
+          textBody: `INTERNXT-ENCRYPTED-EMAIL-v1\n${expectedBundle}`,
+          htmlBody: undefined,
+        }),
+      );
+    });
+  });
+
+  describe('updateDraft', () => {
+    it('when called, then delegates to provider', async () => {
+      const dto = newDraftEmailDto();
+      provider.updateDraft.mockResolvedValue({ newDraftId: 'new-draft-id' });
+
+      const result = await service.updateDraft(userEmail, 'draft-id', dto);
+
+      expect(provider.updateDraft).toHaveBeenCalledWith(
+        userEmail,
+        'draft-id',
+        dto,
+      );
+      expect(result).toEqual({ newDraftId: 'new-draft-id' });
+    });
+
+    it('when DTO has encryption block, then serializes it into textBody and clears htmlBody', async () => {
+      const encryption = newEncryptionBlock();
+      const dto = newDraftEmailDto({
+        encryption,
+        htmlBody: '<p>original</p>',
+      });
+      provider.updateDraft.mockResolvedValue({ newDraftId: 'new-enc-draft' });
+
+      await service.updateDraft(userEmail, 'draft-id', dto);
+
+      const expectedBundle = Buffer.from(JSON.stringify(encryption)).toString(
+        'base64',
+      );
+      expect(provider.updateDraft).toHaveBeenCalledWith(
+        userEmail,
+        'draft-id',
+        expect.objectContaining({
+          textBody: `INTERNXT-ENCRYPTED-EMAIL-v1\n${expectedBundle}`,
+          htmlBody: undefined,
+        }),
+      );
+    });
   });
 
   describe('moveEmail', () => {

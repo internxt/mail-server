@@ -39,6 +39,7 @@ export interface EmailSummary {
   preview: string;
   isRead: boolean;
   isFlagged: boolean;
+  isDraft: boolean;
   hasAttachment: boolean;
   size: number;
   encryption?: EncryptedSummaryFields | null;
@@ -101,12 +102,14 @@ export interface ThreadingHeaders {
 }
 
 export interface DraftEmailDto {
+  draftId?: string;
   to?: EmailAddress[];
   cc?: EmailAddress[];
   bcc?: EmailAddress[];
   subject?: string;
   textBody?: string;
   htmlBody?: string;
+  encryption?: EncryptionBlock;
   attachments?: EmailAttachment[];
 }
 
