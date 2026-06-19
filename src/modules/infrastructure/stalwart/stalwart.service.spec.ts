@@ -69,6 +69,8 @@ function setResp(
   patch: {
     created?: Record<string, unknown> | null;
     notCreated?: Record<string, unknown> | null;
+    updated?: Record<string, unknown> | null;
+    notUpdated?: Record<string, unknown> | null;
     destroyed?: string[] | null;
     notDestroyed?: Record<string, unknown> | null;
   },
@@ -82,9 +84,9 @@ function setResp(
       newState: 's',
       created: patch.created ?? null,
       notCreated: patch.notCreated ?? null,
-      updated: null,
+      updated: patch.updated ?? null,
       destroyed: patch.destroyed ?? null,
-      notUpdated: null,
+      notUpdated: patch.notUpdated ?? null,
       notDestroyed: patch.notDestroyed ?? null,
     },
     callId,
@@ -327,6 +329,116 @@ describe('StalwartService', () => {
       await expect(
         service.deleteAccountByEmail('alice@test.com'),
       ).rejects.toThrow(StalwartApiError);
+    });
+  });
+
+  describe('suspendAccountByEmail', () => {
+    const accountBatch = () =>
+      jmapResponse([
+        queryResp('x:Account/query', ['acc1']),
+        getResp('x:Account/get', [
+          {
+            id: 'acc1',
+            '@type': 'User',
+            name: 'alice',
+            emailAddress: 'alice@test.com',
+            domainId: 'dom1',
+          },
+        ]),
+      ]);
+
+    it('when account exists, then disables receive and send permissions', async () => {
+      mockRequest
+        .mockResolvedValueOnce(DOMAIN_BATCH_HIT)
+        .mockResolvedValueOnce(accountBatch())
+        .mockResolvedValueOnce(
+          jmapResponse([setResp('x:Account/set', { updated: { acc1: null } })]),
+        );
+
+      await expect(
+        service.suspendAccountByEmail('alice@test.com'),
+      ).resolves.toBeUndefined();
+
+      const setCall = bodyOf(2).methodCalls[0]!;
+      expect(setCall[0]).toBe('x:Account/set');
+      expect(setCall[1]).toEqual({
+        update: {
+          acc1: {
+            'disabledPermissions/email-receive': true,
+            'disabledPermissions/email-send': true,
+          },
+        },
+      });
+    });
+
+    it('when account not found, then throws StalwartApiError', async () => {
+      mockRequest
+        .mockResolvedValueOnce(DOMAIN_BATCH_HIT)
+        .mockResolvedValueOnce(
+          jmapResponse([
+            queryResp('x:Account/query', []),
+            getResp('x:Account/get', []),
+          ]),
+        );
+
+      await expect(
+        service.suspendAccountByEmail('ghost@test.com'),
+      ).rejects.toThrow(StalwartApiError);
+    });
+
+    it('when JMAP reports notUpdated, then throws StalwartApiError', async () => {
+      mockRequest
+        .mockResolvedValueOnce(DOMAIN_BATCH_HIT)
+        .mockResolvedValueOnce(accountBatch())
+        .mockResolvedValueOnce(
+          jmapResponse([
+            setResp('x:Account/set', {
+              notUpdated: { acc1: { type: 'forbidden' } },
+            }),
+          ]),
+        );
+
+      await expect(
+        service.suspendAccountByEmail('alice@test.com'),
+      ).rejects.toThrow(StalwartApiError);
+    });
+  });
+
+  describe('reactivateAccountByEmail', () => {
+    it('when account exists, then removes the disabled receive and send permissions', async () => {
+      mockRequest
+        .mockResolvedValueOnce(DOMAIN_BATCH_HIT)
+        .mockResolvedValueOnce(
+          jmapResponse([
+            queryResp('x:Account/query', ['acc1']),
+            getResp('x:Account/get', [
+              {
+                id: 'acc1',
+                '@type': 'User',
+                name: 'alice',
+                emailAddress: 'alice@test.com',
+                domainId: 'dom1',
+              },
+            ]),
+          ]),
+        )
+        .mockResolvedValueOnce(
+          jmapResponse([setResp('x:Account/set', { updated: { acc1: null } })]),
+        );
+
+      await expect(
+        service.reactivateAccountByEmail('alice@test.com'),
+      ).resolves.toBeUndefined();
+
+      const setCall = bodyOf(2).methodCalls[0]!;
+      expect(setCall[1]).toEqual({
+        update: {
+          acc1: {
+            'disabledPermissions/email-receive': null,
+            'disabledPermissions/email-send': null,
+          },
+        },
+      });
     });
   });
 

@@ -33,6 +33,8 @@ const TYPE_USER = 'User';
 const TYPE_PASSWORD = 'Password';
 const CREATE_REF = 'new1';
 
+const SUSPEND_PERMISSIONS = ['email-receive', 'email-send'] as const;
+
 export interface StalwartAccountCreate {
   name: string;
   domainId: string;
@@ -184,6 +186,39 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     if (failed) {
       throw new StalwartApiError(
         `Failed to delete account '${email}': ${failed.type} ${failed.description}`,
+        failed,
+      );
+    }
+  }
+
+  async suspendAccountByEmail(email: string): Promise<void> {
+    await this.setSuspended(email, true);
+  }
+
+  async reactivateAccountByEmail(email: string): Promise<void> {
+    await this.setSuspended(email, false);
+  }
+
+  private async setSuspended(email: string, suspended: boolean): Promise<void> {
+    const account = await this.getAccountByEmail(email);
+    if (!account) {
+      throw new StalwartApiError(`Account '${email}' not found`, null);
+    }
+
+    const patch: Record<string, true | null> = {};
+    for (const permission of SUSPEND_PERMISSIONS) {
+      patch[`disabledPermissions/${permission}`] = suspended ? true : null;
+    }
+
+    const response = await this.jmapCall<JmapSetResponse<StalwartAccount>>([
+      [JMAP_METHOD.ACCOUNT_SET, { update: { [account.id]: patch } }, 's1'],
+    ]);
+    const set = firstResponse(response);
+
+    const failed = set.notUpdated?.[account.id];
+    if (failed) {
+      throw new StalwartApiError(
+        `Failed to ${suspended ? 'suspend' : 'reactivate'} account '${email}': ${failed.type} ${failed.description}`,
         failed,
       );
     }

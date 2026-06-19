@@ -42,4 +42,24 @@ describe('GatewayController', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('suspendAccount', () => {
+    it('when called, then delegates to the account service', async () => {
+      const uuid = randomUUID();
+
+      await controller.suspendAccount(uuid);
+
+      expect(accountService.suspendAccount).toHaveBeenCalledWith(uuid);
+    });
+  });
+
+  describe('reactivateAccount', () => {
+    it('when called, then delegates to the account service', async () => {
+      const uuid = randomUUID();
+
+      await controller.reactivateAccount(uuid);
+
+      expect(accountService.reactivateAccount).toHaveBeenCalledWith(uuid);
+    });
+  });
 });
