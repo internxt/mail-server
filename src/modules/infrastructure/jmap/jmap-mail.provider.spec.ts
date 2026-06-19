@@ -761,12 +761,30 @@ describe('JmapMailProvider', () => {
 
   describe('getThread', () => {
     it('when opening a conversation that contains several messages, then all of them are returned from newest to oldest', async () => {
-      const older = newJmapEmail({ receivedAt: '2025-01-01T10:00:00Z' });
-      const newer = newJmapEmail({ receivedAt: '2025-01-02T10:00:00Z' });
-      const middle = newJmapEmail({ receivedAt: '2025-01-01T15:00:00Z' });
+      const inboxId = 'inbox-mailbox';
+      const older = newJmapEmail({
+        receivedAt: '2025-01-01T10:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
+      const newer = newJmapEmail({
+        receivedAt: '2025-01-02T10:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
+      const middle = newJmapEmail({
+        receivedAt: '2025-01-01T15:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { list: [{ id: older.id, threadId: 'thread-1' }] },
+          {
+            list: [
+              {
+                id: older.id,
+                threadId: 'thread-1',
+                mailboxIds: { [inboxId]: true },
+              },
+            ],
+          },
           {
             list: [
               { id: 'thread-1', emailIds: [older.id, middle.id, newer.id] },
@@ -782,10 +800,19 @@ describe('JmapMailProvider', () => {
     });
 
     it('when opening a conversation with a single message, then a one-item list is returned', async () => {
-      const only = newJmapEmail();
+      const inboxId = 'inbox-mailbox';
+      const only = newJmapEmail({ mailboxIds: { [inboxId]: true } });
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { list: [{ id: only.id, threadId: 'thread-1' }] },
+          {
+            list: [
+              {
+                id: only.id,
+                threadId: 'thread-1',
+                mailboxIds: { [inboxId]: true },
+              },
+            ],
+          },
           { list: [{ id: 'thread-1', emailIds: [only.id] }] },
           { list: [only] },
         ),
@@ -795,6 +822,42 @@ describe('JmapMailProvider', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]!.id).toBe(only.id);
+    });
+
+    it('when the thread contains copies of the same email in other mailboxes, then only those sharing a mailbox with the requested email are returned', async () => {
+      const inboxId = 'inbox-mailbox';
+      const sentId = 'sent-mailbox';
+      const inboxCopy = newJmapEmail({
+        receivedAt: '2025-01-01T10:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
+      const sentCopy = newJmapEmail({
+        receivedAt: '2025-01-01T10:00:00Z',
+        mailboxIds: { [sentId]: true },
+      });
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          {
+            list: [
+              {
+                id: inboxCopy.id,
+                threadId: 'thread-1',
+                mailboxIds: { [inboxId]: true },
+              },
+            ],
+          },
+          {
+            list: [
+              { id: 'thread-1', emailIds: [inboxCopy.id, sentCopy.id] },
+            ],
+          },
+          { list: [inboxCopy, sentCopy] },
+        ),
+      );
+
+      const result = await provider.getThread('user@test.com', inboxCopy.id);
+
+      expect(result.map((e) => e.id)).toEqual([inboxCopy.id]);
     });
 
     it('when opening a conversation by an id that does not exist, then an empty list is returned', async () => {
