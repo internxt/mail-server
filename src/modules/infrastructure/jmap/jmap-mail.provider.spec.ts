@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, test, expect, beforeEach } from 'vitest';
 import { Readable } from 'node:stream';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
@@ -297,6 +297,47 @@ describe('JmapMailProvider', () => {
       await expect(provider.saveDraft('user@test.com', dto)).rejects.toThrow(
         'Failed to save draft',
       );
+    });
+  });
+
+  describe('Discarding Draft', () => {
+    test('When discarding a draft, then the draft is removed from the user mailbox', async () => {
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ destroyed: ['draft-1'] }),
+      );
+
+      await provider.discardDraft('user@test.com', 'draft-1');
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const [methodName, methodArgs] = lastCall[1][0]!;
+      expect(methodName).toBe('Email/set');
+      expect(methodArgs['destroy']).toEqual(['draft-1']);
+    });
+
+    test('When the draft cannot be removed, then the user gets an error describing the reason', async () => {
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({
+          notDestroyed: {
+            'draft-1': { type: 'forbidden', description: 'cannot destroy' },
+          },
+        }),
+      );
+
+      await expect(
+        provider.discardDraft('user@test.com', 'draft-1'),
+      ).rejects.toThrow('Failed to discard draft draft-1: cannot destroy');
+    });
+
+    test('When the failure has no description, then the user still gets an error identifying the failure type', async () => {
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({
+          notDestroyed: { 'draft-1': { type: 'notFound' } },
+        }),
+      );
+
+      await expect(
+        provider.discardDraft('user@test.com', 'draft-1'),
+      ).rejects.toThrow('Failed to discard draft draft-1: notFound');
     });
   });
 
@@ -847,9 +888,7 @@ describe('JmapMailProvider', () => {
             ],
           },
           {
-            list: [
-              { id: 'thread-1', emailIds: [inboxCopy.id, sentCopy.id] },
-            ],
+            list: [{ id: 'thread-1', emailIds: [inboxCopy.id, sentCopy.id] }],
           },
           { list: [inboxCopy, sentCopy] },
         ),

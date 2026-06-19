@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { Test } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -254,9 +254,9 @@ describe('EmailService', () => {
     it('when opening a conversation by an id that does not exist, then the user is told it was not found', async () => {
       provider.getThread.mockResolvedValue([]);
 
-      await expect(
-        service.getThread(userEmail, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getThread(userEmail, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('when a conversation contains end-to-end encrypted messages, then the encrypted previews and wrapped keys are attached for the client to decrypt', async () => {
@@ -349,7 +349,11 @@ describe('EmailService', () => {
 
       await service.sendEmail(userEmail, dto);
 
-      expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto, undefined);
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        dto,
+        undefined,
+      );
     });
 
     it('when replying to an existing email, then the reply is delivered into the same conversation', async () => {
@@ -367,7 +371,11 @@ describe('EmailService', () => {
         userEmail,
         'parent-id',
       );
-      expect(provider.sendEmail).toHaveBeenCalledWith(userEmail, dto, threading);
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        dto,
+        threading,
+      );
     });
 
     it('when replying to an email that no longer exists, then the user is told the original was not found', async () => {
@@ -521,10 +529,7 @@ describe('EmailService', () => {
       expect(smtp.sendRaw).toHaveBeenCalledWith(
         expect.objectContaining({
           inReplyTo: '<parent@example.com>',
-          references: [
-            '<grandparent@example.com>',
-            '<parent@example.com>',
-          ],
+          references: ['<grandparent@example.com>', '<parent@example.com>'],
         }),
       );
       expect(provider.saveToSent).toHaveBeenCalledWith(
@@ -637,6 +642,27 @@ describe('EmailService', () => {
           htmlBody: undefined,
         }),
       );
+    });
+  });
+
+  describe('Discard Draft', () => {
+    test('When the user discards an existing draft, then it is removed from their mailbox', async () => {
+      const draft = newEmail({ isDraft: true });
+      provider.getDraft.mockResolvedValue(draft);
+      provider.discardDraft.mockResolvedValue(undefined);
+
+      await service.discardDraft(userEmail, draft.id);
+
+      expect(provider.discardDraft).toHaveBeenCalledWith(userEmail, draft.id);
+    });
+
+    test('When the user tries to discard a draft that does not exist, then they are told it was not found', async () => {
+      provider.getDraft.mockResolvedValue(null);
+
+      await expect(
+        service.discardDraft(userEmail, 'missing-draft'),
+      ).rejects.toThrow(NotFoundException);
+      expect(provider.discardDraft).not.toHaveBeenCalled();
     });
   });
 
