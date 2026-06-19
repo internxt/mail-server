@@ -627,6 +627,98 @@ describe('AccountService', () => {
     });
   });
 
+  describe('suspendAccount', () => {
+    it('when account is active, then suspends every principal and the account', async () => {
+      const addr1 = newMailAddressAttributes({ isDefault: true });
+      const addr2 = newMailAddressAttributes({ isDefault: false });
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Active,
+          addresses: [addr1, addr2],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.suspendAccount(account.userId);
+
+      expect(provider.suspendAccount).toHaveBeenCalledWith(
+        addr1.providerExternalId,
+      );
+      expect(provider.suspendAccount).toHaveBeenCalledWith(
+        addr2.providerExternalId,
+      );
+      expect(accounts.suspend).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account is already suspended, then is a no-op', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Suspended,
+          suspendedAt: new Date(),
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.suspendAccount(account.userId);
+
+      expect(provider.suspendAccount).not.toHaveBeenCalled();
+      expect(accounts.suspend).not.toHaveBeenCalled();
+    });
+
+    it('when account does not exist, then throws NotFoundException', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.suspendAccount('unknown')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('reactivateAccount', () => {
+    it('when account is suspended, then reactivates every principal and the account', async () => {
+      const addr1 = newMailAddressAttributes({ isDefault: true });
+      const addr2 = newMailAddressAttributes({ isDefault: false });
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Suspended,
+          suspendedAt: new Date(),
+          addresses: [addr1, addr2],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.reactivateAccount(account.userId);
+
+      expect(provider.reactivateAccount).toHaveBeenCalledWith(
+        addr1.providerExternalId,
+      );
+      expect(provider.reactivateAccount).toHaveBeenCalledWith(
+        addr2.providerExternalId,
+      );
+      expect(accounts.reactivate).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account is already active, then is a no-op', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ status: MailAccountState.Active }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.reactivateAccount(account.userId);
+
+      expect(provider.reactivateAccount).not.toHaveBeenCalled();
+      expect(accounts.reactivate).not.toHaveBeenCalled();
+    });
+
+    it('when account does not exist, then throws NotFoundException', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.reactivateAccount('unknown')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('addAddress', () => {
     it('when all conditions met, then creates principal and links provider', async () => {
       const accountAttrs = newMailAccountAttributes();

@@ -141,4 +141,30 @@ describe('AccountRepository', () => {
       );
     });
   });
+
+  describe('suspend', () => {
+    it('when given an id, then sets status suspended and suspendedAt', async () => {
+      await repository.suspend('acc-1');
+
+      expect(accountModel.update).toHaveBeenCalledWith(
+        {
+          status: MailAccountState.Suspended,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          suspendedAt: expect.any(Date),
+        },
+        { where: { id: 'acc-1' } },
+      );
+    });
+  });
+
+  describe('reactivate', () => {
+    it('when given an id, then sets status active and clears suspendedAt', async () => {
+      await repository.reactivate('acc-1');
+
+      expect(accountModel.update).toHaveBeenCalledWith(
+        { status: MailAccountState.Active, suspendedAt: null },
+        { where: { id: 'acc-1' } },
+      );
+    });
+  });
 });

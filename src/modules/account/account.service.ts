@@ -463,4 +463,39 @@ export class AccountService {
     }
     return account;
   }
+
+  async suspendAccount(userId: string): Promise<void> {
+    const account = await this.getAccountOrFail(userId);
+    if (account.isSuspended) {
+      this.logger.log(`Account for user '${userId}' is already suspended`);
+      return;
+    }
+
+    await Promise.all(
+      account.addresses.map((a) =>
+        this.provider.suspendAccount(a.providerExternalId),
+      ),
+    );
+
+    await this.accounts.suspend(account.id);
+    this.logger.log(`Suspended account for user '${userId}'`);
+    //TODO: add audit table to keep track of this event
+  }
+
+  async reactivateAccount(userId: string): Promise<void> {
+    const account = await this.getAccountOrFail(userId);
+    if (!account.isSuspended) {
+      this.logger.log(`Account for user '${userId}' is already active`);
+      return;
+    }
+
+    await Promise.all(
+      account.addresses.map((a) =>
+        this.provider.reactivateAccount(a.providerExternalId),
+      ),
+    );
+
+    await this.accounts.reactivate(account.id);
+    this.logger.log(`Reactivated account for user '${userId}'`);
+  }
 }
