@@ -307,6 +307,14 @@ export class EmailService {
     return this.mail.getDraft(userEmail, id);
   }
 
+  async discardDraft(userEmail: string, id: string): Promise<void> {
+    const draft = await this.mail.getDraft(userEmail, id);
+    if (!draft) {
+      throw new NotFoundException(`Draft ${id} not found`);
+    }
+    await this.mail.discardDraft(userEmail, id);
+  }
+
   moveEmail(userEmail: string, id: string, target: MailboxType): Promise<void> {
     return this.mail.moveEmail(userEmail, id, target);
   }

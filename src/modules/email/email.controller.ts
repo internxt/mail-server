@@ -282,6 +282,21 @@ export class EmailController {
     return this.emailService.getDraft(email, id);
   }
 
+  @Delete('drafts/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Discard a draft',
+    description:
+      'Permanently discards a draft by ID. Returns 404 if the email exists ' +
+      'but is not a draft.',
+  })
+  @ApiParam({ name: 'id', description: 'Draft ID' })
+  @ApiNoContentResponse({ description: 'Draft discarded successfully' })
+  @ApiNotFoundResponse({ description: 'Draft not found' })
+  discardDraft(@MailAddress('address') email: string, @Param('id') id: string) {
+    return this.emailService.discardDraft(email, id);
+  }
+
   @Post('attachment')
   @ApiOperation({
     summary: 'Upload an attachment',

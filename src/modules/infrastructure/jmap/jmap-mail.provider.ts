@@ -626,6 +626,20 @@ export class JmapMailProvider extends MailProvider {
     return { newDraftId: createdId };
   }
 
+  async discardDraft(userEmail: string, id: string): Promise<void> {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
+      [['Email/set', { accountId, destroy: [id] }, 'r0']],
+    );
+    const notDestroyed = response.methodResponses[0]![1].notDestroyed?.[id];
+    if (notDestroyed) {
+      throw new Error(
+        `Failed to discard draft ${id}: ${notDestroyed.description ?? notDestroyed.type}`,
+      );
+    }
+  }
+
   async getDraft(userEmail: string, id: string): Promise<Email | null> {
     const email = await this.getEmail(userEmail, id);
     if (!email?.isDraft) return null;
