@@ -643,6 +643,14 @@ describe('EmailService', () => {
         }),
       );
     });
+
+    test('When the user tries to update a draft that does not exist, then they are told it was not found', async () => {
+      provider.updateDraft.mockResolvedValue(null);
+
+      await expect(
+        service.updateDraft(userEmail, 'missing-draft', newDraftEmailDto()),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('Discard Draft', () => {

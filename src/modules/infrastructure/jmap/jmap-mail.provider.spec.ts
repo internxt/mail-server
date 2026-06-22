@@ -300,6 +300,29 @@ describe('JmapMailProvider', () => {
     });
   });
 
+  describe('Update Draft', () => {
+    test('When trying to update a draft that does not exist, then null is returned', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(jmapResponse({ list: [] }));
+
+      const result = await provider.updateDraft(
+        'user@test.com',
+        'missing-draft',
+        newDraftEmailDto(),
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('Discarding Draft', () => {
     test('When discarding a draft, then the draft is removed from the user mailbox', async () => {
       jmapService.request.mockResolvedValueOnce(
