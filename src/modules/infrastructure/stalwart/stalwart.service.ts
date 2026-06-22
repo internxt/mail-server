@@ -205,10 +205,10 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
       throw new StalwartApiError(`Account '${email}' not found`, null);
     }
 
-    const patch: Record<string, true | null> = {};
-    for (const permission of SUSPEND_PERMISSIONS) {
-      patch[`disabledPermissions/${permission}`] = suspended ? true : null;
-    }
+    const value = suspended ? true : null;
+    const patch = Object.fromEntries(
+      SUSPEND_PERMISSIONS.map((p) => [`disabledPermissions/${p}`, value]),
+    );
 
     const response = await this.jmapCall<JmapSetResponse<StalwartAccount>>([
       [JMAP_METHOD.ACCOUNT_SET, { update: { [account.id]: patch } }, 's1'],
