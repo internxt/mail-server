@@ -270,10 +270,10 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [draftsMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse(
-          { created: { draft: { id: savedDraft.id } } },
-          { list: [savedDraft] },
-        ),
+        jmapResponse({ created: { draft: { id: savedDraft.id } } }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [savedDraft] }),
       );
 
       const dto = newDraftEmailDto();
@@ -293,7 +293,7 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [draftsMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse({ created: null }, { list: [] }),
+        jmapResponse({ created: null }),
       );
 
       const dto = newDraftEmailDto();
@@ -314,11 +314,9 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [draftsMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse(
-          { created: { draft: { id: 'draft-id' } } },
-          { list: [] },
-        ),
+        jmapResponse({ created: { draft: { id: 'draft-id' } } }),
       );
+      jmapService.request.mockResolvedValueOnce(jmapResponse({ list: [] }));
 
       await expect(
         provider.saveDraft('user@test.com', newDraftEmailDto()),
@@ -364,10 +362,10 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [existingDraft] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse(
-          { created: { draft: { id: updatedDraft.id } } },
-          { list: [updatedDraft] },
-        ),
+        jmapResponse({ created: { draft: { id: updatedDraft.id } } }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [updatedDraft] }),
       );
 
       const result = await provider.updateDraft(
