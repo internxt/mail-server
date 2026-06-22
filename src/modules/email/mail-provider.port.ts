@@ -41,15 +41,12 @@ export abstract class MailProvider {
     parentId: string,
   ): Promise<ThreadingHeaders | null>;
   abstract getThread(userEmail: string, emailId: string): Promise<Email[]>;
-  abstract saveDraft(
-    userEmail: string,
-    dto: DraftEmailDto,
-  ): Promise<{ id: string }>;
+  abstract saveDraft(userEmail: string, dto: DraftEmailDto): Promise<Email>;
   abstract updateDraft(
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
-  ): Promise<{ newDraftId: string } | null>;
+  ): Promise<Email | null>;
   abstract getDraft(userEmail: string, id: string): Promise<Email | null>;
   abstract discardDraft(userEmail: string, id: string): Promise<void>;
   abstract moveEmail(

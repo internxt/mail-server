@@ -527,10 +527,7 @@ export class JmapMailProvider extends MailProvider {
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
   }
 
-  async saveDraft(
-    userEmail: string,
-    dto: DraftEmailDto,
-  ): Promise<{ id: string }> {
+  async saveDraft(userEmail: string, dto: DraftEmailDto): Promise<Email> {
     const [accountId, identity, draftsMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
       this.resolveIdentity(userEmail),
@@ -542,33 +539,29 @@ export class JmapMailProvider extends MailProvider {
       email: identity.email,
     });
 
-    const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+    const setResponse = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
-      [
-        [
-          'Email/set',
-          {
-            accountId,
-            create: { draft: emailCreate },
-          },
-          'r0',
-        ],
-      ],
+      [['Email/set', { accountId, create: { draft: emailCreate } }, 'r0']],
     );
 
-    const createdId = response.methodResponses[0]![1].created?.['draft']?.id;
+    const createdId = setResponse.methodResponses[0]![1].created?.['draft']?.id;
     if (!createdId) {
       throw new Error('Failed to save draft');
     }
 
-    return { id: createdId };
+    const savedDraft = await this.getEmail(userEmail, createdId);
+    if (!savedDraft) {
+      throw new Error('Failed to fetch the created draft');
+    }
+
+    return savedDraft;
   }
 
   async updateDraft(
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
-  ): Promise<{ newDraftId: string } | null> {
+  ): Promise<Email | null> {
     const [accountId, identity, draftsMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
       this.resolveIdentity(userEmail),
@@ -586,7 +579,7 @@ export class JmapMailProvider extends MailProvider {
       return null;
     }
 
-    const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+    const setResponse = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
       [
         [
@@ -601,26 +594,31 @@ export class JmapMailProvider extends MailProvider {
       ],
     );
 
-    const result = response.methodResponses[0]![1];
+    const setResult = setResponse.methodResponses[0]![1];
 
-    if (result.notDestroyed?.[draftId]) {
+    if (setResult.notDestroyed?.[draftId]) {
       throw new Error(
-        `Failed to update draft: ${result.notDestroyed[draftId].description}`,
+        `Failed to update draft: ${setResult.notDestroyed[draftId].description}`,
       );
     }
 
-    if (result.notCreated?.['draft']) {
+    if (setResult.notCreated?.['draft']) {
       throw new Error(
-        `Failed to update draft: ${result.notCreated['draft'].description}`,
+        `Failed to update draft: ${setResult.notCreated['draft'].description}`,
       );
     }
 
-    const createdId = result.created?.['draft']?.id;
+    const createdId = setResult.created?.['draft']?.id;
     if (!createdId) {
       throw new Error('Failed to recreate draft after destroy');
     }
 
-    return { newDraftId: createdId };
+    const updatedDraft = await this.getEmail(userEmail, createdId);
+    if (!updatedDraft) {
+      throw new Error('Failed to fetch the updated draft');
+    }
+
+    return updatedDraft;
   }
 
   async discardDraft(userEmail: string, id: string): Promise<void> {

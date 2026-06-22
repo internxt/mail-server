@@ -278,7 +278,7 @@ export class EmailService {
     );
   }
 
-  saveDraft(userEmail: string, dto: DraftEmailDto): Promise<{ id: string }> {
+  saveDraft(userEmail: string, dto: DraftEmailDto): Promise<Email> {
     return this.mail.saveDraft(userEmail, this.packDraftEnvelope(dto));
   }
 
@@ -286,7 +286,7 @@ export class EmailService {
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
-  ): Promise<{ newDraftId: string }> {
+  ): Promise<Email> {
     const result = await this.mail.updateDraft(
       userEmail,
       draftId,

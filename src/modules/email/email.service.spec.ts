@@ -575,12 +575,13 @@ describe('EmailService', () => {
   describe('saveDraft', () => {
     it('when called, then delegates to provider', async () => {
       const dto = newDraftEmailDto();
-      provider.saveDraft.mockResolvedValue({ id: 'draft-id' });
+      const savedDraft = newEmail({ isDraft: true });
+      provider.saveDraft.mockResolvedValue(savedDraft);
 
       const result = await service.saveDraft(userEmail, dto);
 
       expect(provider.saveDraft).toHaveBeenCalledWith(userEmail, dto);
-      expect(result).toEqual({ id: 'draft-id' });
+      expect(result).toBe(savedDraft);
     });
 
     it('when DTO has encryption block, then serializes it into textBody and clears htmlBody', async () => {
@@ -589,7 +590,7 @@ describe('EmailService', () => {
         encryption,
         htmlBody: '<p>original</p>',
       });
-      provider.saveDraft.mockResolvedValue({ id: 'enc-draft-id' });
+      provider.saveDraft.mockResolvedValue(newEmail({ isDraft: true }));
 
       await service.saveDraft(userEmail, dto);
 
@@ -609,7 +610,8 @@ describe('EmailService', () => {
   describe('updateDraft', () => {
     it('when called, then delegates to provider', async () => {
       const dto = newDraftEmailDto();
-      provider.updateDraft.mockResolvedValue({ newDraftId: 'new-draft-id' });
+      const updatedDraft = newEmail({ isDraft: true });
+      provider.updateDraft.mockResolvedValue(updatedDraft);
 
       const result = await service.updateDraft(userEmail, 'draft-id', dto);
 
@@ -618,7 +620,7 @@ describe('EmailService', () => {
         'draft-id',
         dto,
       );
-      expect(result).toEqual({ newDraftId: 'new-draft-id' });
+      expect(result).toBe(updatedDraft);
     });
 
     it('when DTO has encryption block, then serializes it into textBody and clears htmlBody', async () => {
@@ -627,7 +629,7 @@ describe('EmailService', () => {
         encryption,
         htmlBody: '<p>original</p>',
       });
-      provider.updateDraft.mockResolvedValue({ newDraftId: 'new-enc-draft' });
+      provider.updateDraft.mockResolvedValue(newEmail({ isDraft: true }));
 
       await service.updateDraft(userEmail, 'draft-id', dto);
 

@@ -45,7 +45,6 @@ import {
   SendEmailRequestDto,
   UpdateEmailRequestDto,
   UploadAttachmentResponseDto,
-  UpdateDraftResponseDto,
 } from './email.dto.js';
 import type { MailboxType } from './email.types.js';
 import { AccountService } from '../account/account.service.js';
@@ -239,7 +238,7 @@ export class EmailController {
   })
   @ApiBody({ type: DraftEmailRequestDto })
   @ApiOkResponse({
-    type: EmailCreatedResponseDto,
+    type: EmailResponseDto,
     description: 'Draft saved successfully',
   })
   saveDraft(
@@ -259,9 +258,10 @@ export class EmailController {
   })
   @ApiBody({ type: DraftEmailRequestDto })
   @ApiOkResponse({
-    type: UpdateDraftResponseDto,
-    description: 'Draft saved successfully',
+    type: EmailResponseDto,
+    description: 'Draft updated successfully',
   })
+  @ApiNotFoundResponse({ description: 'Draft not found' })
   updateDraft(
     @MailAddress('address') email: string,
     @Param('id') draftId: string,

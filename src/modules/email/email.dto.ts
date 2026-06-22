@@ -324,11 +324,6 @@ export class EmailAttachmentDto {
   size!: number;
 }
 
-export class UpdateDraftResponseDto {
-  @ApiProperty({ example: 'f3a1b2c4-…' })
-  newDraftId!: string;
-}
-
 export class EmailResponseDto extends EmailSummaryResponseDto {
   @ApiProperty({ type: [EmailAddressDto] })
   cc!: EmailAddressDto[];

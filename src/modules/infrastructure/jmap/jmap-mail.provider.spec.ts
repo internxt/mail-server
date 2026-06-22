@@ -258,9 +258,10 @@ describe('JmapMailProvider', () => {
   });
 
   describe('saveDraft', () => {
-    it('When draft is saved, then it returns the created id', async () => {
+    test('When the draft is saved, then the full draft email is returned to the caller', async () => {
       const draftsMailbox = newJmapMailbox({ role: 'drafts' });
       const identity = newJmapIdentity();
+      const savedDraft = newJmapEmail({ keywords: { $draft: true } });
 
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [identity] }),
@@ -269,16 +270,19 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [draftsMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapResponse({ created: { draft: { id: 'draft-id' } } }),
+        jmapMultiResponse(
+          { created: { draft: { id: savedDraft.id } } },
+          { list: [savedDraft] },
+        ),
       );
 
       const dto = newDraftEmailDto();
       const result = await provider.saveDraft('user@test.com', dto);
 
-      expect(result).toEqual({ id: 'draft-id' });
+      expect(result.id).toBe(savedDraft.id);
     });
 
-    it('When draft creation fails, then it throws', async () => {
+    test('When the server does not confirm the draft creation, then the caller is told the save failed', async () => {
       const draftsMailbox = newJmapMailbox({ role: 'drafts' });
       const identity = newJmapIdentity();
 
@@ -289,7 +293,7 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [draftsMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapResponse({ created: null }),
+        jmapMultiResponse({ created: null }, { list: [] }),
       );
 
       const dto = newDraftEmailDto();
@@ -297,6 +301,28 @@ describe('JmapMailProvider', () => {
       await expect(provider.saveDraft('user@test.com', dto)).rejects.toThrow(
         'Failed to save draft',
       );
+    });
+
+    test('When the server confirms the creation but the fetch returns no email, then the caller is told the fetch failed', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { created: { draft: { id: 'draft-id' } } },
+          { list: [] },
+        ),
+      );
+
+      await expect(
+        provider.saveDraft('user@test.com', newDraftEmailDto()),
+      ).rejects.toThrow('Failed to fetch the created draft');
     });
   });
 
@@ -320,6 +346,38 @@ describe('JmapMailProvider', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    test('When the draft is updated, then the updated email is returned to the user', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+      const existingDraft = newJmapEmail({ keywords: { $draft: true } });
+      const updatedDraft = newJmapEmail({ keywords: { $draft: true } });
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [existingDraft] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { created: { draft: { id: updatedDraft.id } } },
+          { list: [updatedDraft] },
+        ),
+      );
+
+      const result = await provider.updateDraft(
+        'user@test.com',
+        existingDraft.id,
+        newDraftEmailDto(),
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(updatedDraft.id);
     });
   });
 
