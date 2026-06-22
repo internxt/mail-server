@@ -282,16 +282,20 @@ export class EmailService {
     return this.mail.saveDraft(userEmail, this.packDraftEnvelope(dto));
   }
 
-  updateDraft(
+  async updateDraft(
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
   ): Promise<{ newDraftId: string }> {
-    return this.mail.updateDraft(
+    const result = await this.mail.updateDraft(
       userEmail,
       draftId,
       this.packDraftEnvelope(dto),
     );
+    if (!result) {
+      throw new NotFoundException(`Draft ${draftId} not found`);
+    }
+    return result;
   }
 
   private packDraftEnvelope(dto: DraftEmailDto): DraftEmailDto {

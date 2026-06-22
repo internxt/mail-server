@@ -266,7 +266,6 @@ export class JmapMailProvider extends MailProvider {
     threading?: ThreadingHeaders,
   ): Promise<{ id: string }> {
     if (dto.draftId) {
-      console.log('THERE IS A DRAFT ID');
       return this.submitExistingDraft(userEmail, dto.draftId);
     }
 
@@ -329,8 +328,6 @@ export class JmapMailProvider extends MailProvider {
         this.resolveMailboxId(userEmail, 'drafts'),
         this.resolveMailboxId(userEmail, 'sent'),
       ]);
-
-    console.log('SUBMIT EXISTING DRAFT', draftId);
 
     await this.jmap.request(userEmail, [
       [
@@ -571,7 +568,7 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
-  ): Promise<{ newDraftId: string }> {
+  ): Promise<{ newDraftId: string } | null> {
     const [accountId, identity, draftsMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
       this.resolveIdentity(userEmail),
@@ -586,7 +583,7 @@ export class JmapMailProvider extends MailProvider {
     const existingDraft = await this.getDraft(userEmail, draftId);
 
     if (!existingDraft) {
-      throw new Error('Draft not found');
+      return null;
     }
 
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(

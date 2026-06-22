@@ -49,7 +49,7 @@ export abstract class MailProvider {
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
-  ): Promise<{ newDraftId: string }>;
+  ): Promise<{ newDraftId: string } | null>;
   abstract getDraft(userEmail: string, id: string): Promise<Email | null>;
   abstract discardDraft(userEmail: string, id: string): Promise<void>;
   abstract moveEmail(
