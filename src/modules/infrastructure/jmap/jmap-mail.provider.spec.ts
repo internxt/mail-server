@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, test, expect, beforeEach } from 'vitest';
 import { Readable } from 'node:stream';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
@@ -258,9 +258,10 @@ describe('JmapMailProvider', () => {
   });
 
   describe('saveDraft', () => {
-    it('When draft is saved, then it returns the created id', async () => {
+    test('When the draft is saved, then the full draft email is returned to the caller', async () => {
       const draftsMailbox = newJmapMailbox({ role: 'drafts' });
       const identity = newJmapIdentity();
+      const savedDraft = newJmapEmail({ keywords: { $draft: true } });
 
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [identity] }),
@@ -269,16 +270,19 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [draftsMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapResponse({ created: { draft: { id: 'draft-id' } } }),
+        jmapResponse({ created: { draft: { id: savedDraft.id } } }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [savedDraft] }),
       );
 
       const dto = newDraftEmailDto();
       const result = await provider.saveDraft('user@test.com', dto);
 
-      expect(result).toEqual({ id: 'draft-id' });
+      expect(result.id).toBe(savedDraft.id);
     });
 
-    it('When draft creation fails, then it throws', async () => {
+    test('When the server does not confirm the draft creation, then the caller is told the save failed', async () => {
       const draftsMailbox = newJmapMailbox({ role: 'drafts' });
       const identity = newJmapIdentity();
 
@@ -297,6 +301,122 @@ describe('JmapMailProvider', () => {
       await expect(provider.saveDraft('user@test.com', dto)).rejects.toThrow(
         'Failed to save draft',
       );
+    });
+
+    test('When the server confirms the creation but the fetch returns no email, then the caller is told the fetch failed', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ created: { draft: { id: 'draft-id' } } }),
+      );
+      jmapService.request.mockResolvedValueOnce(jmapResponse({ list: [] }));
+
+      await expect(
+        provider.saveDraft('user@test.com', newDraftEmailDto()),
+      ).rejects.toThrow('Failed to fetch the created draft');
+    });
+  });
+
+  describe('Update Draft', () => {
+    test('When trying to update a draft that does not exist, then null is returned', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(jmapResponse({ list: [] }));
+
+      const result = await provider.updateDraft(
+        'user@test.com',
+        'missing-draft',
+        newDraftEmailDto(),
+      );
+
+      expect(result).toBeNull();
+    });
+
+    test('When the draft is updated, then the updated email is returned to the user', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+      const existingDraft = newJmapEmail({ keywords: { $draft: true } });
+      const updatedDraft = newJmapEmail({ keywords: { $draft: true } });
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [existingDraft] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ created: { draft: { id: updatedDraft.id } } }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [updatedDraft] }),
+      );
+
+      const result = await provider.updateDraft(
+        'user@test.com',
+        existingDraft.id,
+        newDraftEmailDto(),
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(updatedDraft.id);
+    });
+  });
+
+  describe('Discarding Draft', () => {
+    test('When discarding a draft, then the draft is removed from the user mailbox', async () => {
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ destroyed: ['draft-1'] }),
+      );
+
+      await provider.discardDraft('user@test.com', 'draft-1');
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const [methodName, methodArgs] = lastCall[1][0]!;
+      expect(methodName).toBe('Email/set');
+      expect(methodArgs['destroy']).toEqual(['draft-1']);
+    });
+
+    test('When the draft cannot be removed, then the user gets an error describing the reason', async () => {
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({
+          notDestroyed: {
+            'draft-1': { type: 'forbidden', description: 'cannot destroy' },
+          },
+        }),
+      );
+
+      await expect(
+        provider.discardDraft('user@test.com', 'draft-1'),
+      ).rejects.toThrow('Failed to discard draft draft-1: cannot destroy');
+    });
+
+    test('When the failure has no description, then the user still gets an error identifying the failure type', async () => {
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({
+          notDestroyed: { 'draft-1': { type: 'notFound' } },
+        }),
+      );
+
+      await expect(
+        provider.discardDraft('user@test.com', 'draft-1'),
+      ).rejects.toThrow('Failed to discard draft draft-1: notFound');
     });
   });
 
@@ -761,12 +881,30 @@ describe('JmapMailProvider', () => {
 
   describe('getThread', () => {
     it('when opening a conversation that contains several messages, then all of them are returned from newest to oldest', async () => {
-      const older = newJmapEmail({ receivedAt: '2025-01-01T10:00:00Z' });
-      const newer = newJmapEmail({ receivedAt: '2025-01-02T10:00:00Z' });
-      const middle = newJmapEmail({ receivedAt: '2025-01-01T15:00:00Z' });
+      const inboxId = 'inbox-mailbox';
+      const older = newJmapEmail({
+        receivedAt: '2025-01-01T10:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
+      const newer = newJmapEmail({
+        receivedAt: '2025-01-02T10:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
+      const middle = newJmapEmail({
+        receivedAt: '2025-01-01T15:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { list: [{ id: older.id, threadId: 'thread-1' }] },
+          {
+            list: [
+              {
+                id: older.id,
+                threadId: 'thread-1',
+                mailboxIds: { [inboxId]: true },
+              },
+            ],
+          },
           {
             list: [
               { id: 'thread-1', emailIds: [older.id, middle.id, newer.id] },
@@ -782,10 +920,19 @@ describe('JmapMailProvider', () => {
     });
 
     it('when opening a conversation with a single message, then a one-item list is returned', async () => {
-      const only = newJmapEmail();
+      const inboxId = 'inbox-mailbox';
+      const only = newJmapEmail({ mailboxIds: { [inboxId]: true } });
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { list: [{ id: only.id, threadId: 'thread-1' }] },
+          {
+            list: [
+              {
+                id: only.id,
+                threadId: 'thread-1',
+                mailboxIds: { [inboxId]: true },
+              },
+            ],
+          },
           { list: [{ id: 'thread-1', emailIds: [only.id] }] },
           { list: [only] },
         ),
@@ -795,6 +942,40 @@ describe('JmapMailProvider', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]!.id).toBe(only.id);
+    });
+
+    it('when the thread contains copies of the same email in other mailboxes, then only those sharing a mailbox with the requested email are returned', async () => {
+      const inboxId = 'inbox-mailbox';
+      const sentId = 'sent-mailbox';
+      const inboxCopy = newJmapEmail({
+        receivedAt: '2025-01-01T10:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
+      const sentCopy = newJmapEmail({
+        receivedAt: '2025-01-01T10:00:00Z',
+        mailboxIds: { [sentId]: true },
+      });
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          {
+            list: [
+              {
+                id: inboxCopy.id,
+                threadId: 'thread-1',
+                mailboxIds: { [inboxId]: true },
+              },
+            ],
+          },
+          {
+            list: [{ id: 'thread-1', emailIds: [inboxCopy.id, sentCopy.id] }],
+          },
+          { list: [inboxCopy, sentCopy] },
+        ),
+      );
+
+      const result = await provider.getThread('user@test.com', inboxCopy.id);
+
+      expect(result.map((e) => e.id)).toEqual([inboxCopy.id]);
     });
 
     it('when opening a conversation by an id that does not exist, then an empty list is returned', async () => {

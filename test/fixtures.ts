@@ -127,6 +127,7 @@ export function newEmailSummary(attrs?: Partial<EmailSummary>): EmailSummary {
     hasAttachment: random.bool(),
     size: random.natural({ min: 100, max: 100_000 }),
     ...attrs,
+    isDraft: attrs?.isDraft ?? false,
   };
 }
 

@@ -232,11 +232,13 @@ export class EmailController {
   @ApiOperation({
     summary: 'Save a draft',
     description:
-      'Creates a new draft email. All fields are optional so partial drafts can be saved.',
+      'Creates a new draft email. All fields are optional so partial drafts can be saved. ' +
+      "Pass `encryption` to store the body encrypted only with the sender's key — the sender " +
+      'is the only reader and can decrypt it on retrieval.',
   })
   @ApiBody({ type: DraftEmailRequestDto })
   @ApiOkResponse({
-    type: EmailCreatedResponseDto,
+    type: EmailResponseDto,
     description: 'Draft saved successfully',
   })
   saveDraft(
@@ -244,6 +246,55 @@ export class EmailController {
     @Body() dto: DraftEmailRequestDto,
   ) {
     return this.emailService.saveDraft(email, dto);
+  }
+
+  @Patch('drafts/:id')
+  @ApiOperation({
+    summary: 'Update a draft',
+    description:
+      'Updates a draft email. All fields are optional so partial drafts can be saved. ' +
+      'Pass `encryption` with a fresh envelope to replace the stored body — the previous ' +
+      'envelope is dropped together with the destroyed draft.',
+  })
+  @ApiBody({ type: DraftEmailRequestDto })
+  @ApiOkResponse({
+    type: EmailResponseDto,
+    description: 'Draft updated successfully',
+  })
+  @ApiNotFoundResponse({ description: 'Draft not found' })
+  updateDraft(
+    @MailAddress('address') email: string,
+    @Param('id') draftId: string,
+    @Body() dto: DraftEmailRequestDto,
+  ) {
+    return this.emailService.updateDraft(email, draftId, dto);
+  }
+
+  @Get('drafts/:id')
+  @ApiOperation({
+    summary: 'Get a draft',
+    description: 'Returns a draft',
+  })
+  @ApiParam({ name: 'id', description: 'Draft ID' })
+  @ApiOkResponse({ type: EmailResponseDto })
+  @ApiNotFoundResponse({ description: 'Draft not found' })
+  getDraft(@MailAddress('address') email: string, @Param('id') id: string) {
+    return this.emailService.getDraft(email, id);
+  }
+
+  @Delete('drafts/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Discard a draft',
+    description:
+      'Permanently discards a draft by ID. Returns 404 if the email exists ' +
+      'but is not a draft.',
+  })
+  @ApiParam({ name: 'id', description: 'Draft ID' })
+  @ApiNoContentResponse({ description: 'Draft discarded successfully' })
+  @ApiNotFoundResponse({ description: 'Draft not found' })
+  discardDraft(@MailAddress('address') email: string, @Param('id') id: string) {
+    return this.emailService.discardDraft(email, id);
   }
 
   @Post('attachment')

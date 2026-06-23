@@ -265,6 +265,10 @@ export class JmapMailProvider extends MailProvider {
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
   ): Promise<{ id: string }> {
+    if (dto.draftId) {
+      return this.submitExistingDraft(userEmail, dto.draftId);
+    }
+
     const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
       this.resolveIdentity(userEmail),
@@ -313,6 +317,70 @@ export class JmapMailProvider extends MailProvider {
     return { id: createdId };
   }
 
+  private async submitExistingDraft(
+    userEmail: string,
+    draftId: string,
+  ): Promise<{ id: string }> {
+    const [accountId, identity, draftsMailboxId, sentMailboxId] =
+      await Promise.all([
+        this.jmap.getPrimaryAccountId(userEmail),
+        this.resolveIdentity(userEmail),
+        this.resolveMailboxId(userEmail, 'drafts'),
+        this.resolveMailboxId(userEmail, 'sent'),
+      ]);
+
+    await this.jmap.request(userEmail, [
+      [
+        'EmailSubmission/set',
+        {
+          accountId,
+          create: {
+            submission: {
+              identityId: identity.id,
+              emailId: draftId,
+            },
+          },
+          onSuccessUpdateEmail: {
+            '#submission': {
+              [`mailboxIds/${draftsMailboxId}`]: null,
+              [`mailboxIds/${sentMailboxId}`]: true,
+              'keywords/$draft': null,
+            },
+          },
+        },
+        'r0',
+      ],
+    ]);
+
+    return { id: draftId };
+  }
+
+  private async destroyDraft(
+    userEmail: string,
+    accountId: string,
+    draftId: string,
+  ): Promise<void> {
+    try {
+      const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+        userEmail,
+        [['Email/set', { accountId, destroy: [draftId] }, 'r0']],
+      );
+      const notDestroyed =
+        response.methodResponses[0]![1].notDestroyed?.[draftId];
+      if (notDestroyed) {
+        this.logger.warn(
+          `Could not destroy draft ${draftId} after sending: ${notDestroyed.description ?? notDestroyed.type}`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to destroy draft ${draftId} after sending: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
   async saveToSent(
     userEmail: string,
     dto: SendEmailDto,
@@ -333,12 +401,25 @@ export class JmapMailProvider extends MailProvider {
 
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
-      [['Email/set', { accountId, create: { sent: emailCreate } }, 'r0']],
+      [
+        [
+          'Email/set',
+          {
+            accountId,
+            create: { sent: emailCreate },
+          },
+          'r0',
+        ],
+      ],
     );
 
     const createdId = response.methodResponses[0]![1].created?.['sent']?.id;
     if (!createdId) {
       throw new Error('Failed to save email to Sent');
+    }
+
+    if (dto.draftId) {
+      await this.destroyDraft(userEmail, accountId, dto.draftId);
     }
 
     return { id: createdId };
@@ -393,7 +474,11 @@ export class JmapMailProvider extends MailProvider {
     const response = await this.jmap.request(userEmail, [
       [
         'Email/get',
-        { accountId, ids: [emailId], properties: ['id', 'threadId'] },
+        {
+          accountId,
+          ids: [emailId],
+          properties: ['id', 'threadId', 'mailboxIds'],
+        },
         'r0',
       ],
       [
@@ -427,19 +512,22 @@ export class JmapMailProvider extends MailProvider {
 
     const firstLookup = response
       .methodResponses[0]![1] as JmapGetResponse<JmapEmail>;
-    if (firstLookup.list.length === 0) return [];
+    const requestedEmail = firstLookup.list[0];
+    if (!requestedEmail) return [];
+
+    const requestedMailboxIds = new Set(Object.keys(requestedEmail.mailboxIds));
 
     const emailsResult = response
       .methodResponses[2]![1] as JmapGetResponse<JmapEmail>;
     return emailsResult.list
+      .filter((e) =>
+        Object.keys(e.mailboxIds).some((id) => requestedMailboxIds.has(id)),
+      )
       .map(mapJmapEmailToDetail)
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
   }
 
-  async saveDraft(
-    userEmail: string,
-    dto: DraftEmailDto,
-  ): Promise<{ id: string }> {
+  async saveDraft(userEmail: string, dto: DraftEmailDto): Promise<Email> {
     const [accountId, identity, draftsMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
       this.resolveIdentity(userEmail),
@@ -451,13 +539,54 @@ export class JmapMailProvider extends MailProvider {
       email: identity.email,
     });
 
-    const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+    const setResponse = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
+      [['Email/set', { accountId, create: { draft: emailCreate } }, 'r0']],
+    );
+
+    const createdId = setResponse.methodResponses[0]![1].created?.['draft']?.id;
+    if (!createdId) {
+      throw new Error('Failed to save draft');
+    }
+
+    const savedDraft = await this.getEmail(userEmail, createdId);
+    if (!savedDraft) {
+      throw new Error('Failed to fetch the created draft');
+    }
+
+    return savedDraft;
+  }
+
+  async updateDraft(
+    userEmail: string,
+    draftId: string,
+    dto: DraftEmailDto,
+  ): Promise<Email | null> {
+    const [accountId, identity, draftsMailboxId] = await Promise.all([
+      this.jmap.getPrimaryAccountId(userEmail),
+      this.resolveIdentity(userEmail),
+      this.resolveMailboxId(userEmail, 'drafts'),
+    ]);
+
+    const emailCreate = mapDraftDtoToJmapCreate(dto, draftsMailboxId, {
+      name: identity.name,
+      email: identity.email,
+    });
+
+    const existingDraft = await this.getDraft(userEmail, draftId);
+
+    if (!existingDraft) {
+      return null;
+    }
+
+    const setResponse = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
       [
         [
           'Email/set',
           {
             accountId,
+            destroy: [draftId],
             create: { draft: emailCreate },
           },
           'r0',
@@ -465,12 +594,51 @@ export class JmapMailProvider extends MailProvider {
       ],
     );
 
-    const createdId = response.methodResponses[0]![1].created?.['draft']?.id;
-    if (!createdId) {
-      throw new Error('Failed to save draft');
+    const setResult = setResponse.methodResponses[0]![1];
+
+    if (setResult.notDestroyed?.[draftId]) {
+      throw new Error(
+        `Failed to update draft: ${setResult.notDestroyed[draftId].description}`,
+      );
     }
 
-    return { id: createdId };
+    if (setResult.notCreated?.['draft']) {
+      throw new Error(
+        `Failed to update draft: ${setResult.notCreated['draft'].description}`,
+      );
+    }
+
+    const createdId = setResult.created?.['draft']?.id;
+    if (!createdId) {
+      throw new Error('Failed to recreate draft after destroy');
+    }
+
+    const updatedDraft = await this.getEmail(userEmail, createdId);
+    if (!updatedDraft) {
+      throw new Error('Failed to fetch the updated draft');
+    }
+
+    return updatedDraft;
+  }
+
+  async discardDraft(userEmail: string, id: string): Promise<void> {
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
+      [['Email/set', { accountId, destroy: [id] }, 'r0']],
+    );
+    const notDestroyed = response.methodResponses[0]![1].notDestroyed?.[id];
+    if (notDestroyed) {
+      throw new Error(
+        `Failed to discard draft ${id}: ${notDestroyed.description ?? notDestroyed.type}`,
+      );
+    }
+  }
+
+  async getDraft(userEmail: string, id: string): Promise<Email | null> {
+    const email = await this.getEmail(userEmail, id);
+    if (!email?.isDraft) return null;
+    return email;
   }
 
   async moveEmail(

@@ -278,8 +278,45 @@ export class EmailService {
     );
   }
 
-  saveDraft(userEmail: string, dto: DraftEmailDto): Promise<{ id: string }> {
-    return this.mail.saveDraft(userEmail, dto);
+  saveDraft(userEmail: string, dto: DraftEmailDto): Promise<Email> {
+    return this.mail.saveDraft(userEmail, this.packDraftEnvelope(dto));
+  }
+
+  async updateDraft(
+    userEmail: string,
+    draftId: string,
+    dto: DraftEmailDto,
+  ): Promise<Email> {
+    const result = await this.mail.updateDraft(
+      userEmail,
+      draftId,
+      this.packDraftEnvelope(dto),
+    );
+    if (!result) {
+      throw new NotFoundException(`Draft ${draftId} not found`);
+    }
+    return result;
+  }
+
+  private packDraftEnvelope(dto: DraftEmailDto): DraftEmailDto {
+    if (!dto.encryption) return dto;
+    return {
+      ...dto,
+      textBody: packEnvelope(dto.encryption),
+      htmlBody: undefined,
+    };
+  }
+
+  getDraft(userEmail: string, id: string): Promise<Email | null> {
+    return this.mail.getDraft(userEmail, id);
+  }
+
+  async discardDraft(userEmail: string, id: string): Promise<void> {
+    const draft = await this.mail.getDraft(userEmail, id);
+    if (!draft) {
+      throw new NotFoundException(`Draft ${id} not found`);
+    }
+    await this.mail.discardDraft(userEmail, id);
   }
 
   moveEmail(userEmail: string, id: string, target: MailboxType): Promise<void> {

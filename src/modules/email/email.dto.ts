@@ -123,6 +123,14 @@ export class SendEmailRequestDto {
     description: 'JMAP id of the email being replied to (for threading)',
   })
   inReplyToEmailId?: string;
+
+  @ApiPropertyOptional({
+    example: 'Ma1f09b…',
+    description:
+      'JMAP id of the draft being sent. When present, the draft is destroyed ' +
+      'after the email is sent so it no longer appears in the Drafts folder.',
+  })
+  draftId?: string;
 }
 
 export class LookupRecipientKeysRequestDto {
@@ -173,6 +181,15 @@ export class DraftEmailRequestDto {
 
   @ApiPropertyOptional({ example: '<p>Still working on this…</p>' })
   htmlBody?: string;
+
+  @ApiPropertyOptional({
+    type: EncryptionBlockDto,
+    description:
+      'When present, the draft body is stored encrypted. Only the sender can ' +
+      'decrypt it later, so wrappedKeys / attachmentWrappedKeys should contain ' +
+      "a single entry built from the sender's own public key.",
+  })
+  encryption?: EncryptionBlockDto;
 
   @ApiPropertyOptional({ type: [AttachmentRefDto] })
   attachments?: AttachmentRefDto[];
@@ -273,6 +290,9 @@ export class EmailSummaryResponseDto {
 
   @ApiProperty({ example: false })
   isFlagged!: boolean;
+
+  @ApiProperty({ example: false })
+  isDraft!: boolean;
 
   @ApiProperty({ example: false })
   hasAttachment!: boolean;
