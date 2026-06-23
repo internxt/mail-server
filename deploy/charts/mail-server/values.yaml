@@ -34,8 +34,8 @@ database:
 stalwart:
   jmapUrl: http://stalwart:8080
   adminUrl: http://stalwart:8080
-  adminUser: mail-server
-  masterUser: master
+  smtpHost: stalwart
+  smtpPort: 465
 
 mta:
   hooksUsername: stalwart
