@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AccountService } from '../account/account.service.js';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { MailUsageService } from '../usage/mail-usage.service.js';
 import { MailProvider } from './mail-provider.port.js';
 import type {
   DraftEmailDto,
@@ -62,7 +62,7 @@ export class EmailService {
     private readonly accountService: AccountService,
     private readonly smtp: StalwartSmtpService,
     private readonly configService: ConfigService,
-    private readonly bridge: BridgeClient,
+    private readonly usage: MailUsageService,
   ) {}
 
   getMailboxes(userEmail: string): Promise<Mailbox[]> {
@@ -351,11 +351,11 @@ export class EmailService {
     }
 
     try {
-      await this.bridge.deleteBucketEntry(
-        context.userUuid,
-        context.networkBucketId,
+      await this.usage.releaseStoredMessage({
+        userUuid: context.userUuid,
+        bucketId: context.networkBucketId,
         entryKey,
-      );
+      });
     } catch (error) {
       this.logger.warn(
         `Failed to release quota entry '${entryKey}' for '${userEmail}': ${(error as Error).message}`,
