@@ -58,7 +58,7 @@ export class StalwartEventsService {
     }
 
     await this.usage.trackStoredMessage({
-      mailAccountId: context.mailAccountId,
+      mailAddressId: context.mailAddressId,
       userUuid: context.userUuid,
       bucketId: context.networkBucketId,
       entryKey,

@@ -706,7 +706,7 @@ describe('EmailService', () => {
     it('when the message is permanently destroyed, then releases the quota entry on the address bucket', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });
@@ -726,7 +726,7 @@ describe('EmailService', () => {
     it('when the destroyed address has no network bucket, then no quota entry is released', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: null,
       });
@@ -739,7 +739,7 @@ describe('EmailService', () => {
     it('when releasing the quota entry fails, then the deletion still succeeds', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });

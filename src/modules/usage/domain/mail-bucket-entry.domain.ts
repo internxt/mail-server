@@ -1,6 +1,6 @@
 export interface MailBucketEntryAttributes {
   id: string;
-  mailAccountId: string;
+  mailAddressId: string;
   entryKey: string;
   bridgeEntryId: string;
   size: number;
@@ -10,7 +10,7 @@ export interface MailBucketEntryAttributes {
 
 export class MailBucketEntry {
   readonly id!: string;
-  readonly mailAccountId!: string;
+  readonly mailAddressId!: string;
   readonly entryKey!: string;
   readonly bridgeEntryId!: string;
   readonly size!: number;

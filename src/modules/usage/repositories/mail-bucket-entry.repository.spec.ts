@@ -29,7 +29,7 @@ describe('MailBucketEntryRepository', () => {
       const now = new Date();
       entryModel.create.mockResolvedValue({
         id: 'row-1',
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         entryKey: '42:7',
         bridgeEntryId: 'entry-1',
         size: '240',
@@ -38,14 +38,14 @@ describe('MailBucketEntryRepository', () => {
       } as unknown as MailBucketEntryModel);
 
       const result = await repository.create({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         entryKey: '42:7',
         bridgeEntryId: 'entry-1',
         size: 240,
       });
 
       expect(entryModel.create).toHaveBeenCalledWith({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         entryKey: '42:7',
         bridgeEntryId: 'entry-1',
         size: 240,
@@ -61,7 +61,7 @@ describe('MailBucketEntryRepository', () => {
 
       await expect(
         repository.create({
-          mailAccountId: 'account-1',
+          mailAddressId: 'address-1',
           entryKey: '42:7',
           bridgeEntryId: 'entry-1',
           size: 240,
@@ -74,7 +74,7 @@ describe('MailBucketEntryRepository', () => {
 
       await expect(
         repository.create({
-          mailAccountId: 'account-1',
+          mailAddressId: 'address-1',
           entryKey: '42:7',
           bridgeEntryId: 'entry-1',
           size: 240,
@@ -88,7 +88,7 @@ describe('MailBucketEntryRepository', () => {
       const now = new Date();
       entryModel.findOne.mockResolvedValue({
         id: 'row-1',
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         entryKey: '42:7',
         bridgeEntryId: 'entry-1',
         size: '240',

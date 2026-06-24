@@ -6,7 +6,7 @@ import {
 } from './repositories/mail-bucket-entry.repository.js';
 
 export interface TrackStoredMessageParams {
-  mailAccountId: string;
+  mailAddressId: string;
   userUuid: string;
   bucketId: string;
   entryKey: string;
@@ -29,7 +29,7 @@ export class MailUsageService {
   ) {}
 
   async trackStoredMessage(params: TrackStoredMessageParams): Promise<void> {
-    const { mailAccountId, userUuid, bucketId, entryKey, size } = params;
+    const { mailAddressId, userUuid, bucketId, entryKey, size } = params;
 
     const existing = await this.entries.findByEntryKey(entryKey);
     if (existing) {
@@ -42,7 +42,7 @@ export class MailUsageService {
 
     try {
       await this.entries.create({
-        mailAccountId,
+        mailAddressId,
         entryKey,
         bridgeEntryId,
         size,

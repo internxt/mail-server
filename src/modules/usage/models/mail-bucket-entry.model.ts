@@ -10,7 +10,7 @@ import {
   Table,
   Unique,
 } from 'sequelize-typescript';
-import { MailAccountModel } from '../../account/models/mail-account.model.js';
+import { MailAddressModel } from '../../account/models/mail-address.model.js';
 
 @Table({
   underscored: true,
@@ -24,9 +24,9 @@ export class MailBucketEntryModel extends Model {
   declare id: string;
 
   @AllowNull(false)
-  @ForeignKey(() => MailAccountModel)
+  @ForeignKey(() => MailAddressModel)
   @Column(DataType.UUID)
-  declare mailAccountId: string;
+  declare mailAddressId: string;
 
   @AllowNull(false)
   @Unique
@@ -41,6 +41,6 @@ export class MailBucketEntryModel extends Model {
   @Column(DataType.BIGINT)
   declare size: string;
 
-  @BelongsTo(() => MailAccountModel)
-  declare account: MailAccountModel;
+  @BelongsTo(() => MailAddressModel)
+  declare address: MailAddressModel;
 }

@@ -8,7 +8,7 @@ import {
 import { MailBucketEntryModel } from '../models/mail-bucket-entry.model.js';
 
 export interface CreateMailBucketEntryParams {
-  mailAccountId: string;
+  mailAddressId: string;
   entryKey: string;
   bridgeEntryId: string;
   size: number;
@@ -52,7 +52,7 @@ export class MailBucketEntryRepository {
   private toDomain(model: MailBucketEntryModel): MailBucketEntry {
     const attrs: MailBucketEntryAttributes = {
       id: model.id,
-      mailAccountId: model.mailAccountId,
+      mailAddressId: model.mailAddressId,
       entryKey: model.entryKey,
       bridgeEntryId: model.bridgeEntryId,
       size: Number(model.size),

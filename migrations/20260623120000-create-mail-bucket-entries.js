@@ -12,10 +12,10 @@ module.exports = {
         primaryKey: true,
         allowNull: false,
       },
-      mail_account_id: {
+      mail_address_id: {
         type: Sequelize.UUID,
         allowNull: false,
-        references: { model: 'mail_accounts', key: 'id' },
+        references: { model: 'mail_addresses', key: 'id' },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',
       },
@@ -44,7 +44,7 @@ module.exports = {
       },
     });
 
-    await queryInterface.addIndex(TABLE_NAME, ['mail_account_id']);
+    await queryInterface.addIndex(TABLE_NAME, ['mail_address_id']);
   },
 
   async down(queryInterface) {

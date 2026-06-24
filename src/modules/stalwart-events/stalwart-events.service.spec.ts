@@ -51,7 +51,7 @@ describe('StalwartEventsService', () => {
   describe('handleBatch', () => {
     it('when an ingest event resolves to a bucket, then tracks the stored message keyed by accountId:documentId', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });
@@ -62,7 +62,7 @@ describe('StalwartEventsService', () => {
         accounts.findBucketContextByProviderInternalId,
       ).toHaveBeenCalledWith('42');
       expect(usage.trackStoredMessage).toHaveBeenCalledWith({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         bucketId: 'bucket-1',
         entryKey: '42:7',
@@ -105,7 +105,7 @@ describe('StalwartEventsService', () => {
 
     it('when the resolved address has no network bucket, then no message is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: null,
       });
@@ -117,7 +117,7 @@ describe('StalwartEventsService', () => {
 
     it('when the batch has several events, then each ingest event is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });

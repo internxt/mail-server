@@ -12,7 +12,7 @@ import { MailUsageService } from './mail-usage.service.js';
 function entry(overrides: Partial<MailBucketEntry> = {}): MailBucketEntry {
   return MailBucketEntry.build({
     id: 'row-1',
-    mailAccountId: 'account-1',
+    mailAddressId: 'address-1',
     entryKey: '42:7',
     bridgeEntryId: 'entry-1',
     size: 240,
@@ -23,7 +23,7 @@ function entry(overrides: Partial<MailBucketEntry> = {}): MailBucketEntry {
 }
 
 const trackParams = {
-  mailAccountId: 'account-1',
+  mailAddressId: 'address-1',
   userUuid: 'user-1',
   bucketId: 'bucket-1',
   entryKey: '42:7',
@@ -64,7 +64,7 @@ describe('MailUsageService', () => {
         240,
       );
       expect(entries.create).toHaveBeenCalledWith({
-        mailAccountId: 'account-1',
+        mailAddressId: 'address-1',
         entryKey: '42:7',
         bridgeEntryId: 'entry-1',
         size: 240,
