@@ -13,6 +13,7 @@ import { MailProviderAccountModel } from '../models/mail-provider-account.model.
 const MAX_BATCH_LOOKUP = 50;
 
 export interface ProviderAccountBucketContext {
+  mailAccountId: string;
   userUuid: string;
   networkBucketId: string | null;
 }
@@ -110,6 +111,7 @@ export class AddressRepository {
     if (!model?.account) return null;
 
     return {
+      mailAccountId: model.account.id,
       userUuid: model.account.userId,
       networkBucketId: model.networkBucketId,
     };
@@ -132,6 +134,7 @@ export class AddressRepository {
     if (!link?.address?.account) return null;
 
     return {
+      mailAccountId: link.address.account.id,
       userUuid: link.address.account.userId,
       networkBucketId: link.address.networkBucketId,
     };
