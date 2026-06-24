@@ -135,7 +135,7 @@ describe('AddressRepository', () => {
       const link = {
         address: {
           networkBucketId: 'bucket-1',
-          account: { userId: 'user-uuid-1' },
+          account: { id: 'account-1', userId: 'user-uuid-1' },
         },
       } as unknown as MailProviderAccountModel;
       providerAccountModel.findOne.mockResolvedValue(link);
@@ -154,6 +154,7 @@ describe('AddressRepository', () => {
         ],
       });
       expect(result).toEqual({
+        mailAccountId: 'account-1',
         userUuid: 'user-uuid-1',
         networkBucketId: 'bucket-1',
       });
@@ -173,7 +174,7 @@ describe('AddressRepository', () => {
     it('when the address resolves to an account, then returns userUuid and networkBucketId', async () => {
       const model = {
         networkBucketId: 'bucket-1',
-        account: { userId: 'user-uuid-1' },
+        account: { id: 'account-1', userId: 'user-uuid-1' },
       } as unknown as MailAddressModel;
       addressModel.findOne.mockResolvedValue(model);
 
@@ -185,6 +186,7 @@ describe('AddressRepository', () => {
         include: [{ model: MailAccountModel, required: true }],
       });
       expect(result).toEqual({
+        mailAccountId: 'account-1',
         userUuid: 'user-uuid-1',
         networkBucketId: 'bucket-1',
       });
