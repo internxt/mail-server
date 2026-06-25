@@ -23,6 +23,8 @@ nodeEnv: production
 
 paymentsApiUrl: 'https://gateway.internxt.com/payments'
 
+bridgeApiUrl: https://gateway.internxt.com/network
+
 redisUrl: REPLACE_ME
 
 database:
@@ -38,7 +40,10 @@ stalwart:
   smtpPort: 465
 
 mta:
-  hooksUsername: stalwart
+  hooksUsername: REPLACE_ME
+
+webhook:
+  username: REPLACE_ME
 
 secretName: mail-server-secrets
 
