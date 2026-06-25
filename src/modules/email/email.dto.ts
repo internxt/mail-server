@@ -308,6 +308,30 @@ export class EmailSummaryResponseDto {
       'the de-identified wrapped keys for inline client-side decryption.',
   })
   encryption?: EncryptedSummaryDto | null;
+
+  @ApiPropertyOptional({
+    example: 3,
+    description:
+      'Total number of emails in the thread (cross-mailbox). Set only when ' +
+      'the list collapses threads.',
+  })
+  threadSize?: number;
+
+  @ApiPropertyOptional({
+    example: '2025-06-15T10:30:00Z',
+    description:
+      'receivedAt of the most recent email in the thread (cross-mailbox). ' +
+      'Set only when the list collapses threads.',
+  })
+  lastReceivedAt?: string;
+
+  @ApiPropertyOptional({
+    type: [EmailAddressDto],
+    description:
+      'Unique senders that have written in the thread (cross-mailbox), ' +
+      'deduplicated by email. Set only when the list collapses threads.',
+  })
+  participants?: EmailAddressDto[];
 }
 
 export class EmailAttachmentDto {

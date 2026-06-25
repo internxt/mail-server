@@ -71,13 +71,31 @@ describe('JmapMailProvider', () => {
   });
 
   describe('listEmails', () => {
-    it('when called without mailbox, then returns all email summaries', async () => {
-      const jmapEmails = [newJmapEmail(), newJmapEmail()];
+    test('When listing without a mailbox filter, then the list collapses by thread and threads are enriched with size, lastReceivedAt and participants', async () => {
+      const aliceEmail = 'alice@example.com';
+      const bobEmail = 'bob@example.com';
+      const rep = newJmapEmail({
+        threadId: 'thread-1',
+        from: [{ name: 'Alice', email: aliceEmail }],
+        receivedAt: '2026-06-15T10:00:00Z',
+      });
+      const reply = newJmapEmail({
+        threadId: 'thread-1',
+        from: [{ name: 'Bob', email: bobEmail }],
+        receivedAt: '2026-06-15T11:00:00Z',
+      });
+      const earlier = newJmapEmail({
+        threadId: 'thread-1',
+        from: [{ name: 'Alice', email: aliceEmail }],
+        receivedAt: '2026-06-15T09:00:00Z',
+      });
 
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 42 },
-          { list: jmapEmails },
+          { ids: [rep.id], total: 1 },
+          { list: [rep] },
+          { list: [{ id: 'thread-1', emailIds: [earlier.id, rep.id, reply.id] }] },
+          { list: [earlier, rep, reply] },
         ),
       );
 
@@ -87,45 +105,120 @@ describe('JmapMailProvider', () => {
         position: 0,
       });
 
-      expect(result.emails).toHaveLength(2);
-      expect(result.total).toBe(42);
-      expect(result.emails[0]!.mailboxIds).toEqual(
-        Object.keys(jmapEmails[0]!.mailboxIds),
-      );
+      expect(result.emails).toHaveLength(1);
+      expect(result.emails[0]!.threadSize).toBe(3);
+      expect(result.emails[0]!.lastReceivedAt).toBe('2026-06-15T11:00:00Z');
+      expect(result.emails[0]!.participants).toEqual([
+        { name: 'Alice', email: aliceEmail },
+        { name: 'Bob', email: bobEmail },
+      ]);
     });
 
-    it('when called with a mailbox, then filters by that mailbox', async () => {
+    test('When listing an inbox, then Email/query is sent with collapseThreads and the inMailbox filter', async () => {
       const inboxMailbox = newJmapMailbox({ role: 'inbox' });
-      const jmapEmails = [newJmapEmail(), newJmapEmail()];
+      const rep = newJmapEmail({ threadId: 'thread-1' });
 
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [inboxMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 42 },
-          { list: jmapEmails },
+          { ids: [rep.id], total: 1 },
+          { list: [rep] },
+          { list: [{ id: 'thread-1', emailIds: [rep.id] }] },
+          { list: [rep] },
         ),
       );
 
-      const result = await provider.listEmails({
+      await provider.listEmails({
         userEmail: 'user@test.com',
         mailbox: 'inbox',
         limit: 20,
         position: 0,
       });
 
-      expect(result.emails).toHaveLength(2);
-      expect(result.total).toBe(42);
+      const queryCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = queryCall[1][0]![1];
+      expect(queryArgs['collapseThreads']).toBe(true);
+      expect(queryArgs['filter']).toEqual({ inMailbox: inboxMailbox.id });
     });
 
-    it('when result count equals limit, then hasMoreMails is true with nextAnchor', async () => {
-      const jmapEmails = [newJmapEmail(), newJmapEmail()];
+    test('When listing drafts, then collapseThreads is not sent and each draft is returned individually', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const drafts = [newJmapEmail(), newJmapEmail()];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: drafts.map((e) => e.id), total: 2 },
+          { list: drafts },
+        ),
+      );
+
+      const result = await provider.listEmails({
+        userEmail: 'user@test.com',
+        mailbox: 'drafts',
+        limit: 20,
+        position: 0,
+      });
+
+      const queryCall = jmapService.request.mock.calls.at(-1)!;
+      const queryArgs = queryCall[1][0]![1];
+      expect(queryArgs['collapseThreads']).toBeUndefined();
+      expect(result.emails).toHaveLength(2);
+      expect(result.emails[0]!.threadSize).toBeUndefined();
+      expect(result.emails[0]!.participants).toBeUndefined();
+    });
+
+    test('When the same sender appears in multiple emails of the thread, then participants are deduplicated by email (case-insensitive)', async () => {
+      const rep = newJmapEmail({
+        threadId: 'thread-1',
+        from: [{ name: 'Alice', email: 'ALICE@example.com' }],
+        receivedAt: '2026-06-15T10:00:00Z',
+      });
+      const dupAlice = newJmapEmail({
+        threadId: 'thread-1',
+        from: [{ name: 'Alice', email: 'alice@example.com' }],
+        receivedAt: '2026-06-15T11:00:00Z',
+      });
 
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 10 },
-          { list: jmapEmails },
+          { ids: [rep.id], total: 1 },
+          { list: [rep] },
+          { list: [{ id: 'thread-1', emailIds: [rep.id, dupAlice.id] }] },
+          { list: [rep, dupAlice] },
+        ),
+      );
+
+      const result = await provider.listEmails({
+        userEmail: 'user@test.com',
+        limit: 20,
+        position: 0,
+      });
+
+      expect(result.emails[0]!.participants).toHaveLength(1);
+      expect(result.emails[0]!.participants![0]!.email).toBe(
+        'ALICE@example.com',
+      );
+    });
+
+    test('When the result count equals the requested limit, then the caller is told there are more threads and gets the next anchor', async () => {
+      const reps = [
+        newJmapEmail({ threadId: 't-1' }),
+        newJmapEmail({ threadId: 't-2' }),
+      ];
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: reps.map((e) => e.id), total: 10 },
+          { list: reps },
+          {
+            list: reps.map((r) => ({ id: r.threadId, emailIds: [r.id] })),
+          },
+          { list: reps },
         ),
       );
 
@@ -136,16 +229,18 @@ describe('JmapMailProvider', () => {
       });
 
       expect(result.hasMoreMails).toBe(true);
-      expect(result.nextAnchor).toBe(jmapEmails[1]!.id);
+      expect(result.nextAnchor).toBe(reps[1]!.id);
     });
 
-    it('when result count is less than limit, then hasMoreMails is false', async () => {
-      const jmapEmails = [newJmapEmail()];
+    test('When the result count is less than the requested limit, then the caller is told there are no more threads', async () => {
+      const rep = newJmapEmail({ threadId: 't-1' });
 
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { ids: jmapEmails.map((e) => e.id), total: 1 },
-          { list: jmapEmails },
+          { ids: [rep.id], total: 1 },
+          { list: [rep] },
+          { list: [{ id: 't-1', emailIds: [rep.id] }] },
+          { list: [rep] },
         ),
       );
 
@@ -880,31 +975,14 @@ describe('JmapMailProvider', () => {
   });
 
   describe('getThread', () => {
-    it('when opening a conversation that contains several messages, then all of them are returned from newest to oldest', async () => {
-      const inboxId = 'inbox-mailbox';
-      const older = newJmapEmail({
-        receivedAt: '2025-01-01T10:00:00Z',
-        mailboxIds: { [inboxId]: true },
-      });
-      const newer = newJmapEmail({
-        receivedAt: '2025-01-02T10:00:00Z',
-        mailboxIds: { [inboxId]: true },
-      });
-      const middle = newJmapEmail({
-        receivedAt: '2025-01-01T15:00:00Z',
-        mailboxIds: { [inboxId]: true },
-      });
+    test('When opening a conversation with several messages, then all of them are returned from newest to oldest', async () => {
+      const older = newJmapEmail({ receivedAt: '2025-01-01T10:00:00Z' });
+      const newer = newJmapEmail({ receivedAt: '2025-01-02T10:00:00Z' });
+      const middle = newJmapEmail({ receivedAt: '2025-01-01T15:00:00Z' });
+
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          {
-            list: [
-              {
-                id: older.id,
-                threadId: 'thread-1',
-                mailboxIds: { [inboxId]: true },
-              },
-            ],
-          },
+          { list: [{ id: older.id, threadId: 'thread-1' }] },
           {
             list: [
               { id: 'thread-1', emailIds: [older.id, middle.id, newer.id] },
@@ -919,20 +997,12 @@ describe('JmapMailProvider', () => {
       expect(result.map((e) => e.id)).toEqual([newer.id, middle.id, older.id]);
     });
 
-    it('when opening a conversation with a single message, then a one-item list is returned', async () => {
-      const inboxId = 'inbox-mailbox';
-      const only = newJmapEmail({ mailboxIds: { [inboxId]: true } });
+    test('When opening a conversation with a single message, then a one-item list is returned', async () => {
+      const only = newJmapEmail();
+
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          {
-            list: [
-              {
-                id: only.id,
-                threadId: 'thread-1',
-                mailboxIds: { [inboxId]: true },
-              },
-            ],
-          },
+          { list: [{ id: only.id, threadId: 'thread-1' }] },
           { list: [{ id: 'thread-1', emailIds: [only.id] }] },
           { list: [only] },
         ),
@@ -944,7 +1014,7 @@ describe('JmapMailProvider', () => {
       expect(result[0]!.id).toBe(only.id);
     });
 
-    it('when the thread contains copies of the same email in other mailboxes, then only those sharing a mailbox with the requested email are returned', async () => {
+    test('When the thread contains a self-email that lives both in Inbox and Sent, then both copies are returned to the caller', async () => {
       const inboxId = 'inbox-mailbox';
       const sentId = 'sent-mailbox';
       const inboxCopy = newJmapEmail({
@@ -955,30 +1025,54 @@ describe('JmapMailProvider', () => {
         receivedAt: '2025-01-01T10:00:00Z',
         mailboxIds: { [sentId]: true },
       });
+
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          {
-            list: [
-              {
-                id: inboxCopy.id,
-                threadId: 'thread-1',
-                mailboxIds: { [inboxId]: true },
-              },
-            ],
-          },
+          { list: [{ id: inboxCopy.id, threadId: 'thread-1' }] },
           {
             list: [{ id: 'thread-1', emailIds: [inboxCopy.id, sentCopy.id] }],
           },
-          { list: [inboxCopy, sentCopy] },
+          { list: [sentCopy, inboxCopy] },
         ),
       );
 
       const result = await provider.getThread('user@test.com', inboxCopy.id);
 
-      expect(result.map((e) => e.id)).toEqual([inboxCopy.id]);
+      expect(result.map((e) => e.id).sort()).toEqual(
+        [inboxCopy.id, sentCopy.id].sort(),
+      );
     });
 
-    it('when opening a conversation by an id that does not exist, then an empty list is returned', async () => {
+    test('When opening a thread that mixes messages received and messages sent by the user, then every email in the thread is returned', async () => {
+      const inboxId = 'inbox-mailbox';
+      const sentId = 'sent-mailbox';
+      const myReply = newJmapEmail({
+        receivedAt: '2025-01-01T10:00:00Z',
+        mailboxIds: { [sentId]: true },
+      });
+      const theirMessage = newJmapEmail({
+        receivedAt: '2025-01-01T11:00:00Z',
+        mailboxIds: { [inboxId]: true },
+      });
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { list: [{ id: theirMessage.id, threadId: 'thread-1' }] },
+          {
+            list: [
+              { id: 'thread-1', emailIds: [myReply.id, theirMessage.id] },
+            ],
+          },
+          { list: [myReply, theirMessage] },
+        ),
+      );
+
+      const result = await provider.getThread('user@test.com', theirMessage.id);
+
+      expect(result.map((e) => e.id)).toEqual([theirMessage.id, myReply.id]);
+    });
+
+    test('When opening a conversation by an id that does not exist, then an empty list is returned', async () => {
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse({ list: [] }, { list: [] }, { list: [] }),
       );

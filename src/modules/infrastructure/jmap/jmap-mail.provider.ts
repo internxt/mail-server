@@ -3,6 +3,7 @@ import { MailProvider } from '../../email/mail-provider.port.js';
 import type {
   DraftEmailDto,
   Email,
+  EmailAddress,
   EmailListResponse,
   ListEmails,
   MailQuota,
@@ -106,21 +107,36 @@ export class JmapMailProvider extends MailProvider {
   }: ListEmails): Promise<EmailListResponse> {
     const accountId = await this.jmap.getPrimaryAccountId(userEmail);
 
-    if (!mailbox) {
-      return this.queryEmails(userEmail, accountId, limit, position, anchorId);
-    }
+    const unreadKeyword = unread ? { notKeyword: '$seen' } : undefined;
 
-    const unreadKeyword = unread
-      ? {
-          notKeyword: '$seen',
-        }
+    const mailboxFilter = mailbox
+      ? { inMailbox: await this.resolveMailboxId(userEmail, mailbox) }
       : undefined;
 
-    const mailboxId = await this.resolveMailboxId(userEmail, mailbox);
-    return this.queryEmails(userEmail, accountId, limit, position, anchorId, {
-      inMailbox: mailboxId,
-      ...unreadKeyword,
-    });
+    const filter =
+      mailboxFilter || unreadKeyword
+        ? { ...mailboxFilter, ...unreadKeyword }
+        : undefined;
+
+    if (mailbox === 'drafts') {
+      return this.queryEmails(
+        userEmail,
+        accountId,
+        limit,
+        position,
+        anchorId,
+        filter,
+      );
+    }
+
+    return this.queryEmailsCollapsedByThread(
+      userEmail,
+      accountId,
+      limit,
+      position,
+      anchorId,
+      filter,
+    );
   }
 
   private async queryEmails(
@@ -167,6 +183,110 @@ export class JmapMailProvider extends MailProvider {
       .methodResponses[1]![1] as JmapGetResponse<JmapEmail>;
 
     const emails = getResult.list.map(mapJmapEmailToSummary);
+    const hasMoreEmails = emails.length >= limit;
+
+    return {
+      emails,
+      total: queryResult.total ?? 0,
+      hasMoreMails: hasMoreEmails,
+      nextAnchor: hasMoreEmails ? emails.at(-1)?.id : undefined,
+    };
+  }
+
+  private async queryEmailsCollapsedByThread(
+    userEmail: string,
+    accountId: string,
+    limit: number,
+    position: number,
+    anchorId?: string,
+    filter?: Record<string, unknown>,
+  ): Promise<EmailListResponse> {
+    const queryParams: Record<string, unknown> = {
+      accountId,
+      sort: [{ property: 'receivedAt', isAscending: false }],
+      limit,
+      calculateTotal: true,
+      collapseThreads: true,
+    };
+
+    if (filter) {
+      queryParams.filter = filter;
+    }
+
+    if (anchorId) {
+      queryParams.anchor = anchorId;
+      queryParams.anchorOffset = 1;
+    } else {
+      queryParams.position = position;
+    }
+
+    const response = await this.jmap.request(userEmail, [
+      ['Email/query', queryParams, 'r0'],
+      [
+        'Email/get',
+        {
+          accountId,
+          '#ids': { resultOf: 'r0', name: 'Email/query', path: '/ids' },
+          properties: EMAIL_LIST_PROPERTIES,
+        },
+        'r1',
+      ],
+      [
+        'Thread/get',
+        {
+          accountId,
+          '#ids': {
+            resultOf: 'r1',
+            name: 'Email/get',
+            path: '/list/*/threadId',
+          },
+        },
+        'r2',
+      ],
+      [
+        'Email/get',
+        {
+          accountId,
+          '#ids': {
+            resultOf: 'r2',
+            name: 'Thread/get',
+            path: '/list/*/emailIds',
+          },
+          properties: ['id', 'threadId', 'from', 'receivedAt'],
+        },
+        'r3',
+      ],
+    ]);
+
+    const queryResult = response.methodResponses[0]![1] as JmapQueryResponse;
+    const representatives = (
+      response.methodResponses[1]![1] as JmapGetResponse<JmapEmail>
+    ).list;
+    const threadEmails = (
+      response.methodResponses[3]![1] as JmapGetResponse<JmapEmail>
+    ).list;
+
+    const emailsByThread = new Map<string, JmapEmail[]>();
+    for (const e of threadEmails) {
+      const bucket = emailsByThread.get(e.threadId) ?? [];
+      bucket.push(e);
+      emailsByThread.set(e.threadId, bucket);
+    }
+
+    const emails = representatives.map((rep) => {
+      const summary = mapJmapEmailToSummary(rep);
+      const thread = emailsByThread.get(rep.threadId) ?? [rep];
+      return {
+        ...summary,
+        threadSize: thread.length,
+        lastReceivedAt: thread.reduce(
+          (latest, e) => (e.receivedAt > latest ? e.receivedAt : latest),
+          thread[0]!.receivedAt,
+        ),
+        participants: uniqueParticipants(thread),
+      };
+    });
+
     const hasMoreEmails = emails.length >= limit;
 
     return {
@@ -477,7 +597,7 @@ export class JmapMailProvider extends MailProvider {
         {
           accountId,
           ids: [emailId],
-          properties: ['id', 'threadId', 'mailboxIds'],
+          properties: ['id', 'threadId'],
         },
         'r0',
       ],
@@ -512,17 +632,12 @@ export class JmapMailProvider extends MailProvider {
 
     const firstLookup = response
       .methodResponses[0]![1] as JmapGetResponse<JmapEmail>;
-    const requestedEmail = firstLookup.list[0];
-    if (!requestedEmail) return [];
-
-    const requestedMailboxIds = new Set(Object.keys(requestedEmail.mailboxIds));
+    if (firstLookup.list.length === 0) return [];
 
     const emailsResult = response
       .methodResponses[2]![1] as JmapGetResponse<JmapEmail>;
+
     return emailsResult.list
-      .filter((e) =>
-        Object.keys(e.mailboxIds).some((id) => requestedMailboxIds.has(id)),
-      )
       .map(mapJmapEmailToDetail)
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
   }
@@ -850,4 +965,21 @@ export class JmapMailProvider extends MailProvider {
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
   }
+}
+
+function uniqueParticipants(thread: JmapEmail[]): EmailAddress[] {
+  const sorted = [...thread].sort((a, b) =>
+    a.receivedAt.localeCompare(b.receivedAt),
+  );
+  const seen = new Set<string>();
+  const result: EmailAddress[] = [];
+  for (const email of sorted) {
+    for (const addr of email.from ?? []) {
+      const key = addr.email.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({ name: addr.name, email: addr.email });
+    }
+  }
+  return result;
 }

@@ -43,6 +43,9 @@ export interface EmailSummary {
   hasAttachment: boolean;
   size: number;
   encryption?: EncryptedSummaryFields | null;
+  threadSize?: number;
+  lastReceivedAt?: string;
+  participants?: EmailAddress[];
 }
 
 export interface EmailAttachment {
