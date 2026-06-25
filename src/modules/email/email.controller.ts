@@ -95,7 +95,10 @@ export class EmailController {
   @ApiOperation({
     summary: 'List emails',
     description:
-      'Paginated list of email summaries. Filter by mailbox or omit to list all.',
+      'Paginated list of email summaries. Filter by mailbox or omit to list all. ' +
+      'Responses collapse by thread in every mailbox except `drafts`: each row ' +
+      'represents the most recent email of the thread in that mailbox and carries ' +
+      '`threadSize`, `lastReceivedAt` and `participants` (cross-mailbox).',
   })
   @ApiQuery({
     name: 'mailbox',
