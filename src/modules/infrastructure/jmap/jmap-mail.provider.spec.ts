@@ -350,6 +350,58 @@ describe('JmapMailProvider', () => {
         'Failed to create email for sending',
       );
     });
+
+    test('When sending from an existing draft, then the new email is created with the latest content and the previous draft is removed in the same operation', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { created: { draft: { id: 'sent-email-id' } } },
+          { created: { submission: { id: 'sub-id' } } },
+        ),
+      );
+
+      const dto = newSendEmailDto({ draftId: 'old-draft-id' });
+      const result = await provider.sendEmail('user@test.com', dto);
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const [emailSetName, emailSetArgs] = lastCall[1][0]!;
+      expect(emailSetName).toBe('Email/set');
+      expect(emailSetArgs['destroy']).toEqual(['old-draft-id']);
+      expect(emailSetArgs['create']).toBeDefined();
+      expect(result).toEqual({ id: 'sent-email-id' });
+    });
+
+    test('When sending without a draftId, then the Email/set call does not include any destroy operation', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { created: { draft: { id: 'sent-email-id' } } },
+          { created: { submission: { id: 'sub-id' } } },
+        ),
+      );
+
+      await provider.sendEmail('user@test.com', newSendEmailDto());
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const [, emailSetArgs] = lastCall[1][0]!;
+      expect(emailSetArgs['destroy']).toBeUndefined();
+    });
   });
 
   describe('saveDraft', () => {
