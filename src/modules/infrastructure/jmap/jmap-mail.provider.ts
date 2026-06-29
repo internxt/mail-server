@@ -385,10 +385,6 @@ export class JmapMailProvider extends MailProvider {
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
   ): Promise<{ id: string }> {
-    if (dto.draftId) {
-      return this.submitExistingDraft(userEmail, dto.draftId);
-    }
-
     const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
       this.resolveIdentity(userEmail),
@@ -408,6 +404,7 @@ export class JmapMailProvider extends MailProvider {
         {
           accountId,
           create: { draft: emailCreate },
+          ...(dto.draftId && { destroy: [dto.draftId] }),
         },
         'r0',
       ],
@@ -435,44 +432,6 @@ export class JmapMailProvider extends MailProvider {
     }
 
     return { id: createdId };
-  }
-
-  private async submitExistingDraft(
-    userEmail: string,
-    draftId: string,
-  ): Promise<{ id: string }> {
-    const [accountId, identity, draftsMailboxId, sentMailboxId] =
-      await Promise.all([
-        this.jmap.getPrimaryAccountId(userEmail),
-        this.resolveIdentity(userEmail),
-        this.resolveMailboxId(userEmail, 'drafts'),
-        this.resolveMailboxId(userEmail, 'sent'),
-      ]);
-
-    await this.jmap.request(userEmail, [
-      [
-        'EmailSubmission/set',
-        {
-          accountId,
-          create: {
-            submission: {
-              identityId: identity.id,
-              emailId: draftId,
-            },
-          },
-          onSuccessUpdateEmail: {
-            '#submission': {
-              [`mailboxIds/${draftsMailboxId}`]: null,
-              [`mailboxIds/${sentMailboxId}`]: true,
-              'keywords/$draft': null,
-            },
-          },
-        },
-        'r0',
-      ],
-    ]);
-
-    return { id: draftId };
   }
 
   private async destroyDraft(
