@@ -76,7 +76,7 @@ describe('BridgeClient', () => {
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
         statusCode: 500,
-        body: { text: () => Promise.resolve('boom') },
+        body: { text: () => Promise.resolve('internal error') },
       });
 
       const error: unknown = await service
