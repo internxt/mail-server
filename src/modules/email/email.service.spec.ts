@@ -510,6 +510,30 @@ describe('EmailService', () => {
       expect(result).toEqual({ id: 'msg-2' });
     });
 
+    it('when the decrypted body is HTML, then it is delivered as the HTML part with a plain-text alternative', async () => {
+      const dto = newSendEmailDto({
+        attachments: undefined,
+        encryption: newEncryptionBlock(),
+      });
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      mockedDecryptBody.mockResolvedValue(
+        '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+      );
+      smtp.sendRaw.mockResolvedValue({ messageId: 'msg-html' });
+      provider.saveToSent.mockResolvedValue({ id: 'sent-html' });
+
+      await service.sendExternalEmail(userEmail, dto);
+
+      expect(smtp.sendRaw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          html: '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+          text: 'Testing the new mail config\n\nlmk how it goes!',
+        }),
+      );
+    });
+
     it('when replying to an external recipient, then the conversation thread is carried through SMTP and the saved copy', async () => {
       const dto = newSendEmailDto({
         inReplyToEmailId: 'parent-id',
