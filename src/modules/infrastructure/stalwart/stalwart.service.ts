@@ -33,7 +33,7 @@ const TYPE_USER = 'User';
 const TYPE_PASSWORD = 'Password';
 const CREATE_REF = 'new1';
 
-const SUSPEND_PERMISSIONS = ['email-receive', 'email-send'] as const;
+const SUSPEND_PERMISSIONS = ['emailReceive', 'emailSend'] as const;
 
 export interface StalwartAccountCreate {
   name: string;
@@ -205,15 +205,33 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
       throw new StalwartApiError(`Account '${email}' not found`, null);
     }
 
-    const value = suspended ? true : null;
-    const patch = Object.fromEntries(
-      SUSPEND_PERMISSIONS.map((p) => [`disabledPermissions/${p}`, value]),
+    const disabledPermissions = Object.fromEntries(
+      SUSPEND_PERMISSIONS.map((p) => [p, true]),
     );
+    const permissions = suspended
+      ? {
+          '@type': 'Merge',
+          enabledPermissions: {},
+          disabledPermissions,
+        }
+      : { '@type': 'Inherit' };
 
     const response = await this.jmapCall<JmapSetResponse<StalwartAccount>>([
-      [JMAP_METHOD.ACCOUNT_SET, { update: { [account.id]: patch } }, 's1'],
+      [
+        JMAP_METHOD.ACCOUNT_SET,
+        {
+          update: {
+            [account.id]: {
+              permissions,
+            },
+          },
+        },
+        's1',
+      ],
     ]);
     const set = firstResponse(response);
+
+    this.logger.debug(`[DEBUG] x:Account/set response: ${JSON.stringify(set)}`);
 
     const failed = set.notUpdated?.[account.id];
     if (failed) {
