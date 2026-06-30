@@ -10,47 +10,30 @@ spec:
   selector:
     app: stalwart
   ports:
-    - name: management
-      port: {{ .Values.service.ports.management }}
+    - name: http
+      port: {{ .Values.service.port }}
       targetPort: management
       protocol: TCP
-    - name: http
-      port: {{ .Values.service.ports.http }}
-      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stalwart-nodeport
+  labels:
+    app: stalwart
+    owner: internxt
+spec:
+  type: {{ .Values.mailService.type }}
+  {{- with .Values.mailService.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  selector:
+    app: stalwart
+  ports:
+    {{- range $name, $cfg := .Values.mailService.ports }}
+    - name: {{ $name }}
+      port: {{ $cfg.port }}
+      targetPort: {{ $name }}
+      nodePort: {{ $cfg.nodePort }}
       protocol: TCP
-    - name: https
-      port: {{ .Values.service.ports.https }}
-      targetPort: https
-      protocol: TCP
-    - name: smtp
-      port: {{ .Values.service.ports.smtp }}
-      targetPort: smtp
-      protocol: TCP
-    - name: smtps
-      port: {{ .Values.service.ports.smtps }}
-      targetPort: smtps
-      protocol: TCP
-    - name: submission
-      port: {{ .Values.service.ports.submission }}
-      targetPort: submission
-      protocol: TCP
-    - name: imap
-      port: {{ .Values.service.ports.imap }}
-      targetPort: imap
-      protocol: TCP
-    - name: imaps
-      port: {{ .Values.service.ports.imaps }}
-      targetPort: imaps
-      protocol: TCP
-    - name: pop3
-      port: {{ .Values.service.ports.pop3 }}
-      targetPort: pop3
-      protocol: TCP
-    - name: pop3s
-      port: {{ .Values.service.ports.pop3s }}
-      targetPort: pop3s
-      protocol: TCP
-    - name: managesieve
-      port: {{ .Values.service.ports.managesieve }}
-      targetPort: managesieve
-      protocol: TCP
+    {{- end }}

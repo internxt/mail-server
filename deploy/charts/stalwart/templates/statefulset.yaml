@@ -33,27 +33,25 @@ spec:
             - "/etc/stalwart/config.json"
           ports:
             - name: management
-              containerPort: {{ .Values.service.ports.management }}
-            - name: http
-              containerPort: {{ .Values.service.ports.http }}
+              containerPort: {{ .Values.mailService.ports.management.port }}
             - name: https
-              containerPort: {{ .Values.service.ports.https }}
+              containerPort: 443
             - name: smtp
-              containerPort: {{ .Values.service.ports.smtp }}
+              containerPort: {{ .Values.mailService.ports.smtp.port }}
             - name: smtps
-              containerPort: {{ .Values.service.ports.smtps }}
+              containerPort: {{ .Values.mailService.ports.smtps.port }}
             - name: submission
-              containerPort: {{ .Values.service.ports.submission }}
+              containerPort: {{ .Values.mailService.ports.submission.port }}
             - name: imap
-              containerPort: {{ .Values.service.ports.imap }}
+              containerPort: {{ .Values.mailService.ports.imap.port }}
             - name: imaps
-              containerPort: {{ .Values.service.ports.imaps }}
+              containerPort: {{ .Values.mailService.ports.imaps.port }}
             - name: pop3
-              containerPort: {{ .Values.service.ports.pop3 }}
+              containerPort: {{ .Values.mailService.ports.pop3.port }}
             - name: pop3s
-              containerPort: {{ .Values.service.ports.pop3s }}
+              containerPort: {{ .Values.mailService.ports.pop3s.port }}
             - name: managesieve
-              containerPort: {{ .Values.service.ports.managesieve }}
+              containerPort: {{ .Values.mailService.ports.managesieve.port }}
           env:
             - name: STALWART_ROLE
               value: {{ .Values.role | quote }}
