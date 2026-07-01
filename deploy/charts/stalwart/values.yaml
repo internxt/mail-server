@@ -13,19 +13,47 @@ recoveryMode:
   enabled: false
 
 service:
-  type: LoadBalancer
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: mail-ingress-traefik
+  clusterIssuer: letsencrypt-prod
+  host: mail.inxt.me
+  tlsSecretName: stalwart-tls
+
+mailService:
+  type: NodePort
+  externalTrafficPolicy: Local
   ports:
-    management: 8080
-    http: 80
-    https: 443
-    smtp: 25
-    smtps: 465
-    submission: 587
-    imap: 143
-    imaps: 993
-    pop3: 110
-    pop3s: 995
-    managesieve: 4190
+    management:
+      port: 8080
+      nodePort: 30742
+    smtp:
+      port: 25
+      nodePort: 32443
+    smtps:
+      port: 465
+      nodePort: 32010
+    submission:
+      port: 587
+      nodePort: 32303
+    imap:
+      port: 143
+      nodePort: 30164
+    imaps:
+      port: 993
+      nodePort: 30110
+    pop3:
+      port: 110
+      nodePort: 31940
+    pop3s:
+      port: 995
+      nodePort: 31666
+    managesieve:
+      port: 4190
+      nodePort: 32309
 
 persistence:
   enabled: true
