@@ -7,7 +7,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Client } from 'undici';
-import type { BucketEntry, MailBucket } from './bridge.types.js';
+import type {
+  BucketEntry,
+  MailBucket,
+  UserSpaceSnapshot,
+} from './bridge.types.js';
 
 @Injectable()
 export class BridgeClient implements OnModuleInit, OnModuleDestroy {
@@ -155,6 +159,31 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
         text,
       );
     }
+  }
+
+  async getUserUsage(userUuid: string): Promise<UserSpaceSnapshot> {
+    const token = this.signGatewayToken(userUuid);
+
+    const { statusCode, body } = await this.httpClient.request({
+      method: 'GET',
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/usage`,
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    const text = await body.text();
+
+    if (statusCode !== 200) {
+      throw new BridgeApiError(
+        `Failed to fetch usage for user '${userUuid}': HTTP ${statusCode}`,
+        statusCode,
+        text,
+      );
+    }
+
+    return JSON.parse(text) as UserSpaceSnapshot;
   }
 
   private signGatewayToken(userUuid: string): string {
