@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -23,7 +22,6 @@ import {
 import { GetMailAccountKeysDto } from './dto/get-mail-account-keys.dto.js';
 import { User } from '../auth/decorators/user.decorator.js';
 import type { UserPayload } from '../auth/jwt-payload.dto.js';
-import { PaymentsService } from '../infrastructure/payments/payments.service.js';
 import { AccountService } from './account.service.js';
 import { CreateMailAccountDto } from './dto/create-mail-account.dto.js';
 import { MailAccountGuard } from '../provisioning/provisioning.guard.js';
@@ -40,10 +38,7 @@ import {
 export class UserController {
   private readonly logger = new Logger(UserController.name);
 
-  constructor(
-    private readonly accountService: AccountService,
-    private readonly payments: PaymentsService,
-  ) {}
+  constructor(private readonly accountService: AccountService) {}
 
   @Get('me/mail-account')
   @UseGuards(MailAccountGuard)
@@ -75,13 +70,6 @@ export class UserController {
     @User() user: UserPayload,
     @Body() dto: CreateMailAccountDto,
   ): Promise<CreateMailAccountResponseDto> {
-    const tier = await this.payments.getUserTier(user.uuid);
-    if (!tier.featuresPerService.mail?.enabled) {
-      throw new ForbiddenException(
-        'Mail access is not available for your current plan',
-      );
-    }
-
     const fullAddress = `${dto.address}@${dto.domain}`;
 
     const account = await this.accountService.provisionAccount({

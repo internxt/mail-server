@@ -3,6 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import {
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -17,6 +18,8 @@ import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { PaymentsService } from '../infrastructure/payments/payments.service.js';
+import type { Tier } from '../infrastructure/payments/payments.types.js';
 import {
   newMailAccountAttributes,
   newMailAddressKeyBundle,
@@ -35,6 +38,7 @@ describe('AccountService', () => {
   let domains: DeepMocked<DomainRepository>;
   let keys: DeepMocked<MailAddressKeysRepository>;
   let bridge: DeepMocked<BridgeClient>;
+  let payments: DeepMocked<PaymentsService>;
   let config: DeepMocked<ConfigService>;
 
   beforeEach(async () => {
@@ -51,6 +55,7 @@ describe('AccountService', () => {
     domains = module.get(DomainRepository);
     keys = module.get(MailAddressKeysRepository);
     bridge = module.get(BridgeClient);
+    payments = module.get(PaymentsService);
     config = module.get(ConfigService);
   });
 
@@ -342,6 +347,21 @@ describe('AccountService', () => {
       displayName: 'Alice Smith',
       keys: newMailAddressKeyBundle(),
     };
+    const PLAN_BYTES = 1_000_000_000;
+    const validTier: Tier = {
+      id: 't1',
+      label: 'standard',
+      productId: 'p1',
+      billingType: 'monthly',
+      featuresPerService: {
+        mail: { enabled: true, addressesPerUser: 3 },
+        drive: { enabled: true, maxSpaceBytes: PLAN_BYTES },
+      },
+    };
+
+    beforeEach(() => {
+      payments.getUserTier.mockResolvedValue(validTier);
+    });
 
     it('when all inputs are valid, then creates account, address, provider link, and stalwart principal', async () => {
       const createdAccount = MailAccount.build(
@@ -413,12 +433,49 @@ describe('AccountService', () => {
           accountId: createdAccount.id,
           primaryAddress: params.address,
           displayName: params.displayName,
+          quota: PLAN_BYTES,
         }),
       );
       expect(keys.create).toHaveBeenCalledWith({
         mailAddressId: createdAddressId,
         ...params.keys,
       });
+    });
+
+    it('when the plan does not include mail, then throws ForbiddenException and creates nothing', async () => {
+      payments.getUserTier.mockResolvedValue({
+        ...validTier,
+        featuresPerService: {
+          drive: { enabled: true, maxSpaceBytes: PLAN_BYTES },
+        },
+      });
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+      expect(provider.createAccount).not.toHaveBeenCalled();
+    });
+
+    it('when the plan has no drive storage allowance, then throws and never provisions an unlimited principal', async () => {
+      payments.getUserTier.mockResolvedValue({
+        ...validTier,
+        featuresPerService: {
+          mail: { enabled: true, addressesPerUser: 3 },
+        },
+      });
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+      expect(provider.createAccount).not.toHaveBeenCalled();
     });
 
     it('when domain does not exist, then throws NotFoundException', async () => {
