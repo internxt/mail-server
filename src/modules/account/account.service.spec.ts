@@ -30,6 +30,18 @@ import {
 import { MailAddressKeys } from './domain/mail-address-keys.domain.js';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 
+const PLAN_BYTES = 1_000_000_000;
+const validTier: Tier = {
+  id: 't1',
+  label: 'standard',
+  productId: 'p1',
+  billingType: 'monthly',
+  featuresPerService: {
+    mail: { enabled: true, addressesPerUser: 3 },
+    drive: { enabled: true, maxSpaceBytes: PLAN_BYTES },
+  },
+};
+
 describe('AccountService', () => {
   let service: AccountService;
   let provider: DeepMocked<AccountProvider>;
@@ -346,17 +358,6 @@ describe('AccountService', () => {
       domain: 'internxt.com',
       displayName: 'Alice Smith',
       keys: newMailAddressKeyBundle(),
-    };
-    const PLAN_BYTES = 1_000_000_000;
-    const validTier: Tier = {
-      id: 't1',
-      label: 'standard',
-      productId: 'p1',
-      billingType: 'monthly',
-      featuresPerService: {
-        mail: { enabled: true, addressesPerUser: 3 },
-        drive: { enabled: true, maxSpaceBytes: PLAN_BYTES },
-      },
     };
 
     beforeEach(() => {
@@ -685,6 +686,10 @@ describe('AccountService', () => {
   });
 
   describe('addAddress', () => {
+    beforeEach(() => {
+      payments.getUserTier.mockResolvedValue(validTier);
+    });
+
     it('when all conditions met, then creates principal and links provider', async () => {
       const accountAttrs = newMailAccountAttributes();
       const account = MailAccount.build(accountAttrs);
@@ -726,6 +731,7 @@ describe('AccountService', () => {
         primaryAddress: newAddr,
         displayName: 'Display Name',
         password: 'password123',
+        quota: PLAN_BYTES,
       });
       expect(addresses.createProviderLink).toHaveBeenCalledWith({
         mailAddressId: newAddressId,
@@ -741,6 +747,28 @@ describe('AccountService', () => {
         newAddressId,
         'bucket-1',
       );
+    });
+
+    it('when the plan has no drive storage allowance, then throws and never provisions an unlimited principal', async () => {
+      payments.getUserTier.mockResolvedValue({
+        ...validTier,
+        featuresPerService: {
+          mail: { enabled: true, addressesPerUser: 3 },
+        },
+      });
+      accounts.findByUserId.mockResolvedValue(
+        MailAccount.build(newMailAccountAttributes()),
+      );
+      domains.findByDomain.mockResolvedValue(
+        MailDomain.build(newMailDomainAttributes()),
+      );
+      addresses.findByAddress.mockResolvedValue(null);
+
+      await expect(
+        service.addAddress('user-uuid-1', 'a@b.com', 'b.com', 'pass'),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(addresses.create).not.toHaveBeenCalled();
+      expect(provider.createAccount).not.toHaveBeenCalled();
     });
 
     it('when bucket creation fails, then rolls back principal, link, and address', async () => {

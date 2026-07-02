@@ -301,7 +301,8 @@ export class AccountService {
     password: string,
     displayName?: string,
   ): Promise<void> {
-    const [account, domain, existing] = await Promise.all([
+    const [tier, account, domain, existing] = await Promise.all([
+      this.payments.getUserTier(userId),
       this.accounts.findByUserId(userId),
       this.domains.findByDomain(domainName),
       this.addresses.findByAddress(address),
@@ -315,6 +316,13 @@ export class AccountService {
     }
     if (existing) {
       throw new ConflictException(`Address '${address}' already exists`);
+    }
+
+    const quota = tier.featuresPerService.drive?.maxSpaceBytes;
+    if (!quota || quota <= 0) {
+      throw new UnprocessableEntityException(
+        `Cannot add address for '${userId}': plan has no drive storage allowance`,
+      );
     }
 
     const newAddressId = await this.addresses.create({
@@ -331,6 +339,7 @@ export class AccountService {
         primaryAddress: address,
         displayName: displayName ?? '',
         password,
+        quota,
       });
     } catch (error) {
       await this.addresses.delete(newAddressId);
