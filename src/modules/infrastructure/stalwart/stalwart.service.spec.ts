@@ -364,8 +364,14 @@ describe('StalwartService', () => {
       expect(setCall[1]).toEqual({
         update: {
           acc1: {
-            'disabledPermissions/email-receive': true,
-            'disabledPermissions/email-send': true,
+            permissions: {
+              '@type': 'Merge',
+              enabledPermissions: {},
+              disabledPermissions: {
+                emailReceive: true,
+                emailSend: true,
+              },
+            },
           },
         },
       });
@@ -434,8 +440,9 @@ describe('StalwartService', () => {
       expect(setCall[1]).toEqual({
         update: {
           acc1: {
-            'disabledPermissions/email-receive': null,
-            'disabledPermissions/email-send': null,
+            permissions: {
+              '@type': 'Inherit',
+            },
           },
         },
       });
