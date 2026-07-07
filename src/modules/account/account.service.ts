@@ -226,7 +226,7 @@ export class AccountService {
         password,
       });
     } catch (error) {
-      await this.accounts.delete(account.id);
+      await this.rollbackAccount(account.id);
       throw error;
     }
 
@@ -239,9 +239,7 @@ export class AccountService {
       });
       await this.createNetworkBucket(params.userId, addressId);
     } catch (error) {
-      await this.provider.deleteAccount(created.externalId);
-      await this.addresses.deleteProviderLink(addressId);
-      await this.accounts.delete(account.id);
+      await this.rollbackAccount(account.id, created.externalId);
       throw error;
     }
 
@@ -315,7 +313,7 @@ export class AccountService {
         password,
       });
     } catch (error) {
-      await this.addresses.delete(newAddressId);
+      await this.rollbackAddress(newAddressId);
       throw error;
     }
 
@@ -326,18 +324,9 @@ export class AccountService {
         externalId: created.externalId,
         providerInternalId: created.internalId,
       });
-    } catch (error) {
-      await this.provider.deleteAccount(created.externalId);
-      await this.addresses.delete(newAddressId);
-      throw error;
-    }
-
-    try {
       await this.createNetworkBucket(userId, newAddressId);
     } catch (error) {
-      await this.provider.deleteAccount(address);
-      await this.addresses.deleteProviderLink(newAddressId);
-      await this.addresses.delete(newAddressId);
+      await this.rollbackAddress(newAddressId, created.externalId);
       throw error;
     }
 
@@ -430,6 +419,38 @@ export class AccountService {
       return { available: false, suggestion };
     } else {
       return { available: false, suggestion: null };
+    }
+  }
+
+  private async rollbackAccount(
+    accountId: string,
+    providerExternalId?: string,
+  ): Promise<void> {
+    if (providerExternalId) {
+      await this.tryDeleteProviderAccount(providerExternalId);
+    }
+    await this.accounts.delete(accountId, { force: true });
+  }
+
+  private async rollbackAddress(
+    addressId: string,
+    providerExternalId?: string,
+  ): Promise<void> {
+    if (providerExternalId) {
+      await this.tryDeleteProviderAccount(providerExternalId);
+    }
+    await this.addresses.delete(addressId, { force: true });
+  }
+
+  private async tryDeleteProviderAccount(
+    providerExternalId: string,
+  ): Promise<void> {
+    try {
+      await this.provider.deleteAccount(providerExternalId);
+    } catch (error) {
+      this.logger.warn(
+        `Rollback: failed to delete provider account '${providerExternalId}': ${(error as Error).message}`,
+      );
     }
   }
 

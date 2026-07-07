@@ -167,8 +167,8 @@ export class AddressRepository {
     return model.id;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.addressModel.destroy({ where: { id } });
+  async delete(id: string, options?: { force?: boolean }): Promise<void> {
+    await this.addressModel.destroy({ where: { id }, force: options?.force });
   }
 
   async setNetworkBucketId(id: string, networkBucketId: string): Promise<void> {
