@@ -479,7 +479,9 @@ describe('AccountService', () => {
       await expect(service.provisionAccount(params)).rejects.toThrow(
         'Stalwart down',
       );
-      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
       expect(addresses.createProviderLink).not.toHaveBeenCalled();
     });
 
@@ -505,10 +507,12 @@ describe('AccountService', () => {
 
       await expect(service.provisionAccount(params)).rejects.toThrow('DB down');
       expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
-      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
     });
 
-    it('when bucket creation fails, then deletes the principal and account (undo) and rethrows', async () => {
+    it('when bucket creation fails, then deletes the principal and hard-deletes the account (undo) and rethrows', async () => {
       const createdAccount = MailAccount.build(
         newMailAccountAttributes({
           userId: params.userId,
@@ -532,9 +536,41 @@ describe('AccountService', () => {
         'Bridge down',
       );
       expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
-      expect(addresses.deleteProviderLink).toHaveBeenCalledWith('addr-id');
-      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
       expect(accounts.setNetworkBucketId).not.toHaveBeenCalled();
+    });
+
+    it('when the provider delete fails during rollback, then still hard-deletes the account', async () => {
+      const createdAccount = MailAccount.build(
+        newMailAccountAttributes({
+          userId: params.userId,
+          addresses: [],
+        }),
+      );
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+      accounts.create.mockResolvedValue(createdAccount);
+      addresses.create.mockResolvedValue('addr-id');
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: params.address,
+        internalId: '42',
+      });
+      bridge.createMailBucket.mockRejectedValue(new Error('Bridge down'));
+      provider.deleteAccount.mockRejectedValue(
+        new Error('Stalwart unreachable'),
+      );
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        'Bridge down',
+      );
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
     });
 
     it('when concurrent provisioning race occurs, then returns the existing account', async () => {
@@ -778,7 +814,7 @@ describe('AccountService', () => {
       );
     });
 
-    it('when bucket creation fails, then rolls back principal, link, and address', async () => {
+    it('when bucket creation fails, then rolls back principal and hard-deletes the address', async () => {
       const account = MailAccount.build(newMailAccountAttributes());
       const domain = MailDomain.build(newMailDomainAttributes());
       const newAddr = 'new@example.com';
@@ -788,6 +824,11 @@ describe('AccountService', () => {
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       addresses.create.mockResolvedValue(newAddressId);
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: newAddr,
+        internalId: '7',
+      });
       bridge.createMailBucket.mockRejectedValue(new Error('Bridge down'));
 
       await expect(
@@ -795,8 +836,9 @@ describe('AccountService', () => {
       ).rejects.toThrow('Bridge down');
 
       expect(provider.deleteAccount).toHaveBeenCalledWith(newAddr);
-      expect(addresses.deleteProviderLink).toHaveBeenCalledWith(newAddressId);
-      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId, {
+        force: true,
+      });
       expect(addresses.setNetworkBucketId).not.toHaveBeenCalled();
     });
 
@@ -862,7 +904,9 @@ describe('AccountService', () => {
         ),
       ).rejects.toThrow('provider down');
 
-      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId, {
+        force: true,
+      });
       expect(addresses.createProviderLink).not.toHaveBeenCalled();
     });
 
@@ -888,7 +932,9 @@ describe('AccountService', () => {
       ).rejects.toThrow('DB down');
 
       expect(provider.deleteAccount).toHaveBeenCalledWith(newAddr);
-      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId, {
+        force: true,
+      });
     });
   });
 

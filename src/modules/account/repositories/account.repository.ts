@@ -42,8 +42,8 @@ export class AccountRepository {
     return this.toDomain(model);
   }
 
-  async delete(id: string): Promise<void> {
-    await this.accountModel.destroy({ where: { id } });
+  async delete(id: string, options?: { force?: boolean }): Promise<void> {
+    await this.accountModel.destroy({ where: { id }, force: options?.force });
   }
 
   async setNetworkBucketId(id: string, networkBucketId: string): Promise<void> {
