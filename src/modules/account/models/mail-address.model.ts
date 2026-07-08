@@ -10,7 +10,6 @@ import {
   Model,
   PrimaryKey,
   Table,
-  Unique,
 } from 'sequelize-typescript';
 import { MailAccountModel } from './mail-account.model.js';
 import { MailDomainModel } from './mail-domain.model.js';
@@ -21,6 +20,14 @@ import { MailProviderAccountModel } from './mail-provider-account.model.js';
   timestamps: true,
   paranoid: true,
   tableName: 'mail_addresses',
+  indexes: [
+    {
+      name: 'mail_addresses_address_active_unique',
+      unique: true,
+      fields: ['address'],
+      where: { deleted_at: null },
+    },
+  ],
 })
 export class MailAddressModel extends Model {
   @PrimaryKey
@@ -35,7 +42,6 @@ export class MailAddressModel extends Model {
   declare mailAccountId: string;
 
   @AllowNull(false)
-  @Unique
   @Column(DataType.STRING(255))
   declare address: string;
 
