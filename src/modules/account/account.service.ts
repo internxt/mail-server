@@ -195,10 +195,16 @@ export class AccountService {
         error instanceof Error &&
         error.name === 'SequelizeUniqueConstraintError'
       ) {
-        this.logger.warn(
-          `Concurrent provisioning for '${params.userId}', returning existing`,
+        const existing = await this.accounts.findByUserId(params.userId);
+        if (existing) {
+          this.logger.warn(
+            `Concurrent provisioning for '${params.userId}', returning existing`,
+          );
+          return existing;
+        }
+        throw new ConflictException(
+          `Account for user '${params.userId}' already exists`,
         );
-        return this.getAccountOrFail(params.userId);
       }
       throw error;
     }

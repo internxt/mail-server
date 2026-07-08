@@ -592,6 +592,21 @@ describe('AccountService', () => {
       expect(result).toBe(existingAccount);
       expect(provider.createAccount).not.toHaveBeenCalled();
     });
+
+    it('when unique collision occurs but no account is visible, then throws a conflict', async () => {
+      const uniqueError = new Error('Unique constraint violated');
+      uniqueError.name = 'SequelizeUniqueConstraintError';
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+      accounts.create.mockRejectedValue(uniqueError);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(provider.createAccount).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteAccount', () => {

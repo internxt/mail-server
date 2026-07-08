@@ -8,7 +8,6 @@ import {
   Model,
   PrimaryKey,
   Table,
-  Unique,
 } from 'sequelize-typescript';
 import { MailAddressModel } from './mail-address.model.js';
 
@@ -17,7 +16,20 @@ import { MailAddressModel } from './mail-address.model.js';
   timestamps: true,
   paranoid: true,
   tableName: 'mail_provider_accounts',
-  indexes: [{ unique: true, fields: ['provider', 'external_id'] }],
+  indexes: [
+    {
+      name: 'mail_provider_accounts_provider_external_id_active_unique',
+      unique: true,
+      fields: ['provider', 'external_id'],
+      where: { deleted_at: null },
+    },
+    {
+      name: 'mail_provider_accounts_mail_address_id_active_unique',
+      unique: true,
+      fields: ['mail_address_id'],
+      where: { deleted_at: null },
+    },
+  ],
 })
 export class MailProviderAccountModel extends Model {
   @PrimaryKey
@@ -26,7 +38,6 @@ export class MailProviderAccountModel extends Model {
   declare id: string;
 
   @AllowNull(false)
-  @Unique
   @ForeignKey(() => MailAddressModel)
   @Column(DataType.UUID)
   declare mailAddressId: string;
