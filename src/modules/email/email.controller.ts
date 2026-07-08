@@ -21,6 +21,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -265,6 +266,9 @@ export class EmailController {
     description: 'Draft updated successfully',
   })
   @ApiNotFoundResponse({ description: 'Draft not found' })
+  @ApiConflictResponse({
+    description: 'Draft was modified concurrently; retry the save',
+  })
   updateDraft(
     @MailAddress('address') email: string,
     @Param('id') draftId: string,

@@ -18,6 +18,13 @@ import type {
   ThreadingHeaders,
 } from './email.types.js';
 
+export class DraftUpdateConflictError extends Error {
+  constructor(draftId: string) {
+    super(`Draft ${draftId} was modified concurrently, retry the save`);
+    this.name = 'DraftUpdateConflictError';
+  }
+}
+
 export abstract class MailProvider {
   abstract getMailboxes(userEmail: string): Promise<Mailbox[]>;
   abstract listEmails(params: ListEmails): Promise<EmailListResponse>;
