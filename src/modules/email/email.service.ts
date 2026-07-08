@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -7,7 +8,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AccountService } from '../account/account.service.js';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
-import { MailProvider } from './mail-provider.port.js';
+import {
+  DraftUpdateConflictError,
+  MailProvider,
+} from './mail-provider.port.js';
 import type {
   DraftEmailDto,
   Email,
@@ -299,11 +303,19 @@ export class EmailService {
     draftId: string,
     dto: DraftEmailDto,
   ): Promise<Email> {
-    const result = await this.mail.updateDraft(
-      userEmail,
-      draftId,
-      this.packDraftEnvelope(dto),
-    );
+    let result: Email | null;
+    try {
+      result = await this.mail.updateDraft(
+        userEmail,
+        draftId,
+        this.packDraftEnvelope(dto),
+      );
+    } catch (error) {
+      if (error instanceof DraftUpdateConflictError) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
     if (!result) {
       throw new NotFoundException(`Draft ${draftId} not found`);
     }

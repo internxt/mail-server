@@ -1,12 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { Test } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { Readable } from 'node:stream';
 import { EmailService } from './email.service.js';
-import { MailProvider } from './mail-provider.port.js';
+import {
+  DraftUpdateConflictError,
+  MailProvider,
+} from './mail-provider.port.js';
 import { AccountService } from '../account/account.service.js';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
 import { StalwartSmtpService } from '../infrastructure/smtp/stalwart-smtp.service.js';
@@ -679,6 +686,16 @@ describe('EmailService', () => {
       await expect(
         service.updateDraft(userEmail, 'missing-draft', newDraftEmailDto()),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    test('When the draft was modified concurrently, then the caller gets a conflict so it can retry the save', async () => {
+      provider.updateDraft.mockRejectedValue(
+        new DraftUpdateConflictError('draft-id'),
+      );
+
+      await expect(
+        service.updateDraft(userEmail, 'draft-id', newDraftEmailDto()),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
