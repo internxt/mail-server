@@ -14,6 +14,10 @@ spec:
       port: {{ .Values.service.port }}
       targetPort: management
       protocol: TCP
+    - name: smtps
+      port: {{ .Values.mailService.ports.smtps.port }}
+      targetPort: smtps
+      protocol: TCP
 ---
 apiVersion: v1
 kind: Service
