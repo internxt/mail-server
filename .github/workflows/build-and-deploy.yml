@@ -1,7 +1,7 @@
 name: Build & Deploy to Production
 on:
   push:
-    branches: ['master']
+    branches: ['master', 'test_actions']
 jobs:
   build:
     runs-on: ubuntu-latest
