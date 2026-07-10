@@ -69,4 +69,21 @@ describe('MtaHooksAuthGuard', () => {
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
+
+  it('when the secret is empty, then throws Unauthorized', () => {
+    const context = contextWithAuth(basic(username, ''));
+
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+  });
+
+  it('when the configured secret is empty, then fails to construct', () => {
+    const configService = createMock<ConfigService>();
+    configService.getOrThrow.mockImplementation((key: string) => {
+      if (key === 'mtaHooks.username') return username;
+      if (key === 'mtaHooks.secret') return '';
+      throw new Error(`unknown key: ${key}`);
+    });
+
+    expect(() => new MtaHooksAuthGuard(configService)).toThrow();
+  });
 });

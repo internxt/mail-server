@@ -14,9 +14,21 @@ export class MtaHooksAuthGuard implements CanActivate {
   private readonly expectedSecret: string;
 
   constructor(configService: ConfigService) {
-    this.expectedUsername =
-      configService.getOrThrow<string>('mtaHooks.username');
-    this.expectedSecret = configService.getOrThrow<string>('mtaHooks.secret');
+    this.expectedUsername = this.requireNonEmpty(
+      configService.getOrThrow<string>('mtaHooks.username'),
+      'mtaHooks.username',
+    );
+    this.expectedSecret = this.requireNonEmpty(
+      configService.getOrThrow<string>('mtaHooks.secret'),
+      'mtaHooks.secret',
+    );
+  }
+
+  private requireNonEmpty(value: string, key: string): string {
+    if (value.length === 0) {
+      throw new Error(`Missing required configuration: ${key}`);
+    }
+    return value;
   }
 
   canActivate(context: ExecutionContext): boolean {
