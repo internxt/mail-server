@@ -362,6 +362,10 @@ describe('AccountService', () => {
 
     beforeEach(() => {
       payments.getUserTier.mockResolvedValue(validTier);
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: PLAN_BYTES,
+        totalUsedSpaceBytes: 0,
+      });
     });
 
     it('when all inputs are valid, then creates account, address, provider link, and stalwart principal', async () => {
@@ -461,12 +465,10 @@ describe('AccountService', () => {
       expect(provider.createAccount).not.toHaveBeenCalled();
     });
 
-    it('when the plan has no drive storage allowance, then throws and never provisions an unlimited principal', async () => {
-      payments.getUserTier.mockResolvedValue({
-        ...validTier,
-        featuresPerService: {
-          mail: { enabled: true, addressesPerUser: 3 },
-        },
+    it('when the user has no storage allowance, then throws and never provisions an unlimited principal', async () => {
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: 0,
+        totalUsedSpaceBytes: 0,
       });
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
@@ -687,7 +689,10 @@ describe('AccountService', () => {
 
   describe('addAddress', () => {
     beforeEach(() => {
-      payments.getUserTier.mockResolvedValue(validTier);
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: PLAN_BYTES,
+        totalUsedSpaceBytes: 0,
+      });
     });
 
     it('when all conditions met, then creates principal and links provider', async () => {
@@ -749,12 +754,10 @@ describe('AccountService', () => {
       );
     });
 
-    it('when the plan has no drive storage allowance, then throws and never provisions an unlimited principal', async () => {
-      payments.getUserTier.mockResolvedValue({
-        ...validTier,
-        featuresPerService: {
-          mail: { enabled: true, addressesPerUser: 3 },
-        },
+    it('when the user has no storage allowance, then throws and never provisions an unlimited principal', async () => {
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: 0,
+        totalUsedSpaceBytes: 0,
       });
       accounts.findByUserId.mockResolvedValue(
         MailAccount.build(newMailAccountAttributes()),

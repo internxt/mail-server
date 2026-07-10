@@ -170,9 +170,10 @@ export class AccountService {
     displayName: string;
     keys: MailAddressKeyBundle;
   }): Promise<MailAccount> {
-    const [tier, domainRecord, existingAddress, existingAccount] =
+    const [tier, usage, domainRecord, existingAddress, existingAccount] =
       await Promise.all([
         this.payments.getUserTier(params.userId),
+        this.bridge.getUserUsage(params.userId),
         this.domains.findByDomain(params.domain),
         this.addresses.findByAddress(params.address),
         this.accounts.findByUserId(params.userId),
@@ -195,10 +196,10 @@ export class AccountService {
       );
     }
 
-    const quota = tier.featuresPerService.drive?.maxSpaceBytes;
+    const quota = usage.maxSpaceBytes;
     if (!quota || quota <= 0) {
       throw new UnprocessableEntityException(
-        `Cannot provision mail account for '${params.userId}': plan has no drive storage allowance`,
+        `Cannot provision mail account for '${params.userId}': user has no storage allowance`,
       );
     }
 
@@ -301,8 +302,8 @@ export class AccountService {
     password: string,
     displayName?: string,
   ): Promise<void> {
-    const [tier, account, domain, existing] = await Promise.all([
-      this.payments.getUserTier(userId),
+    const [usage, account, domain, existing] = await Promise.all([
+      this.bridge.getUserUsage(userId),
       this.accounts.findByUserId(userId),
       this.domains.findByDomain(domainName),
       this.addresses.findByAddress(address),
@@ -318,10 +319,10 @@ export class AccountService {
       throw new ConflictException(`Address '${address}' already exists`);
     }
 
-    const quota = tier.featuresPerService.drive?.maxSpaceBytes;
+    const quota = usage.maxSpaceBytes;
     if (!quota || quota <= 0) {
       throw new UnprocessableEntityException(
-        `Cannot add address for '${userId}': plan has no drive storage allowance`,
+        `Cannot add address for '${userId}': user has no storage allowance`,
       );
     }
 
