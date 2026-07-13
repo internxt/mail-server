@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -7,7 +8,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AccountService } from '../account/account.service.js';
 import { MailUsageService } from '../usage/mail-usage.service.js';
-import { MailProvider } from './mail-provider.port.js';
+import {
+  DraftUpdateConflictError,
+  MailProvider,
+} from './mail-provider.port.js';
 import type {
   DraftEmailDto,
   Email,
@@ -28,6 +32,7 @@ import {
   parseEnvelope,
   projectForCaller,
 } from './email-encryption.js';
+import { convert } from 'html-to-text';
 import {
   DownloadAttachmentPayload,
   DownloadAttachmentResponse,
@@ -181,7 +186,7 @@ export class EmailService {
       'base64',
     );
 
-    const [plainBody, attachments] = await Promise.all([
+    const [decryptedBody, attachments] = await Promise.all([
       this.decryptBodyForExternalDelivery(dto, serverPrivateKey),
       this.decryptAttachmentsForExternalDelivery(
         userEmail,
@@ -190,13 +195,19 @@ export class EmailService {
       ),
     ]);
 
+    const htmlBody = decryptedBody ?? dto.htmlBody;
+    const textBody = htmlBody
+      ? convert(htmlBody, { wordwrap: false })
+      : dto.textBody;
+
     const { messageId } = await this.smtp.sendRaw({
       userEmail,
       to: dto.to,
       cc: dto.cc,
       bcc: dto.bcc,
       subject: dto.subject,
-      text: plainBody ?? dto.textBody,
+      html: htmlBody,
+      text: textBody,
       attachments,
       inReplyTo: threading?.messageId[0],
       references: threading?.references,
@@ -292,11 +303,19 @@ export class EmailService {
     draftId: string,
     dto: DraftEmailDto,
   ): Promise<Email> {
-    const result = await this.mail.updateDraft(
-      userEmail,
-      draftId,
-      this.packDraftEnvelope(dto),
-    );
+    let result: Email | null;
+    try {
+      result = await this.mail.updateDraft(
+        userEmail,
+        draftId,
+        this.packDraftEnvelope(dto),
+      );
+    } catch (error) {
+      if (error instanceof DraftUpdateConflictError) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
     if (!result) {
       throw new NotFoundException(`Draft ${draftId} not found`);
     }

@@ -3,7 +3,8 @@ import { Readable } from 'node:stream';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { JmapMailProvider } from './jmap-mail.provider.js';
-import { JmapService } from './jmap.service.js';
+import { JmapError, JmapService } from './jmap.service.js';
+import { DraftUpdateConflictError } from '../../email/mail-provider.port.js';
 import {
   newJmapMailbox,
   newJmapEmail,
@@ -94,7 +95,11 @@ describe('JmapMailProvider', () => {
         jmapMultiResponse(
           { ids: [rep.id], total: 1 },
           { list: [rep] },
-          { list: [{ id: 'thread-1', emailIds: [earlier.id, rep.id, reply.id] }] },
+          {
+            list: [
+              { id: 'thread-1', emailIds: [earlier.id, rep.id, reply.id] },
+            ],
+          },
           { list: [earlier, rep, reply] },
         ),
       );
@@ -523,6 +528,155 @@ describe('JmapMailProvider', () => {
 
       expect(result).not.toBeNull();
       expect(result!.id).toBe(updatedDraft.id);
+    });
+
+    test('When the draft is updated, then the destroy+create is guarded with ifInState from the prior read', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+      const existingDraft = newJmapEmail({ keywords: { $draft: true } });
+      const updatedDraft = newJmapEmail({ keywords: { $draft: true } });
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [existingDraft], state: 'email-state-1' }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ created: { draft: { id: updatedDraft.id } } }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [updatedDraft] }),
+      );
+
+      await provider.updateDraft(
+        'user@test.com',
+        existingDraft.id,
+        newDraftEmailDto(),
+      );
+
+      const setCall = jmapService.request.mock.calls.find(
+        (call) => call[1][0]![0] === 'Email/set',
+      )!;
+      const [, setArgs] = setCall[1][0]!;
+      expect(setArgs['ifInState']).toBe('email-state-1');
+      expect(setArgs['destroy']).toEqual([existingDraft.id]);
+    });
+
+    test('When the account state changes between the read and the write, then the update is retried and succeeds', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+      const existingDraft = newJmapEmail({ keywords: { $draft: true } });
+      const updatedDraft = newJmapEmail({ keywords: { $draft: true } });
+      const stateMismatch = new JmapError('JMAP method error', [
+        ['error', { type: 'stateMismatch' }, 'r0'],
+      ]);
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [existingDraft], state: 'email-state-1' }),
+      );
+      jmapService.request.mockRejectedValueOnce(stateMismatch);
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [existingDraft], state: 'email-state-2' }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ created: { draft: { id: updatedDraft.id } } }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [updatedDraft] }),
+      );
+
+      const result = await provider.updateDraft(
+        'user@test.com',
+        existingDraft.id,
+        newDraftEmailDto(),
+      );
+
+      expect(result!.id).toBe(updatedDraft.id);
+      const setCalls = jmapService.request.mock.calls.filter(
+        (call) => call[1][0]![0] === 'Email/set',
+      );
+      expect(setCalls).toHaveLength(2);
+      expect(setCalls[1]![1][0]![1]['ifInState']).toBe('email-state-2');
+    });
+
+    test('When the update keeps losing the state race, then a conflict error is surfaced', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+      const existingDraft = newJmapEmail({ keywords: { $draft: true } });
+      const stateMismatch = new JmapError('JMAP method error', [
+        ['error', { type: 'stateMismatch' }, 'r0'],
+      ]);
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      for (let i = 0; i < 3; i++) {
+        jmapService.request.mockResolvedValueOnce(
+          jmapResponse({ list: [existingDraft], state: `email-state-${i}` }),
+        );
+        jmapService.request.mockRejectedValueOnce(stateMismatch);
+      }
+
+      await expect(
+        provider.updateDraft(
+          'user@test.com',
+          existingDraft.id,
+          newDraftEmailDto(),
+        ),
+      ).rejects.toThrow(DraftUpdateConflictError);
+    });
+
+    test('When the old draft cannot be destroyed but the copy was created, then the copy is cleaned up and the update fails', async () => {
+      const draftsMailbox = newJmapMailbox({ role: 'drafts' });
+      const identity = newJmapIdentity();
+      const existingDraft = newJmapEmail({ keywords: { $draft: true } });
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [draftsMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [existingDraft], state: 'email-state-1' }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({
+          created: { draft: { id: 'orphan-copy' } },
+          notDestroyed: {
+            [existingDraft.id]: { type: 'notFound', description: 'gone' },
+          },
+        }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ destroyed: ['orphan-copy'] }),
+      );
+
+      await expect(
+        provider.updateDraft(
+          'user@test.com',
+          existingDraft.id,
+          newDraftEmailDto(),
+        ),
+      ).rejects.toThrow('Failed to update draft: gone');
+
+      const lastCall = jmapService.request.mock.calls.at(-1)!;
+      const [methodName, methodArgs] = lastCall[1][0]!;
+      expect(methodName).toBe('Email/set');
+      expect(methodArgs['destroy']).toEqual(['orphan-copy']);
     });
   });
 
@@ -1121,9 +1275,7 @@ describe('JmapMailProvider', () => {
         jmapMultiResponse(
           { list: [{ id: theirMessage.id, threadId: 'thread-1' }] },
           {
-            list: [
-              { id: 'thread-1', emailIds: [myReply.id, theirMessage.id] },
-            ],
+            list: [{ id: 'thread-1', emailIds: [myReply.id, theirMessage.id] }],
           },
           { list: [myReply, theirMessage] },
         ),

@@ -39,18 +39,19 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.15",
     "@nestjs/sequelize": "^11.0.1",
-    "@nestjs/swagger": "^11.2.6",
+    "@nestjs/swagger": "^11.4.5",
     "@nestjs/throttler": "^6.5.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "cross-env": "^10.1.0",
     "dayjs": "^1.11.20",
     "helmet": "^8.1.0",
+    "html-to-text": "^10.0.0",
     "internxt-crypto": "^1.5.0",
     "ioredis": "^5.10.1",
     "nanoid": "^5.1.5",
     "nestjs-pino": "^4.6.0",
-    "nodemailer": "^8.0.10",
+    "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
@@ -62,7 +63,7 @@
     "sequelize": "^6.37.8",
     "sequelize-cli": "^6.6.5",
     "swagger-ui-express": "^5.0.1",
-    "undici": "^7.22.0"
+    "undici": "^7.28.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
@@ -73,6 +74,7 @@
     "@swc/core": "^1.15.18",
     "@types/chance": "^1.1.7",
     "@types/express": "^5.0.6",
+    "@types/html-to-text": "^9.0.4",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.15.0",
     "@types/nodemailer": "^8.0.0",
@@ -98,6 +100,7 @@
     ]
   },
   "overrides": {
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "multer": "^2.2.0"
   }
 }

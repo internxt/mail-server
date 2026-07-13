@@ -8,7 +8,14 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiNotFoundResponse,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AccountService } from '../account/account.service.js';
 import { GatewayAuthGuard } from './gateway.guard.js';
@@ -38,15 +45,21 @@ export class GatewayController {
 
   @Post('accounts/:uuid/suspend')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiParam({ name: 'uuid', description: 'The UUID of the account' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  @ApiNotFoundResponse({ description: 'Account not found' })
   @ApiOperation({ summary: 'Suspend a mail account' })
-  async suspendAccount(@Param('uuid') _uuid: string) {
-    // mark as frozen and suspend account in Stalwart
+  async suspendAccount(@Param('uuid') uuid: string) {
+    await this.accountService.suspendAccount(uuid);
   }
 
   @Post('accounts/:uuid/reactivate')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiParam({ name: 'uuid', description: 'The UUID of the account' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  @ApiNotFoundResponse({ description: 'Account not found' })
   @ApiOperation({ summary: 'Reactivate a mail account' })
-  async reactivateAccount(@Param('uuid') _uuid: string) {
-    // unmark as frozen and reactivate account in Stalwart
+  async reactivateAccount(@Param('uuid') uuid: string) {
+    await this.accountService.reactivateAccount(uuid);
   }
 }

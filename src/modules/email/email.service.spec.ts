@@ -1,12 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { Test } from '@nestjs/testing';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { Readable } from 'node:stream';
 import { EmailService } from './email.service.js';
-import { MailProvider } from './mail-provider.port.js';
+import {
+  DraftUpdateConflictError,
+  MailProvider,
+} from './mail-provider.port.js';
 import { AccountService } from '../account/account.service.js';
 import { MailUsageService } from '../usage/mail-usage.service.js';
 import { StalwartSmtpService } from '../infrastructure/smtp/stalwart-smtp.service.js';
@@ -510,6 +517,30 @@ describe('EmailService', () => {
       expect(result).toEqual({ id: 'msg-2' });
     });
 
+    it('when the decrypted body is HTML, then it is delivered as the HTML part with a plain-text alternative', async () => {
+      const dto = newSendEmailDto({
+        attachments: undefined,
+        encryption: newEncryptionBlock(),
+      });
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      mockedDecryptBody.mockResolvedValue(
+        '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+      );
+      smtp.sendRaw.mockResolvedValue({ messageId: 'msg-html' });
+      provider.saveToSent.mockResolvedValue({ id: 'sent-html' });
+
+      await service.sendExternalEmail(userEmail, dto);
+
+      expect(smtp.sendRaw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          html: '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+          text: 'Testing the new mail config\n\nlmk how it goes!',
+        }),
+      );
+    });
+
     it('when replying to an external recipient, then the conversation thread is carried through SMTP and the saved copy', async () => {
       const dto = newSendEmailDto({
         inReplyToEmailId: 'parent-id',
@@ -655,6 +686,16 @@ describe('EmailService', () => {
       await expect(
         service.updateDraft(userEmail, 'missing-draft', newDraftEmailDto()),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    test('When the draft was modified concurrently, then the caller gets a conflict so it can retry the save', async () => {
+      provider.updateDraft.mockRejectedValue(
+        new DraftUpdateConflictError('draft-id'),
+      );
+
+      await expect(
+        service.updateDraft(userEmail, 'draft-id', newDraftEmailDto()),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
