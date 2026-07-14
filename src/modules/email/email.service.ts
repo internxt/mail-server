@@ -43,11 +43,7 @@ import {
   StalwartSmtpService,
   type SmtpAttachment,
 } from '../infrastructure/smtp/stalwart-smtp.service.js';
-import {
-  decryptAttachment,
-  decryptBody,
-  unwrapAttachmentKey,
-} from './server-crypto.js';
+import { decryptAttachment, decryptBody } from './server-crypto.js';
 import type { Readable } from 'node:stream';
 
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
@@ -186,16 +182,17 @@ export class EmailService {
       'base64',
     );
 
-    const [decryptedBody, attachments] = await Promise.all([
-      this.decryptBodyForExternalDelivery(dto, serverPrivateKey),
-      this.decryptAttachmentsForExternalDelivery(
-        userEmail,
-        dto,
-        serverPrivateKey,
-      ),
-    ]);
+    const payload = await this.decryptPayloadForExternalDelivery(
+      dto,
+      serverPrivateKey,
+    );
+    const attachments = await this.decryptAttachmentsForExternalDelivery(
+      userEmail,
+      dto,
+      payload?.attachmentsSessionKey,
+    );
 
-    const htmlBody = decryptedBody ?? dto.htmlBody;
+    const htmlBody = payload?.body ?? dto.htmlBody;
     const textBody = htmlBody
       ? convert(htmlBody, { wordwrap: false })
       : dto.textBody;
@@ -244,37 +241,45 @@ export class EmailService {
     return threading;
   }
 
-  private async decryptBodyForExternalDelivery(
+  private async decryptPayloadForExternalDelivery(
     dto: SendEmailDto,
     serverPrivateKey: Uint8Array,
-  ): Promise<string | undefined> {
+  ): Promise<{ body: string; attachmentsSessionKey?: string } | undefined> {
     if (!dto.encryption?.encryptedText || !dto.encryption.wrappedKeys?.length) {
       return undefined;
     }
-    return decryptBody(
+    const text = await decryptBody(
       dto.encryption.encryptedText,
       dto.encryption.wrappedKeys,
       serverPrivateKey,
     );
+    try {
+      return JSON.parse(text) as {
+        body: string;
+        attachmentsSessionKey?: string;
+      };
+    } catch {
+      throw new BadRequestException(
+        'Encrypted payload is not a valid body envelope',
+      );
+    }
   }
 
   private async decryptAttachmentsForExternalDelivery(
     userEmail: string,
     dto: SendEmailDto,
-    serverPrivateKey: Uint8Array,
+    attachmentsSessionKey: string | undefined,
   ): Promise<SmtpAttachment[] | undefined> {
     if (!dto.attachments?.length) return undefined;
 
-    const wrappedKeys = dto.encryption?.attachmentWrappedKeys;
-    if (!wrappedKeys?.length) {
+    if (!attachmentsSessionKey) {
       throw new BadRequestException(
-        'attachmentWrappedKeys are required when sending attachments in MIXED mode',
+        'attachmentsSessionKey is required when sending attachments in MIXED mode',
       );
     }
 
-    const attachmentKey = await unwrapAttachmentKey(
-      wrappedKeys,
-      serverPrivateKey,
+    const attachmentKey = new Uint8Array(
+      Buffer.from(attachmentsSessionKey, 'base64'),
     );
 
     return Promise.all(

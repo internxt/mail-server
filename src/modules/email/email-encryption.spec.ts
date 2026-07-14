@@ -54,15 +54,18 @@ describe('email-encryption', () => {
   });
 
   describe('projectForCaller', () => {
-    it('when given an envelope, then projects the preview and full wrapped-key array', () => {
-      const wrappedKeys = [newEncryptedWrappedKey(), newEncryptedWrappedKey()];
-      const envelope = newEncryptionBlock({ wrappedKeys });
+    it('when given an envelope, then projects the preview and the labeled keys that unlock it', () => {
+      const previewWrappedKeys = [
+        newEncryptedWrappedKey(),
+        newEncryptedWrappedKey(),
+      ];
+      const envelope = newEncryptionBlock({ previewWrappedKeys });
 
       const result = projectForCaller(envelope);
 
       expect(result).toEqual({
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKeys,
+        wrappedKeys: previewWrappedKeys,
       });
     });
   });

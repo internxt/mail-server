@@ -28,14 +28,9 @@ import {
   newEncryptedWrappedKey,
 } from '../../../test/fixtures.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
-import {
-  unwrapAttachmentKey,
-  decryptAttachment,
-  decryptBody,
-} from './server-crypto.js';
+import { decryptAttachment, decryptBody } from './server-crypto.js';
 
 vi.mock('./server-crypto.js', () => ({
-  unwrapAttachmentKey: vi.fn(),
   decryptAttachment: vi.fn(),
   decryptBody: vi.fn(),
 }));
@@ -161,7 +156,7 @@ describe('EmailService', () => {
       ]);
       expect(result.emails[0]!.encryption).toEqual({
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKeys: envelope.wrappedKeys,
+        wrappedKeys: envelope.previewWrappedKeys,
       });
       expect(result.emails[0]!.preview).toBe('');
       expect(result.emails[1]!.encryption).toBeUndefined();
@@ -194,7 +189,7 @@ describe('EmailService', () => {
       ]);
       expect(result.emails[0]!.encryption).toEqual({
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKeys: envelope.wrappedKeys,
+        wrappedKeys: envelope.previewWrappedKeys,
       });
       expect(result.emails[0]!.preview).toBe('');
     });
@@ -284,7 +279,7 @@ describe('EmailService', () => {
 
       expect(result[0]!.encryption).toEqual({
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKeys: envelope.wrappedKeys,
+        wrappedKeys: envelope.previewWrappedKeys,
       });
       expect(result[0]!.preview).toBe('');
       expect(result[1]!.encryption).toBeUndefined();
@@ -409,7 +404,6 @@ describe('EmailService', () => {
   });
 
   describe('sendExternalEmail', () => {
-    const mockedUnwrap = vi.mocked(unwrapAttachmentKey);
     const mockedDecrypt = vi.mocked(decryptAttachment);
     const mockedDecryptBody = vi.mocked(decryptBody);
 
@@ -467,10 +461,7 @@ describe('EmailService', () => {
     });
 
     it('when sending an external email with end-to-end encrypted body and attachments, then the recipient receives them in clear and the user keeps the encrypted copy in Sent', async () => {
-      const wrappedKey = newEncryptedWrappedKey();
-      const encryption = newEncryptionBlock({
-        attachmentWrappedKeys: [wrappedKey],
-      });
+      const encryption = newEncryptionBlock();
       const dto = newSendEmailDto({
         attachments: [
           { blobId: 'b1', name: 'photo.jpg', type: 'image/jpeg', size: 1024 },
@@ -481,9 +472,13 @@ describe('EmailService', () => {
       configService.getOrThrow.mockReturnValue(
         Buffer.from('server-priv-key').toString('base64'),
       );
-      mockedDecryptBody.mockResolvedValue('plain body text');
       const attachmentKey = new Uint8Array([1, 2, 3, 4]);
-      mockedUnwrap.mockResolvedValue(attachmentKey);
+      mockedDecryptBody.mockResolvedValue(
+        JSON.stringify({
+          body: 'plain body text',
+          attachmentsSessionKey: Buffer.from(attachmentKey).toString('base64'),
+        }),
+      );
       provider.downloadAttachment.mockResolvedValue({
         stream: Readable.from([Buffer.from('cipher-bytes')]),
         contentType: 'image/jpeg',
@@ -526,7 +521,9 @@ describe('EmailService', () => {
         Buffer.from('server-priv-key').toString('base64'),
       );
       mockedDecryptBody.mockResolvedValue(
-        '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+        JSON.stringify({
+          body: '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+        }),
       );
       smtp.sendRaw.mockResolvedValue({ messageId: 'msg-html' });
       provider.saveToSent.mockResolvedValue({ id: 'sent-html' });

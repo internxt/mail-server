@@ -29,7 +29,6 @@ export interface DeleteEmailResult {
 export interface EncryptedSummaryFields {
   encryptedPreview: string;
   wrappedKeys: EncryptedWrappedKey[];
-  attachmentWrappedKeys?: EncryptedWrappedKey[];
 }
 
 export interface EmailSummary {
@@ -81,14 +80,15 @@ export interface ListEmails {
 export interface EncryptedWrappedKey {
   hybridCiphertext: string;
   encryptedKey: string;
+  encryptedForEmail: string;
 }
 
 export interface EncryptionBlock {
-  version: 'v1';
-  encryptedPreview: string;
+  version: 'v2';
   encryptedText: string;
   wrappedKeys: EncryptedWrappedKey[];
-  attachmentWrappedKeys?: EncryptedWrappedKey[];
+  encryptedPreview: string;
+  previewWrappedKeys: EncryptedWrappedKey[];
 }
 
 export interface SendEmailDto {
