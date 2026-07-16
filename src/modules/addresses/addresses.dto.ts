@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
+import { IsMailUsername } from '../../common/decorators/is-mail-username.decorator.js';
 
 export class CheckAvailabilityQueryDto {
   @ApiProperty({
@@ -9,10 +10,8 @@ export class CheckAvailabilityQueryDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[a-zA-Z0-9._%+-]+$/, {
-    message: 'username contains invalid characters',
-  })
   @Transform(({ value }: { value: string }) => value.toLowerCase())
+  @IsMailUsername()
   username!: string;
 
   @ApiProperty({ description: 'Email domain', example: 'inxt.me' })

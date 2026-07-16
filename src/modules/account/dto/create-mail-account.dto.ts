@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsNotEmpty, IsString, ValidateNested } from 'class-validator';
+import { IsMailUsername } from '../../../common/decorators/is-mail-username.decorator.js';
 
 export class MailAddressKeyBundleDto {
   @ApiProperty({
@@ -31,6 +32,8 @@ export class CreateMailAccountDto {
   @ApiProperty({ example: 'alice' })
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }: { value: string }) => value.toLowerCase())
+  @IsMailUsername()
   address!: string;
 
   @ApiProperty({ example: 'inxt.eu' })
