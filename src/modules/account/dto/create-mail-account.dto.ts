@@ -32,7 +32,9 @@ export class CreateMailAccountDto {
   @ApiProperty({ example: 'alice' })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: string }) => value.toLowerCase())
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.toLowerCase() : value,
+  )
   @IsMailUsername()
   address!: string;
 

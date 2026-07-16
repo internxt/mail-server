@@ -10,14 +10,18 @@ export class CheckAvailabilityQueryDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: string }) => value.toLowerCase())
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.toLowerCase() : value,
+  )
   @IsMailUsername()
   username!: string;
 
   @ApiProperty({ description: 'Email domain', example: 'inxt.me' })
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }: { value: string }) => value.toLowerCase())
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.toLowerCase() : value,
+  )
   domain!: string;
 }
 
