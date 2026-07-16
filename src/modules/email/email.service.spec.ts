@@ -28,11 +28,14 @@ import {
   newEncryptedWrappedKey,
 } from '../../../test/fixtures.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
-import { decryptAttachment, decryptBody } from './server-crypto.js';
+import {
+  decryptAttachment,
+  decryptEnvelopeWithServerKey,
+} from './server-crypto.js';
 
 vi.mock('./server-crypto.js', () => ({
   decryptAttachment: vi.fn(),
-  decryptBody: vi.fn(),
+  decryptEnvelopeWithServerKey: vi.fn(),
 }));
 
 describe('EmailService', () => {
@@ -156,7 +159,7 @@ describe('EmailService', () => {
       ]);
       expect(result.emails[0]!.encryption).toEqual({
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKeys: envelope.previewWrappedKeys,
+        wrappedKeys: envelope.wrappedKeys,
       });
       expect(result.emails[0]!.preview).toBe('');
       expect(result.emails[1]!.encryption).toBeUndefined();
@@ -189,7 +192,7 @@ describe('EmailService', () => {
       ]);
       expect(result.emails[0]!.encryption).toEqual({
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKeys: envelope.previewWrappedKeys,
+        wrappedKeys: envelope.wrappedKeys,
       });
       expect(result.emails[0]!.preview).toBe('');
     });
@@ -279,7 +282,7 @@ describe('EmailService', () => {
 
       expect(result[0]!.encryption).toEqual({
         encryptedPreview: envelope.encryptedPreview,
-        wrappedKeys: envelope.previewWrappedKeys,
+        wrappedKeys: envelope.wrappedKeys,
       });
       expect(result[0]!.preview).toBe('');
       expect(result[1]!.encryption).toBeUndefined();
@@ -405,7 +408,7 @@ describe('EmailService', () => {
 
   describe('sendExternalEmail', () => {
     const mockedDecrypt = vi.mocked(decryptAttachment);
-    const mockedDecryptBody = vi.mocked(decryptBody);
+    const mockedDecryptEnvelope = vi.mocked(decryptEnvelopeWithServerKey);
 
     it('when sending an external email with no recipients, then it is rejected before reaching SMTP', async () => {
       const dto = newSendEmailDto({ to: [] });
@@ -473,12 +476,10 @@ describe('EmailService', () => {
         Buffer.from('server-priv-key').toString('base64'),
       );
       const attachmentKey = new Uint8Array([1, 2, 3, 4]);
-      mockedDecryptBody.mockResolvedValue(
-        JSON.stringify({
-          body: 'plain body text',
-          attachmentsSessionKey: Buffer.from(attachmentKey).toString('base64'),
-        }),
-      );
+      mockedDecryptEnvelope.mockResolvedValue({
+        body: 'plain body text',
+        attachmentsSessionKey: attachmentKey,
+      });
       provider.downloadAttachment.mockResolvedValue({
         stream: Readable.from([Buffer.from('cipher-bytes')]),
         contentType: 'image/jpeg',
@@ -520,11 +521,10 @@ describe('EmailService', () => {
       configService.getOrThrow.mockReturnValue(
         Buffer.from('server-priv-key').toString('base64'),
       );
-      mockedDecryptBody.mockResolvedValue(
-        JSON.stringify({
-          body: '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
-        }),
-      );
+      mockedDecryptEnvelope.mockResolvedValue({
+        body: '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+        attachmentsSessionKey: new Uint8Array([1, 2, 3, 4]),
+      });
       smtp.sendRaw.mockResolvedValue({ messageId: 'msg-html' });
       provider.saveToSent.mockResolvedValue({ id: 'sent-html' });
 

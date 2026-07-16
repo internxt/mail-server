@@ -45,6 +45,6 @@ export function projectForCaller(
 ): EncryptedSummaryFields {
   return {
     encryptedPreview: envelope.encryptedPreview,
-    wrappedKeys: envelope.previewWrappedKeys,
+    wrappedKeys: envelope.wrappedKeys,
   };
 }
