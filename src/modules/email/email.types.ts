@@ -84,11 +84,11 @@ export interface EncryptedWrappedKey {
 }
 
 export interface EncryptionBlock {
-  version: 'v2';
+  version: 'v3';
   encryptedText: string;
-  wrappedKeys: EncryptedWrappedKey[];
   encryptedPreview: string;
-  previewWrappedKeys: EncryptedWrappedKey[];
+  encryptedAttachmentsSessionKey: string;
+  wrappedKeys: EncryptedWrappedKey[];
 }
 
 export interface SendEmailDto {

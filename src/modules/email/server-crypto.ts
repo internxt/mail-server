@@ -1,29 +1,36 @@
 import { decryptEmailHybrid } from 'internxt-crypto/email-crypto';
 import { decryptSymmetrically } from 'internxt-crypto';
-import type { EncryptedWrappedKey } from './email.types.js';
+import type { EncryptionBlock } from './email.types.js';
 
-export async function decryptBody(
-  encryptedText: string,
-  wrappedKeys: EncryptedWrappedKey[],
+export interface DecryptedEnvelope {
+  body: string;
+  attachmentsSessionKey: Uint8Array;
+}
+
+export async function decryptEnvelopeWithServerKey(
+  envelope: EncryptionBlock,
   serverPrivateKey: Uint8Array,
-): Promise<string> {
-  if (!wrappedKeys.length) throw new Error('No wrapped keys provided for body');
-  for (const wrappedKey of wrappedKeys) {
+): Promise<DecryptedEnvelope> {
+  if (!envelope.wrappedKeys.length)
+    throw new Error('No wrapped keys provided for body');
+  for (const wrappedKey of envelope.wrappedKeys) {
     try {
-      const { text } = await decryptEmailHybrid(
+      const { text, attachmentsSessionKey } = await decryptEmailHybrid(
         {
-          encryptedKey: wrappedKey,
-          encEmail: { encText: encryptedText },
+          encText: envelope.encryptedText,
+          encPreview: envelope.encryptedPreview,
+          encAttachmentsSessionKey: envelope.encryptedAttachmentsSessionKey,
         },
+        wrappedKey,
         serverPrivateKey,
       );
-      return text;
+      return { body: text, attachmentsSessionKey };
     } catch {
       // not our key, try the next one
     }
   }
   throw new Error(
-    'None of the wrapped keys could be used to decrypt the body with the server private key',
+    'None of the wrapped keys could be used to decrypt the envelope with the server private key',
   );
 }
 

@@ -43,7 +43,11 @@ import {
   StalwartSmtpService,
   type SmtpAttachment,
 } from '../infrastructure/smtp/stalwart-smtp.service.js';
-import { decryptAttachment, decryptBody } from './server-crypto.js';
+import {
+  decryptAttachment,
+  decryptEnvelopeWithServerKey,
+  type DecryptedEnvelope,
+} from './server-crypto.js';
 import type { Readable } from 'node:stream';
 
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
@@ -244,43 +248,25 @@ export class EmailService {
   private async decryptPayloadForExternalDelivery(
     dto: SendEmailDto,
     serverPrivateKey: Uint8Array,
-  ): Promise<{ body: string; attachmentsSessionKey?: string } | undefined> {
+  ): Promise<DecryptedEnvelope | undefined> {
     if (!dto.encryption?.encryptedText || !dto.encryption.wrappedKeys?.length) {
       return undefined;
     }
-    const text = await decryptBody(
-      dto.encryption.encryptedText,
-      dto.encryption.wrappedKeys,
-      serverPrivateKey,
-    );
-    try {
-      return JSON.parse(text) as {
-        body: string;
-        attachmentsSessionKey?: string;
-      };
-    } catch {
-      throw new BadRequestException(
-        'Encrypted payload is not a valid body envelope',
-      );
-    }
+    return decryptEnvelopeWithServerKey(dto.encryption, serverPrivateKey);
   }
 
   private async decryptAttachmentsForExternalDelivery(
     userEmail: string,
     dto: SendEmailDto,
-    attachmentsSessionKey: string | undefined,
+    attachmentKey: Uint8Array | undefined,
   ): Promise<SmtpAttachment[] | undefined> {
     if (!dto.attachments?.length) return undefined;
 
-    if (!attachmentsSessionKey) {
+    if (!attachmentKey) {
       throw new BadRequestException(
-        'attachmentsSessionKey is required when sending attachments in MIXED mode',
+        'An encryption block with the attachments session key is required when sending attachments in MIXED mode',
       );
     }
-
-    const attachmentKey = new Uint8Array(
-      Buffer.from(attachmentsSessionKey, 'base64'),
-    );
 
     return Promise.all(
       dto.attachments.map(async (a) => {

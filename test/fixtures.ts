@@ -161,11 +161,11 @@ export function newEncryptionBlock(
   attrs?: Partial<EncryptionBlock>,
 ): EncryptionBlock {
   return {
-    version: 'v2',
+    version: 'v3',
     encryptedText: random.hash({ length: 128 }),
-    wrappedKeys: [newEncryptedWrappedKey()],
     encryptedPreview: random.hash({ length: 64 }),
-    previewWrappedKeys: [newEncryptedWrappedKey()],
+    encryptedAttachmentsSessionKey: random.hash({ length: 64 }),
+    wrappedKeys: [newEncryptedWrappedKey()],
     ...attrs,
   };
 }

@@ -46,33 +46,30 @@ export class EncryptedWrappedKeyDto {
 }
 
 export class EncryptionBlockDto {
-  @ApiProperty({ example: 'v2' })
-  version!: 'v2';
+  @ApiProperty({ example: 'v3' })
+  version!: 'v3';
 
-  @ApiProperty({
-    description:
-      'Encrypted body payload (base64); decrypts to JSON { body, attachmentsSessionKey }',
-  })
+  @ApiProperty({ description: 'Encrypted body (base64)' })
   encryptedText!: string;
 
   @ApiProperty({
-    type: [EncryptedWrappedKeyDto],
     description:
-      'Wrapped keys that unlock the body payload, labeled per recipient',
-  })
-  wrappedKeys!: EncryptedWrappedKeyDto[];
-
-  @ApiProperty({
-    description:
-      'Encrypted preview snippet (base64), ~256 chars plaintext, sealed separately from the body',
+      'Encrypted preview snippet (base64), ~256 chars plaintext, same session key as the body',
   })
   encryptedPreview!: string;
 
   @ApiProperty({
-    type: [EncryptedWrappedKeyDto],
-    description: 'Wrapped keys that unlock the preview, labeled per recipient',
+    description:
+      'Encrypted attachments session key (base64), same session key as the body',
   })
-  previewWrappedKeys!: EncryptedWrappedKeyDto[];
+  encryptedAttachmentsSessionKey!: string;
+
+  @ApiProperty({
+    type: [EncryptedWrappedKeyDto],
+    description:
+      'Wrapped session keys, labeled per recipient; one entry unlocks body, preview and attachments key',
+  })
+  wrappedKeys!: EncryptedWrappedKeyDto[];
 }
 
 export class AttachmentRefDto {
@@ -194,7 +191,7 @@ export class DraftEmailRequestDto {
     type: EncryptionBlockDto,
     description:
       'When present, the draft body is stored encrypted. Only the sender can ' +
-      'decrypt it later, so wrappedKeys / previewWrappedKeys should contain ' +
+      'decrypt it later, so wrappedKeys should contain ' +
       "a single entry built from the sender's own public key.",
   })
   encryption?: EncryptionBlockDto;
