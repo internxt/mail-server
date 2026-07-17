@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { AccountService } from '../account/account.service.js';
@@ -39,7 +39,7 @@ describe('MtaHooksService', () => {
   });
 
   describe('handleRcpt', () => {
-    it('when the recipient stays within quota, then accepts', async () => {
+    test('when the recipient stays within quota, then accepts', async () => {
       accountService.findUserIdByAddress.mockResolvedValue('user-1');
       bridgeClient.getUserUsage.mockResolvedValue({
         maxSpaceBytes: 5000,
@@ -57,7 +57,7 @@ describe('MtaHooksService', () => {
       expect(bridgeClient.getUserUsage).toHaveBeenCalledWith('user-1');
     });
 
-    it('when the declared SIZE pushes the recipient over quota, then rejects with 452 4.2.2', async () => {
+    test('when the declared SIZE pushes the recipient over quota, then rejects with 452 4.2.2', async () => {
       accountService.findUserIdByAddress.mockResolvedValue('user-1');
       bridgeClient.getUserUsage.mockResolvedValue({
         maxSpaceBytes: 5000,
@@ -78,7 +78,7 @@ describe('MtaHooksService', () => {
       });
     });
 
-    it('when projected usage exactly equals the quota, then accepts', async () => {
+    test('when projected usage exactly equals the quota, then accepts', async () => {
       accountService.findUserIdByAddress.mockResolvedValue('user-1');
       bridgeClient.getUserUsage.mockResolvedValue({
         maxSpaceBytes: 5000,
@@ -92,7 +92,7 @@ describe('MtaHooksService', () => {
       expect(result).toStrictEqual({ action: 'accept' });
     });
 
-    it('when no SIZE is declared but the mailbox is already over quota, then rejects', async () => {
+    test('when no SIZE is declared but the mailbox is already over quota, then rejects', async () => {
       accountService.findUserIdByAddress.mockResolvedValue('user-1');
       bridgeClient.getUserUsage.mockResolvedValue({
         maxSpaceBytes: 5000,
@@ -104,7 +104,7 @@ describe('MtaHooksService', () => {
       expect(result.action).toBe('reject');
     });
 
-    it('when the address resolves to no internxt user, then skips it and accepts', async () => {
+    test('when the address resolves to no internxt user, then skips test and accepts', async () => {
       accountService.findUserIdByAddress.mockResolvedValue(null);
 
       const result = await service.handleRcpt(
@@ -115,7 +115,7 @@ describe('MtaHooksService', () => {
       expect(bridgeClient.getUserUsage).not.toHaveBeenCalled();
     });
 
-    it('when the recipient address is upper-cased, then it is lowercased before resolution', async () => {
+    test('when the recipient address is upper-cased, then test is lowercased before resolution', async () => {
       accountService.findUserIdByAddress.mockResolvedValue('user-1');
       bridgeClient.getUserUsage.mockResolvedValue({
         maxSpaceBytes: 5000,
@@ -129,7 +129,7 @@ describe('MtaHooksService', () => {
       );
     });
 
-    it('when several recipients are present, then only the current (last) one is evaluated', async () => {
+    test('when several recipients are present, then only the current (last) one is evaluated', async () => {
       accountService.findUserIdByAddress.mockResolvedValue('user-1');
       bridgeClient.getUserUsage.mockResolvedValue({
         maxSpaceBytes: 5000,
@@ -146,7 +146,7 @@ describe('MtaHooksService', () => {
       );
     });
 
-    it('when recipient resolution throws, then fails open and accepts', async () => {
+    test('when recipient resolution throws, then fails open and accepts', async () => {
       accountService.findUserIdByAddress.mockRejectedValue(
         new Error('database down'),
       );
@@ -157,7 +157,7 @@ describe('MtaHooksService', () => {
       expect(bridgeClient.getUserUsage).not.toHaveBeenCalled();
     });
 
-    it('when the Bridge usage lookup throws, then fails open and accepts', async () => {
+    test('when the Bridge usage lookup throws, then fails open and accepts', async () => {
       accountService.findUserIdByAddress.mockResolvedValue('user-1');
       bridgeClient.getUserUsage.mockRejectedValue(new Error('bridge down'));
 
@@ -166,7 +166,7 @@ describe('MtaHooksService', () => {
       expect(result).toStrictEqual({ action: 'accept' });
     });
 
-    it('when the request carries no recipients, then accepts without lookups', async () => {
+    test('when the request carries no recipients, then accepts without lookups', async () => {
       const result = await service.handleRcpt({
         context: { stage: 'rcpt' },
       });

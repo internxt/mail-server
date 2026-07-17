@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach } from 'vitest';
 import { createMock } from '@golevelup/ts-vitest';
 import { type ConfigService } from '@nestjs/config';
 import { UnauthorizedException, type ExecutionContext } from '@nestjs/common';
@@ -32,37 +32,37 @@ describe('MtaHooksAuthGuard', () => {
     guard = new MtaHooksAuthGuard(configService);
   });
 
-  it('when credentials match, then allows the request', () => {
+  test('when credentials match, then allows the request', () => {
     const context = contextWithAuth(basic(username, secret));
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
-  it('when the secret is wrong, then throws Unauthorized', () => {
+  test('when the secret is wrong, then throws Unauthorized', () => {
     const context = contextWithAuth(basic(username, 'wrong'));
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it('when the username is wrong, then throws Unauthorized', () => {
+  test('when the username is wrong, then throws Unauthorized', () => {
     const context = contextWithAuth(basic('wrong', secret));
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it('when the Authorization header is missing, then throws Unauthorized', () => {
+  test('when the Authorization header is missing, then throws Unauthorized', () => {
     const context = contextWithAuth(undefined);
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it('when the scheme is not Basic, then throws Unauthorized', () => {
+  test('when the scheme is not Basic, then throws Unauthorized', () => {
     const context = contextWithAuth('Bearer some-token');
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it('when the decoded credentials lack a colon separator, then throws Unauthorized', () => {
+  test('when the decoded credentials lack a colon separator, then throws Unauthorized', () => {
     const context = contextWithAuth(
       `Basic ${Buffer.from('nocolon').toString('base64')}`,
     );
@@ -70,13 +70,13 @@ describe('MtaHooksAuthGuard', () => {
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it('when the secret is empty, then throws Unauthorized', () => {
+  test('when the secret is empty, then throws Unauthorized', () => {
     const context = contextWithAuth(basic(username, ''));
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
   });
 
-  it('when the configured secret is empty, then fails to construct', () => {
+  test('when the configured secret is empty, then fails to construct', () => {
     const configService = createMock<ConfigService>();
     configService.getOrThrow.mockImplementation((key: string) => {
       if (key === 'mtaHooks.username') return username;
