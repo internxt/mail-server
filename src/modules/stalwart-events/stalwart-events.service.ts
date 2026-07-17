@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../account/account.service.js';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { MailUsageService } from '../usage/mail-usage.service.js';
 import type {
   StalwartEvent,
   StalwartWebhookPayload,
@@ -12,7 +12,7 @@ export class StalwartEventsService {
 
   constructor(
     private readonly accounts: AccountService,
-    private readonly bridge: BridgeClient,
+    private readonly usage: MailUsageService,
   ) {}
 
   async handleBatch(payload: StalwartWebhookPayload): Promise<void> {
@@ -57,16 +57,12 @@ export class StalwartEventsService {
       return;
     }
 
-    const { totalUsedSpaceBytes } = await this.bridge.createBucketEntry(
-      context.userUuid,
-      context.networkBucketId,
+    await this.usage.trackStoredMessage({
+      mailAddressId: context.mailAddressId,
+      userUuid: context.userUuid,
+      bucketId: context.networkBucketId,
       entryKey,
       size,
-    );
-
-    this.logger.log(
-      { entryKey, size, totalUsedSpaceBytes, type: event.type },
-      'Created bucket entry for ingested message',
-    );
+    });
   }
 }

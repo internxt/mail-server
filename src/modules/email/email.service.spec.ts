@@ -15,7 +15,7 @@ import {
   MailProvider,
 } from './mail-provider.port.js';
 import { AccountService } from '../account/account.service.js';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { MailUsageService } from '../usage/mail-usage.service.js';
 import { StalwartSmtpService } from '../infrastructure/smtp/stalwart-smtp.service.js';
 import {
   newMailbox,
@@ -44,7 +44,7 @@ describe('EmailService', () => {
   let accountService: DeepMocked<AccountService>;
   let smtp: DeepMocked<StalwartSmtpService>;
   let configService: DeepMocked<ConfigService>;
-  let bridge: DeepMocked<BridgeClient>;
+  let usage: DeepMocked<MailUsageService>;
   const userEmail = 'test@example.com';
 
   beforeEach(async () => {
@@ -60,7 +60,7 @@ describe('EmailService', () => {
     accountService = module.get<DeepMocked<AccountService>>(AccountService);
     smtp = module.get<DeepMocked<StalwartSmtpService>>(StalwartSmtpService);
     configService = module.get<DeepMocked<ConfigService>>(ConfigService);
-    bridge = module.get<DeepMocked<BridgeClient>>(BridgeClient);
+    usage = module.get<DeepMocked<MailUsageService>>(MailUsageService);
   });
 
   describe('getMailboxes', () => {
@@ -738,12 +738,13 @@ describe('EmailService', () => {
       await service.deleteEmail(userEmail, 'email-id');
 
       expect(provider.deleteEmail).toHaveBeenCalledWith(userEmail, 'email-id');
-      expect(bridge.deleteBucketEntry).not.toHaveBeenCalled();
+      expect(usage.releaseStoredMessage).not.toHaveBeenCalled();
     });
 
     it('when the message is permanently destroyed, then releases the quota entry on the address bucket', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });
@@ -753,32 +754,34 @@ describe('EmailService', () => {
       expect(accountService.findBucketContextByAddress).toHaveBeenCalledWith(
         userEmail,
       );
-      expect(bridge.deleteBucketEntry).toHaveBeenCalledWith(
-        'user-1',
-        'bucket-1',
-        '42:7',
-      );
+      expect(usage.releaseStoredMessage).toHaveBeenCalledWith({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:7',
+      });
     });
 
     it('when the destroyed address has no network bucket, then no quota entry is released', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: null,
       });
 
       await service.deleteEmail(userEmail, 'email-id');
 
-      expect(bridge.deleteBucketEntry).not.toHaveBeenCalled();
+      expect(usage.releaseStoredMessage).not.toHaveBeenCalled();
     });
 
     it('when releasing the quota entry fails, then the deletion still succeeds', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });
-      bridge.deleteBucketEntry.mockRejectedValue(new Error('Bridge down'));
+      usage.releaseStoredMessage.mockRejectedValue(new Error('Bridge down'));
 
       await expect(
         service.deleteEmail(userEmail, 'email-id'),
