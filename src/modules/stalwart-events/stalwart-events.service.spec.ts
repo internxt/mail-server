@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, test, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { AccountService } from '../account/account.service.js';
@@ -49,7 +49,7 @@ describe('StalwartEventsService', () => {
   });
 
   describe('handleBatch', () => {
-    it('when an ingest event resolves to a bucket, then tracks the stored message keyed by accountId:documentId', async () => {
+    test('when an ingest event resolves to a bucket, then tracks the stored message keyed by accountId:documentId', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
         mailAddressId: 'address-1',
         userUuid: 'user-1',
@@ -95,7 +95,7 @@ describe('StalwartEventsService', () => {
       expect(usage.trackStoredMessage).not.toHaveBeenCalled();
     });
 
-    it('when no account resolves for the event, then no message is tracked', async () => {
+    test('when no account resolves for the event, then no message is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue(null);
 
       await service.handleBatch({ events: [ingestEvent()] });
@@ -103,7 +103,7 @@ describe('StalwartEventsService', () => {
       expect(usage.trackStoredMessage).not.toHaveBeenCalled();
     });
 
-    it('when the resolved address has no network bucket, then no message is tracked', async () => {
+    test('when the resolved address has no network bucket, then no message is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
         mailAddressId: 'address-1',
         userUuid: 'user-1',
@@ -115,7 +115,7 @@ describe('StalwartEventsService', () => {
       expect(usage.trackStoredMessage).not.toHaveBeenCalled();
     });
 
-    it('when the batch has several events, then each ingest event is tracked', async () => {
+    test('when the batch has several events, then each ingest event is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
         mailAddressId: 'address-1',
         userUuid: 'user-1',

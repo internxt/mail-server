@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import {
+  BridgeApiError,
+  BridgeClient,
+} from '../infrastructure/bridge/bridge.service.js';
 import { MailBucketEntry } from './domain/mail-bucket-entry.domain.js';
 import {
   DuplicateEntryKeyError,
@@ -48,7 +51,7 @@ describe('MailUsageService', () => {
   });
 
   describe('trackStoredMessage', () => {
-    it('when the entry is new, then mints a bridge entry and persists the pointer', async () => {
+    test('when the entry is new, then mints a bridge entry and persists the pointer', async () => {
       entries.findByEntryKey.mockResolvedValue(null);
       bridge.createBucketEntry.mockResolvedValue({
         id: 'entry-1',
@@ -71,7 +74,7 @@ describe('MailUsageService', () => {
       });
     });
 
-    it('when the entry is already tracked, then mints nothing (idempotent)', async () => {
+    test('when the entry is already tracked, then mints nothing (idempotent)', async () => {
       entries.findByEntryKey.mockResolvedValue(entry());
 
       await service.trackStoredMessage(trackParams);
@@ -80,7 +83,7 @@ describe('MailUsageService', () => {
       expect(entries.create).not.toHaveBeenCalled();
     });
 
-    it('when a concurrent delivery wins the race, then rolls back the minted bridge entry', async () => {
+    test('when a concurrent delivery wins the race, then rolls back the minted bridge entry', async () => {
       entries.findByEntryKey.mockResolvedValue(null);
       bridge.createBucketEntry.mockResolvedValue({
         id: 'entry-1',
@@ -98,7 +101,7 @@ describe('MailUsageService', () => {
       );
     });
 
-    it('when persistence fails for another reason, then propagates and does not roll back', async () => {
+    test('when persistence fails for another reason, then rolls back the minted bridge entry and propagates', async () => {
       entries.findByEntryKey.mockResolvedValue(null);
       bridge.createBucketEntry.mockResolvedValue({
         id: 'entry-1',
@@ -110,12 +113,36 @@ describe('MailUsageService', () => {
       await expect(service.trackStoredMessage(trackParams)).rejects.toThrow(
         'DB down',
       );
-      expect(bridge.deleteBucketEntry).not.toHaveBeenCalled();
+      expect(bridge.deleteBucketEntry).toHaveBeenCalledWith(
+        'user-1',
+        'bucket-1',
+        'entry-1',
+      );
+    });
+
+    test('when persistence fails and the rollback also fails, then the original error still propagates', async () => {
+      entries.findByEntryKey.mockResolvedValue(null);
+      bridge.createBucketEntry.mockResolvedValue({
+        id: 'entry-1',
+        maxSpaceBytes: 1000,
+        totalUsedSpaceBytes: 240,
+      });
+      entries.create.mockRejectedValue(new Error('DB down'));
+      bridge.deleteBucketEntry.mockRejectedValue(new Error('Bridge down'));
+
+      await expect(service.trackStoredMessage(trackParams)).rejects.toThrow(
+        'DB down',
+      );
+      expect(bridge.deleteBucketEntry).toHaveBeenCalledWith(
+        'user-1',
+        'bucket-1',
+        'entry-1',
+      );
     });
   });
 
   describe('releaseStoredMessage', () => {
-    it('when the pointer exists, then deletes the bridge entry by id and drops the pointer', async () => {
+    test('when the pointer exists, then deletes the bridge entry by id and drops the pointer', async () => {
       entries.findByEntryKey.mockResolvedValue(entry());
 
       await service.releaseStoredMessage({
@@ -132,7 +159,7 @@ describe('MailUsageService', () => {
       expect(entries.deleteByEntryKey).toHaveBeenCalledWith('42:7');
     });
 
-    it('when no pointer exists, then is a no-op', async () => {
+    test('when no pointer exists, then is a no-op', async () => {
       entries.findByEntryKey.mockResolvedValue(null);
 
       await service.releaseStoredMessage({
@@ -145,7 +172,7 @@ describe('MailUsageService', () => {
       expect(entries.deleteByEntryKey).not.toHaveBeenCalled();
     });
 
-    it('when the bridge delete fails, then the pointer is kept for retry', async () => {
+    test('when the bridge delete fails, then the pointer is kept for retry', async () => {
       entries.findByEntryKey.mockResolvedValue(entry());
       bridge.deleteBucketEntry.mockRejectedValue(new Error('Bridge down'));
 
@@ -157,6 +184,21 @@ describe('MailUsageService', () => {
         }),
       ).rejects.toThrow('Bridge down');
       expect(entries.deleteByEntryKey).not.toHaveBeenCalled();
+    });
+
+    test('when the bridge entry is already gone (404), then the pointer is still dropped', async () => {
+      entries.findByEntryKey.mockResolvedValue(entry());
+      bridge.deleteBucketEntry.mockRejectedValue(
+        new BridgeApiError('not found', 404, 'entry missing'),
+      );
+
+      await service.releaseStoredMessage({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:7',
+      });
+
+      expect(entries.deleteByEntryKey).toHaveBeenCalledWith('42:7');
     });
   });
 });

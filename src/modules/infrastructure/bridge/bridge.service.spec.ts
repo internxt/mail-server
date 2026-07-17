@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { ConfigService } from '@nestjs/config';
@@ -143,7 +143,7 @@ describe('BridgeClient', () => {
   });
 
   describe('createBucketEntry', () => {
-    it('when Bridge returns 200, then signs a token, POSTs only the size, and returns the entry', async () => {
+    test('when Bridge returns 200, then signs a token, POSTs only the size, and returns the entry', async () => {
       const entry = {
         id: 'entry-1',
         maxSpaceBytes: 1000,
@@ -191,7 +191,7 @@ describe('BridgeClient', () => {
   });
 
   describe('deleteBucketEntry', () => {
-    it('when Bridge returns 200, then signs a token, DELETEs by entry id, and returns the snapshot', async () => {
+    test('when Bridge returns 200, then signs a token, DELETEs by entry id, and returns the snapshot', async () => {
       const snapshot = { maxSpaceBytes: 1000, totalUsedSpaceBytes: 0 };
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({

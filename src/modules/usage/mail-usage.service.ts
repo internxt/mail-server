@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import {
+  BridgeApiError,
+  BridgeClient,
+} from '../infrastructure/bridge/bridge.service.js';
 import {
   DuplicateEntryKeyError,
   MailBucketEntryRepository,
@@ -53,9 +56,19 @@ export class MailUsageService {
           { entryKey, bridgeEntryId },
           'Concurrent tracking detected; rolling back minted bucket entry',
         );
-        await this.bridge.deleteBucketEntry(userUuid, bucketId, bridgeEntryId);
+        await this.rollbackBucketEntry(userUuid, bucketId, bridgeEntryId, {
+          entryKey,
+        });
         return;
       }
+
+      this.logger.error(
+        { entryKey, bridgeEntryId, error },
+        'Failed to persist tracked message; rolling back minted bucket entry',
+      );
+      await this.rollbackBucketEntry(userUuid, bucketId, bridgeEntryId, {
+        entryKey,
+      });
       throw error;
     }
 
@@ -79,16 +92,42 @@ export class MailUsageService {
       return;
     }
 
-    await this.bridge.deleteBucketEntry(
-      userUuid,
-      bucketId,
-      existing.bridgeEntryId,
-    );
+    try {
+      await this.bridge.deleteBucketEntry(
+        userUuid,
+        bucketId,
+        existing.bridgeEntryId,
+      );
+    } catch (error) {
+      if (!(error instanceof BridgeApiError && error.statusCode === 404)) {
+        throw error;
+      }
+      this.logger.debug(
+        { entryKey, bridgeEntryId: existing.bridgeEntryId },
+        'Bridge entry already removed; continuing release',
+      );
+    }
     await this.entries.deleteByEntryKey(entryKey);
 
     this.logger.log(
       { entryKey, bridgeEntryId: existing.bridgeEntryId },
       'Released stored message',
     );
+  }
+
+  private async rollbackBucketEntry(
+    userUuid: string,
+    bucketId: string,
+    bridgeEntryId: string,
+    context: { entryKey: string },
+  ): Promise<void> {
+    try {
+      await this.bridge.deleteBucketEntry(userUuid, bucketId, bridgeEntryId);
+    } catch (rollbackError) {
+      this.logger.error(
+        { ...context, bridgeEntryId, rollbackError },
+        'Failed to roll back minted bucket entry; manual reconciliation required',
+      );
+    }
   }
 }
