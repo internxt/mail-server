@@ -45,8 +45,8 @@ import {
 } from '../infrastructure/smtp/stalwart-smtp.service.js';
 import {
   decryptAttachment,
-  decryptBody,
-  unwrapAttachmentKey,
+  decryptEnvelopeWithServerKey,
+  type DecryptedEnvelope,
 } from './server-crypto.js';
 import type { Readable } from 'node:stream';
 
@@ -186,16 +186,17 @@ export class EmailService {
       'base64',
     );
 
-    const [decryptedBody, attachments] = await Promise.all([
-      this.decryptBodyForExternalDelivery(dto, serverPrivateKey),
-      this.decryptAttachmentsForExternalDelivery(
-        userEmail,
-        dto,
-        serverPrivateKey,
-      ),
-    ]);
+    const payload = await this.decryptPayloadForExternalDelivery(
+      dto,
+      serverPrivateKey,
+    );
+    const attachments = await this.decryptAttachmentsForExternalDelivery(
+      userEmail,
+      dto,
+      payload?.attachmentsSessionKey,
+    );
 
-    const htmlBody = decryptedBody ?? dto.htmlBody;
+    const htmlBody = payload?.body ?? dto.htmlBody;
     const textBody = htmlBody
       ? convert(htmlBody, { wordwrap: false })
       : dto.textBody;
@@ -244,38 +245,28 @@ export class EmailService {
     return threading;
   }
 
-  private async decryptBodyForExternalDelivery(
+  private async decryptPayloadForExternalDelivery(
     dto: SendEmailDto,
     serverPrivateKey: Uint8Array,
-  ): Promise<string | undefined> {
+  ): Promise<DecryptedEnvelope | undefined> {
     if (!dto.encryption?.encryptedText || !dto.encryption.wrappedKeys?.length) {
       return undefined;
     }
-    return decryptBody(
-      dto.encryption.encryptedText,
-      dto.encryption.wrappedKeys,
-      serverPrivateKey,
-    );
+    return decryptEnvelopeWithServerKey(dto.encryption, serverPrivateKey);
   }
 
   private async decryptAttachmentsForExternalDelivery(
     userEmail: string,
     dto: SendEmailDto,
-    serverPrivateKey: Uint8Array,
+    attachmentKey: Uint8Array | undefined,
   ): Promise<SmtpAttachment[] | undefined> {
     if (!dto.attachments?.length) return undefined;
 
-    const wrappedKeys = dto.encryption?.attachmentWrappedKeys;
-    if (!wrappedKeys?.length) {
+    if (!attachmentKey) {
       throw new BadRequestException(
-        'attachmentWrappedKeys are required when sending attachments in MIXED mode',
+        'An encryption block with the attachments session key is required when sending attachments in MIXED mode',
       );
     }
-
-    const attachmentKey = await unwrapAttachmentKey(
-      wrappedKeys,
-      serverPrivateKey,
-    );
 
     return Promise.all(
       dto.attachments.map(async (a) => {

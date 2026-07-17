@@ -40,31 +40,36 @@ export class EncryptedWrappedKeyDto {
 
   @ApiProperty({ description: 'Encrypted symmetric key (base64)' })
   encryptedKey!: string;
+
+  @ApiProperty({ description: 'Recipient address this key was wrapped for' })
+  encryptedForEmail!: string;
 }
 
 export class EncryptionBlockDto {
-  @ApiProperty({ example: 'v1' })
-  version!: 'v1';
+  @ApiProperty({ example: 'v3' })
+  version!: 'v3';
 
-  @ApiProperty({
-    description: 'Encrypted preview snippet (base64), ~256 chars plaintext',
-  })
-  encryptedPreview!: string;
-
-  @ApiProperty({ description: 'Encrypted text body (base64)' })
+  @ApiProperty({ description: 'Encrypted body (base64)' })
   encryptedText!: string;
 
   @ApiProperty({
-    type: [EncryptedWrappedKeyDto],
-    description: 'De-identified wrapped keys, one per recipient',
+    description:
+      'Encrypted preview snippet (base64), ~256 chars plaintext, same session key as the body',
   })
-  wrappedKeys!: EncryptedWrappedKeyDto[];
+  encryptedPreview!: string;
+
+  @ApiProperty({
+    description:
+      'Encrypted attachments session key (base64), same session key as the body',
+  })
+  encryptedAttachmentsSessionKey!: string;
 
   @ApiProperty({
     type: [EncryptedWrappedKeyDto],
-    description: 'De-identified attachment wrapped keys, one per recipient',
+    description:
+      'Wrapped session keys, labeled per recipient; one entry unlocks body, preview and attachments key',
   })
-  attachmentWrappedKeys!: EncryptedWrappedKeyDto[];
+  wrappedKeys!: EncryptedWrappedKeyDto[];
 }
 
 export class AttachmentRefDto {
@@ -186,7 +191,7 @@ export class DraftEmailRequestDto {
     type: EncryptionBlockDto,
     description:
       'When present, the draft body is stored encrypted. Only the sender can ' +
-      'decrypt it later, so wrappedKeys / attachmentWrappedKeys should contain ' +
+      'decrypt it later, so wrappedKeys should contain ' +
       "a single entry built from the sender's own public key.",
   })
   encryption?: EncryptionBlockDto;
@@ -247,17 +252,10 @@ export class EncryptedSummaryDto {
   @ApiProperty({
     type: [EncryptedWrappedKeyDto],
     description:
-      'De-identified wrapped keys; the client trial-decrypts to read',
+      'Wrapped keys that unlock the preview, labeled per recipient; the ' +
+      'caller picks theirs by address',
   })
   wrappedKeys!: EncryptedWrappedKeyDto[];
-
-  @ApiPropertyOptional({
-    type: [EncryptedWrappedKeyDto],
-    description:
-      'De-identified wrapped keys for the symmetric key that encrypts the ' +
-      "email's attachments. Present only when the email has encrypted attachments.",
-  })
-  attachmentWrappedKeys?: EncryptedWrappedKeyDto[];
 }
 
 export class EmailSummaryResponseDto {
