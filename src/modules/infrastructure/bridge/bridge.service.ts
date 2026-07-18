@@ -105,7 +105,6 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   async createBucketEntry(
     userUuid: string,
     bucketId: string,
-    key: string,
     size: number,
   ): Promise<BucketEntry> {
     const token = this.signGatewayToken(userUuid);
@@ -118,14 +117,14 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ key, size }),
+      body: JSON.stringify({ size }),
     });
 
     const text = await body.text();
 
     if (statusCode !== 200) {
       throw new BridgeApiError(
-        `Failed to create bucket entry '${key}' on bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
+        `Failed to create bucket entry on bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
         statusCode,
         text,
       );
@@ -137,13 +136,13 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   async deleteBucketEntry(
     userUuid: string,
     bucketId: string,
-    key: string,
-  ): Promise<void> {
+    entryId: string,
+  ): Promise<UserSpaceSnapshot> {
     const token = this.signGatewayToken(userUuid);
 
     const { statusCode, body } = await this.httpClient.request({
       method: 'DELETE',
-      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}/entries/${encodeURIComponent(key)}`,
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}/entries/${encodeURIComponent(entryId)}`,
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
@@ -154,11 +153,13 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
 
     if (statusCode !== 200) {
       throw new BridgeApiError(
-        `Failed to delete bucket entry '${key}' on bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
+        `Failed to delete bucket entry '${entryId}' on bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
         statusCode,
         text,
       );
     }
+
+    return JSON.parse(text) as UserSpaceSnapshot;
   }
 
   async getUserUsage(userUuid: string): Promise<UserSpaceSnapshot> {

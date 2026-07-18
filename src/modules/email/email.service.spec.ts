@@ -15,7 +15,7 @@ import {
   MailProvider,
 } from './mail-provider.port.js';
 import { AccountService } from '../account/account.service.js';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { MailUsageService } from '../usage/mail-usage.service.js';
 import { StalwartSmtpService } from '../infrastructure/smtp/stalwart-smtp.service.js';
 import {
   newMailbox,
@@ -29,15 +29,13 @@ import {
 } from '../../../test/fixtures.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
 import {
-  unwrapAttachmentKey,
   decryptAttachment,
-  decryptBody,
+  decryptEnvelopeWithServerKey,
 } from './server-crypto.js';
 
 vi.mock('./server-crypto.js', () => ({
-  unwrapAttachmentKey: vi.fn(),
   decryptAttachment: vi.fn(),
-  decryptBody: vi.fn(),
+  decryptEnvelopeWithServerKey: vi.fn(),
 }));
 
 describe('EmailService', () => {
@@ -46,7 +44,7 @@ describe('EmailService', () => {
   let accountService: DeepMocked<AccountService>;
   let smtp: DeepMocked<StalwartSmtpService>;
   let configService: DeepMocked<ConfigService>;
-  let bridge: DeepMocked<BridgeClient>;
+  let usage: DeepMocked<MailUsageService>;
   const userEmail = 'test@example.com';
 
   beforeEach(async () => {
@@ -62,7 +60,7 @@ describe('EmailService', () => {
     accountService = module.get<DeepMocked<AccountService>>(AccountService);
     smtp = module.get<DeepMocked<StalwartSmtpService>>(StalwartSmtpService);
     configService = module.get<DeepMocked<ConfigService>>(ConfigService);
-    bridge = module.get<DeepMocked<BridgeClient>>(BridgeClient);
+    usage = module.get<DeepMocked<MailUsageService>>(MailUsageService);
   });
 
   describe('getMailboxes', () => {
@@ -409,9 +407,8 @@ describe('EmailService', () => {
   });
 
   describe('sendExternalEmail', () => {
-    const mockedUnwrap = vi.mocked(unwrapAttachmentKey);
     const mockedDecrypt = vi.mocked(decryptAttachment);
-    const mockedDecryptBody = vi.mocked(decryptBody);
+    const mockedDecryptEnvelope = vi.mocked(decryptEnvelopeWithServerKey);
 
     it('when sending an external email with no recipients, then it is rejected before reaching SMTP', async () => {
       const dto = newSendEmailDto({ to: [] });
@@ -467,10 +464,7 @@ describe('EmailService', () => {
     });
 
     it('when sending an external email with end-to-end encrypted body and attachments, then the recipient receives them in clear and the user keeps the encrypted copy in Sent', async () => {
-      const wrappedKey = newEncryptedWrappedKey();
-      const encryption = newEncryptionBlock({
-        attachmentWrappedKeys: [wrappedKey],
-      });
+      const encryption = newEncryptionBlock();
       const dto = newSendEmailDto({
         attachments: [
           { blobId: 'b1', name: 'photo.jpg', type: 'image/jpeg', size: 1024 },
@@ -481,9 +475,11 @@ describe('EmailService', () => {
       configService.getOrThrow.mockReturnValue(
         Buffer.from('server-priv-key').toString('base64'),
       );
-      mockedDecryptBody.mockResolvedValue('plain body text');
       const attachmentKey = new Uint8Array([1, 2, 3, 4]);
-      mockedUnwrap.mockResolvedValue(attachmentKey);
+      mockedDecryptEnvelope.mockResolvedValue({
+        body: 'plain body text',
+        attachmentsSessionKey: attachmentKey,
+      });
       provider.downloadAttachment.mockResolvedValue({
         stream: Readable.from([Buffer.from('cipher-bytes')]),
         contentType: 'image/jpeg',
@@ -525,9 +521,10 @@ describe('EmailService', () => {
       configService.getOrThrow.mockReturnValue(
         Buffer.from('server-priv-key').toString('base64'),
       );
-      mockedDecryptBody.mockResolvedValue(
-        '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
-      );
+      mockedDecryptEnvelope.mockResolvedValue({
+        body: '<p>Testing the new mail config</p><p>lmk how it goes!</p>',
+        attachmentsSessionKey: new Uint8Array([1, 2, 3, 4]),
+      });
       smtp.sendRaw.mockResolvedValue({ messageId: 'msg-html' });
       provider.saveToSent.mockResolvedValue({ id: 'sent-html' });
 
@@ -741,12 +738,13 @@ describe('EmailService', () => {
       await service.deleteEmail(userEmail, 'email-id');
 
       expect(provider.deleteEmail).toHaveBeenCalledWith(userEmail, 'email-id');
-      expect(bridge.deleteBucketEntry).not.toHaveBeenCalled();
+      expect(usage.releaseStoredMessage).not.toHaveBeenCalled();
     });
 
     it('when the message is permanently destroyed, then releases the quota entry on the address bucket', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });
@@ -756,32 +754,34 @@ describe('EmailService', () => {
       expect(accountService.findBucketContextByAddress).toHaveBeenCalledWith(
         userEmail,
       );
-      expect(bridge.deleteBucketEntry).toHaveBeenCalledWith(
-        'user-1',
-        'bucket-1',
-        '42:7',
-      );
+      expect(usage.releaseStoredMessage).toHaveBeenCalledWith({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:7',
+      });
     });
 
     it('when the destroyed address has no network bucket, then no quota entry is released', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: null,
       });
 
       await service.deleteEmail(userEmail, 'email-id');
 
-      expect(bridge.deleteBucketEntry).not.toHaveBeenCalled();
+      expect(usage.releaseStoredMessage).not.toHaveBeenCalled();
     });
 
     it('when releasing the quota entry fails, then the deletion still succeeds', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });
-      bridge.deleteBucketEntry.mockRejectedValue(new Error('Bridge down'));
+      usage.releaseStoredMessage.mockRejectedValue(new Error('Bridge down'));
 
       await expect(
         service.deleteEmail(userEmail, 'email-id'),

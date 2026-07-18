@@ -36,8 +36,9 @@ export function parseEnvelope(textBody: string): EncryptionBlock | null {
 
 /**
  * Projects the summary-safe fields from an envelope: the encrypted preview plus
- * the de-identified wrapped-key array. The client trial-decrypts the keys to
- * determine readability — the backend holds no keys and cannot filter per caller.
+ * the wrapped keys that unlock it. The keys are labeled per recipient
+ * (`encryptedForEmail`), so the client picks its own entry by address — the
+ * backend holds no keys and does not decrypt.
  */
 export function projectForCaller(
   envelope: EncryptionBlock,
@@ -45,8 +46,5 @@ export function projectForCaller(
   return {
     encryptedPreview: envelope.encryptedPreview,
     wrappedKeys: envelope.wrappedKeys,
-    ...(envelope.attachmentWrappedKeys && {
-      attachmentWrappedKeys: envelope.attachmentWrappedKeys,
-    }),
   };
 }

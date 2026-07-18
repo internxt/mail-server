@@ -54,7 +54,7 @@ describe('email-encryption', () => {
   });
 
   describe('projectForCaller', () => {
-    it('when given an envelope, then projects the preview and full wrapped-key array', () => {
+    it('when given an envelope, then projects the preview and the labeled keys that unlock it', () => {
       const wrappedKeys = [newEncryptedWrappedKey(), newEncryptedWrappedKey()];
       const envelope = newEncryptionBlock({ wrappedKeys });
 

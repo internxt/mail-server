@@ -152,6 +152,7 @@ export function newEncryptedWrappedKey(
   return {
     hybridCiphertext: random.hash({ length: 64 }),
     encryptedKey: random.hash({ length: 64 }),
+    encryptedForEmail: random.email(),
     ...attrs,
   };
 }
@@ -160,9 +161,10 @@ export function newEncryptionBlock(
   attrs?: Partial<EncryptionBlock>,
 ): EncryptionBlock {
   return {
-    version: 'v1',
-    encryptedPreview: random.hash({ length: 64 }),
+    version: 'v3',
     encryptedText: random.hash({ length: 128 }),
+    encryptedPreview: random.hash({ length: 64 }),
+    encryptedAttachmentsSessionKey: random.hash({ length: 64 }),
     wrappedKeys: [newEncryptedWrappedKey()],
     ...attrs,
   };
