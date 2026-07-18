@@ -53,4 +53,9 @@ export default () => ({
     username: process.env.STALWART_WEBHOOK_USERNAME ?? 'stalwart',
     secret: process.env.STALWART_WEBHOOK_SECRET ?? '',
   },
+
+  mtaHooks: {
+    username: process.env.MTA_HOOKS_USERNAME ?? 'stalwart',
+    secret: process.env.MTA_HOOKS_SECRET ?? '',
+  },
 });

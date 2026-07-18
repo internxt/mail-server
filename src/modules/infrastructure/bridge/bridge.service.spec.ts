@@ -236,4 +236,47 @@ describe('BridgeClient', () => {
       expect(error.details).toBe('entry not found');
     });
   });
+
+  describe('getUserUsage', () => {
+    it('when Bridge returns 200, then signs a gateway token, GETs the usage, and returns the snapshot', async () => {
+      const snapshot = { maxSpaceBytes: 5000, totalUsedSpaceBytes: 1200 };
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 200,
+        body: { text: () => Promise.resolve(JSON.stringify(snapshot)) },
+      });
+
+      const result = await service.getUserUsage('user-1');
+
+      expect(result).toStrictEqual(snapshot);
+      expect(httpRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'GET',
+          path: '/v2/gateway/users/user-1/usage',
+          headers: expect.objectContaining({
+            authorization: 'Bearer signed-jwt',
+          }) as unknown,
+        }),
+      );
+    });
+
+    it('when Bridge returns a non-200 status, then throws BridgeApiError with statusCode and details', async () => {
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 500,
+        body: { text: () => Promise.resolve('internal error') },
+      });
+
+      const error: unknown = await service
+        .getUserUsage('user-1')
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BridgeApiError);
+      if (!(error instanceof BridgeApiError)) {
+        throw new Error('expected BridgeApiError');
+      }
+      expect(error.statusCode).toBe(500);
+      expect(error.details).toBe('internal error');
+    });
+  });
 });
