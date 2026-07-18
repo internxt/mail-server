@@ -39,6 +39,52 @@ describe('BridgeClient', () => {
     };
   });
 
+  describe('getUserUsage', () => {
+    it('when Bridge returns 200, then signs a gateway token, GETs the usage, and returns the snapshot', async () => {
+      const snapshot = {
+        maxSpaceBytes: 1_000_000_000,
+        totalUsedSpaceBytes: 42,
+      };
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 200,
+        body: { text: () => Promise.resolve(JSON.stringify(snapshot)) },
+      });
+
+      const result = await service.getUserUsage('user-1');
+
+      expect(result).toStrictEqual(snapshot);
+      expect(httpRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'GET',
+          path: '/v2/gateway/users/user-1/usage',
+          headers: expect.objectContaining({
+            authorization: 'Bearer signed-jwt',
+          }) as unknown,
+        }),
+      );
+    });
+
+    it('when Bridge returns a non-200 status, then throws BridgeApiError', async () => {
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 404,
+        body: { text: () => Promise.resolve('user not found') },
+      });
+
+      const error: unknown = await service
+        .getUserUsage('user-1')
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BridgeApiError);
+      if (!(error instanceof BridgeApiError)) {
+        throw new Error('expected BridgeApiError');
+      }
+      expect(error.statusCode).toBe(404);
+      expect(error.details).toBe('user not found');
+    });
+  });
+
   describe('createMailBucket', () => {
     it('when Bridge returns 200, then signs a gateway token, POSTs the name, and returns the bucket', async () => {
       const bucket = { id: 'bucket-1', name: 'account-1' };

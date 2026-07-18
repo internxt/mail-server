@@ -3,6 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import {
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -17,6 +18,8 @@ import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { PaymentsService } from '../infrastructure/payments/payments.service.js';
+import type { Tier } from '../infrastructure/payments/payments.types.js';
 import {
   newMailAccountAttributes,
   newMailAddressKeyBundle,
@@ -27,6 +30,18 @@ import {
 import { MailAddressKeys } from './domain/mail-address-keys.domain.js';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 
+const PLAN_BYTES = 1_000_000_000;
+const validTier: Tier = {
+  id: 't1',
+  label: 'standard',
+  productId: 'p1',
+  billingType: 'monthly',
+  featuresPerService: {
+    mail: { enabled: true, addressesPerUser: 3 },
+    drive: { enabled: true, maxSpaceBytes: PLAN_BYTES },
+  },
+};
+
 describe('AccountService', () => {
   let service: AccountService;
   let provider: DeepMocked<AccountProvider>;
@@ -35,6 +50,7 @@ describe('AccountService', () => {
   let domains: DeepMocked<DomainRepository>;
   let keys: DeepMocked<MailAddressKeysRepository>;
   let bridge: DeepMocked<BridgeClient>;
+  let payments: DeepMocked<PaymentsService>;
   let config: DeepMocked<ConfigService>;
 
   beforeEach(async () => {
@@ -51,6 +67,7 @@ describe('AccountService', () => {
     domains = module.get(DomainRepository);
     keys = module.get(MailAddressKeysRepository);
     bridge = module.get(BridgeClient);
+    payments = module.get(PaymentsService);
     config = module.get(ConfigService);
   });
 
@@ -343,6 +360,14 @@ describe('AccountService', () => {
       keys: newMailAddressKeyBundle(),
     };
 
+    beforeEach(() => {
+      payments.getUserTier.mockResolvedValue(validTier);
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: PLAN_BYTES,
+        totalUsedSpaceBytes: 0,
+      });
+    });
+
     it('when all inputs are valid, then creates account, address, provider link, and stalwart principal', async () => {
       const createdAccount = MailAccount.build(
         newMailAccountAttributes({
@@ -413,12 +438,47 @@ describe('AccountService', () => {
           accountId: createdAccount.id,
           primaryAddress: params.address,
           displayName: params.displayName,
+          quota: PLAN_BYTES,
         }),
       );
       expect(keys.create).toHaveBeenCalledWith({
         mailAddressId: createdAddressId,
         ...params.keys,
       });
+    });
+
+    it('when the plan does not include mail, then throws ForbiddenException and creates nothing', async () => {
+      payments.getUserTier.mockResolvedValue({
+        ...validTier,
+        featuresPerService: {
+          drive: { enabled: true, maxSpaceBytes: PLAN_BYTES },
+        },
+      });
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+      expect(provider.createAccount).not.toHaveBeenCalled();
+    });
+
+    it('when the user has no storage allowance, then throws and never provisions an unlimited principal', async () => {
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: 0,
+        totalUsedSpaceBytes: 0,
+      });
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+      expect(provider.createAccount).not.toHaveBeenCalled();
     });
 
     it('when domain does not exist, then throws NotFoundException', async () => {
@@ -771,6 +831,13 @@ describe('AccountService', () => {
   });
 
   describe('addAddress', () => {
+    beforeEach(() => {
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: PLAN_BYTES,
+        totalUsedSpaceBytes: 0,
+      });
+    });
+
     it('when all conditions met, then creates principal and links provider', async () => {
       const accountAttrs = newMailAccountAttributes();
       const account = MailAccount.build(accountAttrs);
@@ -812,6 +879,7 @@ describe('AccountService', () => {
         primaryAddress: newAddr,
         displayName: 'Display Name',
         password: 'password123',
+        quota: PLAN_BYTES,
       });
       expect(addresses.createProviderLink).toHaveBeenCalledWith({
         mailAddressId: newAddressId,
@@ -829,7 +897,27 @@ describe('AccountService', () => {
       );
     });
 
-    it('when bucket creation fails, then rolls back principal and hard-deletes the address', async () => {
+    it('when the user has no storage allowance, then throws and never provisions an unlimited principal', async () => {
+      bridge.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: 0,
+        totalUsedSpaceBytes: 0,
+      });
+      accounts.findByUserId.mockResolvedValue(
+        MailAccount.build(newMailAccountAttributes()),
+      );
+      domains.findByDomain.mockResolvedValue(
+        MailDomain.build(newMailDomainAttributes()),
+      );
+      addresses.findByAddress.mockResolvedValue(null);
+
+      await expect(
+        service.addAddress('user-uuid-1', 'a@b.com', 'b.com', 'pass'),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(addresses.create).not.toHaveBeenCalled();
+      expect(provider.createAccount).not.toHaveBeenCalled();
+    });
+
+    it('when bucket creation fails, then rolls back principal, link, and address', async () => {
       const account = MailAccount.build(newMailAccountAttributes());
       const domain = MailDomain.build(newMailDomainAttributes());
       const newAddr = 'new@example.com';

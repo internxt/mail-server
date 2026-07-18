@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import dayjs from 'dayjs';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { PaymentsService } from '../infrastructure/payments/payments.service.js';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
 import type { CreateAccountResult } from './account.types.js';
@@ -48,6 +50,7 @@ export class AccountService {
     private readonly domains: DomainRepository,
     private readonly keys: MailAddressKeysRepository,
     private readonly bridge: BridgeClient,
+    private readonly payments: PaymentsService,
     private readonly config: ConfigService,
   ) {}
 
@@ -167,12 +170,20 @@ export class AccountService {
     displayName: string;
     keys: MailAddressKeyBundle;
   }): Promise<MailAccount> {
-    const [domainRecord, existingAddress, existingAccount] = await Promise.all([
-      this.domains.findByDomain(params.domain),
-      this.addresses.findByAddress(params.address),
-      this.accounts.findByUserId(params.userId),
-    ]);
+    const [tier, usage, domainRecord, existingAddress, existingAccount] =
+      await Promise.all([
+        this.payments.getUserTier(params.userId),
+        this.bridge.getUserUsage(params.userId),
+        this.domains.findByDomain(params.domain),
+        this.addresses.findByAddress(params.address),
+        this.accounts.findByUserId(params.userId),
+      ]);
 
+    if (!tier.featuresPerService.mail?.enabled) {
+      throw new ForbiddenException(
+        'Mail access is not available for your current plan',
+      );
+    }
     if (!domainRecord) {
       throw new NotFoundException(`Domain '${params.domain}' not found`);
     }
@@ -182,6 +193,13 @@ export class AccountService {
     if (existingAddress) {
       throw new ConflictException(
         `Address '${params.address}' is already in use`,
+      );
+    }
+
+    const quota = usage.maxSpaceBytes;
+    if (!quota || quota <= 0) {
+      throw new UnprocessableEntityException(
+        `Cannot provision mail account for '${params.userId}': user has no storage allowance`,
       );
     }
 
@@ -230,6 +248,7 @@ export class AccountService {
         primaryAddress: params.address,
         displayName: params.displayName,
         password,
+        quota,
       });
     } catch (error) {
       await this.rollbackAccount(account.id);
@@ -287,7 +306,8 @@ export class AccountService {
     password: string,
     displayName?: string,
   ): Promise<void> {
-    const [account, domain, existing] = await Promise.all([
+    const [usage, account, domain, existing] = await Promise.all([
+      this.bridge.getUserUsage(userId),
       this.accounts.findByUserId(userId),
       this.domains.findByDomain(domainName),
       this.addresses.findByAddress(address),
@@ -301,6 +321,13 @@ export class AccountService {
     }
     if (existing) {
       throw new ConflictException(`Address '${address}' already exists`);
+    }
+
+    const quota = usage.maxSpaceBytes;
+    if (!quota || quota <= 0) {
+      throw new UnprocessableEntityException(
+        `Cannot add address for '${userId}': user has no storage allowance`,
+      );
     }
 
     const newAddressId = await this.addresses.create({
@@ -317,6 +344,7 @@ export class AccountService {
         primaryAddress: address,
         displayName: displayName ?? '',
         password,
+        quota,
       });
     } catch (error) {
       await this.rollbackAddress(newAddressId);
