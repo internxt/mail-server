@@ -33,10 +33,15 @@ async function bootstrap() {
       preflightContinue: false,
     },
     bufferLogs: true,
+    bodyParser: false,
   });
 
   app.useLogger(app.get(Logger));
   const logger = app.get(Logger);
+
+  const BODY_SIZE_LIMIT = '30mb';
+  app.useBodyParser('json', { limit: BODY_SIZE_LIMIT });
+  app.useBodyParser('urlencoded', { extended: true, limit: BODY_SIZE_LIMIT });
 
   const enableTrustProxy = config.isProduction;
   app.set('trust proxy', enableTrustProxy);
