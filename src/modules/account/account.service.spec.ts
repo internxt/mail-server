@@ -539,7 +539,9 @@ describe('AccountService', () => {
       await expect(service.provisionAccount(params)).rejects.toThrow(
         'Stalwart down',
       );
-      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
       expect(addresses.createProviderLink).not.toHaveBeenCalled();
     });
 
@@ -565,10 +567,12 @@ describe('AccountService', () => {
 
       await expect(service.provisionAccount(params)).rejects.toThrow('DB down');
       expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
-      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
     });
 
-    it('when bucket creation fails, then deletes the principal and account (undo) and rethrows', async () => {
+    it('when bucket creation fails, then deletes the principal and hard-deletes the account (undo) and rethrows', async () => {
       const createdAccount = MailAccount.build(
         newMailAccountAttributes({
           userId: params.userId,
@@ -592,9 +596,41 @@ describe('AccountService', () => {
         'Bridge down',
       );
       expect(provider.deleteAccount).toHaveBeenCalledWith(params.address);
-      expect(addresses.deleteProviderLink).toHaveBeenCalledWith('addr-id');
-      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id);
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
       expect(accounts.setNetworkBucketId).not.toHaveBeenCalled();
+    });
+
+    it('when the provider delete fails during rollback, then still hard-deletes the account', async () => {
+      const createdAccount = MailAccount.build(
+        newMailAccountAttributes({
+          userId: params.userId,
+          addresses: [],
+        }),
+      );
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+      accounts.create.mockResolvedValue(createdAccount);
+      addresses.create.mockResolvedValue('addr-id');
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: params.address,
+        internalId: '42',
+      });
+      bridge.createMailBucket.mockRejectedValue(new Error('Bridge down'));
+      provider.deleteAccount.mockRejectedValue(
+        new Error('Stalwart unreachable'),
+      );
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        'Bridge down',
+      );
+      expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
+        force: true,
+      });
     });
 
     it('when concurrent provisioning race occurs, then returns the existing account', async () => {
@@ -614,6 +650,21 @@ describe('AccountService', () => {
       const result = await service.provisionAccount(params);
 
       expect(result).toBe(existingAccount);
+      expect(provider.createAccount).not.toHaveBeenCalled();
+    });
+
+    it('when unique collision occurs but no account is visible, then throws a conflict', async () => {
+      const uniqueError = new Error('Unique constraint violated');
+      uniqueError.name = 'SequelizeUniqueConstraintError';
+
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+      accounts.create.mockRejectedValue(uniqueError);
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        ConflictException,
+      );
       expect(provider.createAccount).not.toHaveBeenCalled();
     });
   });
@@ -682,6 +733,98 @@ describe('AccountService', () => {
       accounts.findByUserId.mockResolvedValue(null);
 
       await expect(service.deleteAccount('unknown')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('suspendAccount', () => {
+    it('when account is active, then suspends every principal and the account', async () => {
+      const addr1 = newMailAddressAttributes({ isDefault: true });
+      const addr2 = newMailAddressAttributes({ isDefault: false });
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Active,
+          addresses: [addr1, addr2],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.suspendAccount(account.userId);
+
+      expect(provider.suspendAccount).toHaveBeenCalledWith(
+        addr1.providerExternalId,
+      );
+      expect(provider.suspendAccount).toHaveBeenCalledWith(
+        addr2.providerExternalId,
+      );
+      expect(accounts.suspend).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account is already suspended, then is a no-op', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Suspended,
+          suspendedAt: new Date(),
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.suspendAccount(account.userId);
+
+      expect(provider.suspendAccount).not.toHaveBeenCalled();
+      expect(accounts.suspend).not.toHaveBeenCalled();
+    });
+
+    it('when account does not exist, then throws NotFoundException', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.suspendAccount('unknown')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('reactivateAccount', () => {
+    it('when account is suspended, then reactivates every principal and the account', async () => {
+      const addr1 = newMailAddressAttributes({ isDefault: true });
+      const addr2 = newMailAddressAttributes({ isDefault: false });
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Suspended,
+          suspendedAt: new Date(),
+          addresses: [addr1, addr2],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.reactivateAccount(account.userId);
+
+      expect(provider.reactivateAccount).toHaveBeenCalledWith(
+        addr1.providerExternalId,
+      );
+      expect(provider.reactivateAccount).toHaveBeenCalledWith(
+        addr2.providerExternalId,
+      );
+      expect(accounts.reactivate).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account is already active, then is a no-op', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({ status: MailAccountState.Active }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.reactivateAccount(account.userId);
+
+      expect(provider.reactivateAccount).not.toHaveBeenCalled();
+      expect(accounts.reactivate).not.toHaveBeenCalled();
+    });
+
+    it('when account does not exist, then throws NotFoundException', async () => {
+      accounts.findByUserId.mockResolvedValue(null);
+
+      await expect(service.reactivateAccount('unknown')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -784,6 +927,11 @@ describe('AccountService', () => {
       domains.findByDomain.mockResolvedValue(domain);
       addresses.findByAddress.mockResolvedValue(null);
       addresses.create.mockResolvedValue(newAddressId);
+      provider.createAccount.mockResolvedValue({
+        provider: 'stalwart',
+        externalId: newAddr,
+        internalId: '7',
+      });
       bridge.createMailBucket.mockRejectedValue(new Error('Bridge down'));
 
       await expect(
@@ -791,8 +939,9 @@ describe('AccountService', () => {
       ).rejects.toThrow('Bridge down');
 
       expect(provider.deleteAccount).toHaveBeenCalledWith(newAddr);
-      expect(addresses.deleteProviderLink).toHaveBeenCalledWith(newAddressId);
-      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId, {
+        force: true,
+      });
       expect(addresses.setNetworkBucketId).not.toHaveBeenCalled();
     });
 
@@ -858,7 +1007,9 @@ describe('AccountService', () => {
         ),
       ).rejects.toThrow('provider down');
 
-      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId, {
+        force: true,
+      });
       expect(addresses.createProviderLink).not.toHaveBeenCalled();
     });
 
@@ -884,7 +1035,9 @@ describe('AccountService', () => {
       ).rejects.toThrow('DB down');
 
       expect(provider.deleteAccount).toHaveBeenCalledWith(newAddr);
-      expect(addresses.delete).toHaveBeenCalledWith(newAddressId);
+      expect(addresses.delete).toHaveBeenCalledWith(newAddressId, {
+        force: true,
+      });
     });
   });
 

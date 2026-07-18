@@ -94,6 +94,26 @@ describe('StalwartAccountProvider', () => {
     });
   });
 
+  describe('suspendAccount', () => {
+    it('when called, then delegates to stalwart service', async () => {
+      await provider.suspendAccount('user@example.com');
+
+      expect(stalwart.suspendAccountByEmail).toHaveBeenCalledWith(
+        'user@example.com',
+      );
+    });
+  });
+
+  describe('reactivateAccount', () => {
+    it('when called, then delegates to stalwart service', async () => {
+      await provider.reactivateAccount('user@example.com');
+
+      expect(stalwart.reactivateAccountByEmail).toHaveBeenCalledWith(
+        'user@example.com',
+      );
+    });
+  });
+
   describe('getAccount', () => {
     it('when account exists, then returns AccountInfo with full email as name', async () => {
       stalwart.getAccountByEmail.mockResolvedValue({

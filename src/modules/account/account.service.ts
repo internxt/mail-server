@@ -213,10 +213,16 @@ export class AccountService {
         error instanceof Error &&
         error.name === 'SequelizeUniqueConstraintError'
       ) {
-        this.logger.warn(
-          `Concurrent provisioning for '${params.userId}', returning existing`,
+        const existing = await this.accounts.findByUserId(params.userId);
+        if (existing) {
+          this.logger.warn(
+            `Concurrent provisioning for '${params.userId}', returning existing`,
+          );
+          return existing;
+        }
+        throw new ConflictException(
+          `Account for user '${params.userId}' already exists`,
         );
-        return this.getAccountOrFail(params.userId);
       }
       throw error;
     }
@@ -245,7 +251,7 @@ export class AccountService {
         quota,
       });
     } catch (error) {
-      await this.accounts.delete(account.id);
+      await this.rollbackAccount(account.id);
       throw error;
     }
 
@@ -258,9 +264,7 @@ export class AccountService {
       });
       await this.createNetworkBucket(params.userId, addressId);
     } catch (error) {
-      await this.provider.deleteAccount(created.externalId);
-      await this.addresses.deleteProviderLink(addressId);
-      await this.accounts.delete(account.id);
+      await this.rollbackAccount(account.id, created.externalId);
       throw error;
     }
 
@@ -343,7 +347,7 @@ export class AccountService {
         quota,
       });
     } catch (error) {
-      await this.addresses.delete(newAddressId);
+      await this.rollbackAddress(newAddressId);
       throw error;
     }
 
@@ -354,18 +358,9 @@ export class AccountService {
         externalId: created.externalId,
         providerInternalId: created.internalId,
       });
-    } catch (error) {
-      await this.provider.deleteAccount(created.externalId);
-      await this.addresses.delete(newAddressId);
-      throw error;
-    }
-
-    try {
       await this.createNetworkBucket(userId, newAddressId);
     } catch (error) {
-      await this.provider.deleteAccount(address);
-      await this.addresses.deleteProviderLink(newAddressId);
-      await this.addresses.delete(newAddressId);
+      await this.rollbackAddress(newAddressId, created.externalId);
       throw error;
     }
 
@@ -461,6 +456,38 @@ export class AccountService {
     }
   }
 
+  private async rollbackAccount(
+    accountId: string,
+    providerExternalId?: string,
+  ): Promise<void> {
+    if (providerExternalId) {
+      await this.tryDeleteProviderAccount(providerExternalId);
+    }
+    await this.accounts.delete(accountId, { force: true });
+  }
+
+  private async rollbackAddress(
+    addressId: string,
+    providerExternalId?: string,
+  ): Promise<void> {
+    if (providerExternalId) {
+      await this.tryDeleteProviderAccount(providerExternalId);
+    }
+    await this.addresses.delete(addressId, { force: true });
+  }
+
+  private async tryDeleteProviderAccount(
+    providerExternalId: string,
+  ): Promise<void> {
+    try {
+      await this.provider.deleteAccount(providerExternalId);
+    } catch (error) {
+      this.logger.warn(
+        `Rollback: failed to delete provider account '${providerExternalId}': ${(error as Error).message}`,
+      );
+    }
+  }
+
   private async createNetworkBucket(
     userUuid: string,
     addressId: string,
@@ -490,5 +517,40 @@ export class AccountService {
       throw new NotFoundException(`No mail account for user '${userId}'`);
     }
     return account;
+  }
+
+  async suspendAccount(userId: string): Promise<void> {
+    const account = await this.getAccountOrFail(userId);
+    if (account.isSuspended) {
+      this.logger.log(`Account for user '${userId}' is already suspended`);
+      return;
+    }
+
+    await Promise.all(
+      account.addresses.map((a) =>
+        this.provider.suspendAccount(a.providerExternalId),
+      ),
+    );
+
+    await this.accounts.suspend(account.id);
+    this.logger.log(`Suspended account for user '${userId}'`);
+    //TODO: add audit table to keep track of this event
+  }
+
+  async reactivateAccount(userId: string): Promise<void> {
+    const account = await this.getAccountOrFail(userId);
+    if (!account.isSuspended) {
+      this.logger.log(`Account for user '${userId}' is already active`);
+      return;
+    }
+
+    await Promise.all(
+      account.addresses.map((a) =>
+        this.provider.reactivateAccount(a.providerExternalId),
+      ),
+    );
+
+    await this.accounts.reactivate(account.id);
+    this.logger.log(`Reactivated account for user '${userId}'`);
   }
 }

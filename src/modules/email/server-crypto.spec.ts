@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { newEncryptedWrappedKey } from '../../../test/fixtures.js';
+import {
+  newEncryptedWrappedKey,
+  newEncryptionBlock,
+} from '../../../test/fixtures.js';
 
 vi.mock('internxt-crypto/email-crypto', () => ({
-  decryptKeysHybrid: vi.fn(),
   decryptEmailHybrid: vi.fn(),
 }));
 
@@ -10,123 +12,87 @@ vi.mock('internxt-crypto', () => ({
   decryptSymmetrically: vi.fn(),
 }));
 
-import {
-  decryptKeysHybrid,
-  decryptEmailHybrid,
-} from 'internxt-crypto/email-crypto';
+import { decryptEmailHybrid } from 'internxt-crypto/email-crypto';
 import { decryptSymmetrically } from 'internxt-crypto';
 import {
-  unwrapAttachmentKey,
-  decryptBody,
+  decryptEnvelopeWithServerKey,
   decryptAttachment,
 } from './server-crypto.js';
 
 describe('server-crypto', () => {
-  const mockedDecryptKeysHybrid = vi.mocked(decryptKeysHybrid);
   const mockedDecryptEmailHybrid = vi.mocked(decryptEmailHybrid);
   const mockedDecryptSymmetrically = vi.mocked(decryptSymmetrically);
   const serverPrivateKey = new Uint8Array([1, 2, 3, 4]);
+  const decrypted = {
+    text: 'Hello world',
+    preview: 'Hello…',
+    attachmentsSessionKey: new Uint8Array([9, 8, 7]),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('unwrapAttachmentKey', () => {
-    it('When there is a wrapped key that matches the server, then the attachment key is returned', async () => {
-      const wrappedKey = newEncryptedWrappedKey();
-      const expectedKey = new Uint8Array([9, 9, 9]);
-      mockedDecryptKeysHybrid.mockResolvedValue(expectedKey);
+  describe('decryptEnvelopeWithServerKey', () => {
+    it('When the server key matches, then the decrypted body and attachments key are returned', async () => {
+      const envelope = newEncryptionBlock();
+      mockedDecryptEmailHybrid.mockResolvedValue(decrypted);
 
-      const result = await unwrapAttachmentKey([wrappedKey], serverPrivateKey);
-
-      expect(result).toBe(expectedKey);
-    });
-
-    it('When the first key does not match but the second does, then it keeps trying until it finds the right one', async () => {
-      const wrongKey = newEncryptedWrappedKey();
-      const rightKey = newEncryptedWrappedKey();
-      const expectedKey = new Uint8Array([7, 7, 7]);
-      mockedDecryptKeysHybrid
-        .mockRejectedValueOnce(new Error('integrity check failed'))
-        .mockResolvedValueOnce(expectedKey);
-
-      const result = await unwrapAttachmentKey(
-        [wrongKey, rightKey],
+      const result = await decryptEnvelopeWithServerKey(
+        envelope,
         serverPrivateKey,
       );
 
-      expect(mockedDecryptKeysHybrid).toHaveBeenCalledTimes(2);
-      expect(result).toBe(expectedKey);
-    });
-
-    it('When none of the wrapped keys match the server, then an error is thrown', async () => {
-      mockedDecryptKeysHybrid.mockRejectedValue(
-        new Error('integrity check failed'),
-      );
-
-      await expect(
-        unwrapAttachmentKey(
-          [newEncryptedWrappedKey(), newEncryptedWrappedKey()],
-          serverPrivateKey,
-        ),
-      ).rejects.toThrow();
-    });
-
-    it('When the wrapped keys array is empty, then an error is thrown immediately', async () => {
-      await expect(unwrapAttachmentKey([], serverPrivateKey)).rejects.toThrow();
-
-      expect(mockedDecryptKeysHybrid).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('decryptBody', () => {
-    it('When the server key matches, then the decrypted body text is returned', async () => {
-      const wrappedKey = newEncryptedWrappedKey();
-      mockedDecryptEmailHybrid.mockResolvedValue({ text: 'Hello world' });
-
-      const result = await decryptBody(
-        'encrypted-text',
-        [wrappedKey],
+      expect(mockedDecryptEmailHybrid).toHaveBeenCalledWith(
+        {
+          encText: envelope.encryptedText,
+          encPreview: envelope.encryptedPreview,
+          encAttachmentsSessionKey: envelope.encryptedAttachmentsSessionKey,
+        },
+        envelope.wrappedKeys[0],
         serverPrivateKey,
       );
-
-      expect(result).toBe('Hello world');
+      expect(result).toEqual({
+        body: 'Hello world',
+        attachmentsSessionKey: decrypted.attachmentsSessionKey,
+      });
     });
 
     it('When the first key does not match but the second does, then it keeps trying until it finds the right one', async () => {
-      const wrongKey = newEncryptedWrappedKey();
-      const rightKey = newEncryptedWrappedKey();
+      const envelope = newEncryptionBlock({
+        wrappedKeys: [newEncryptedWrappedKey(), newEncryptedWrappedKey()],
+      });
       mockedDecryptEmailHybrid
         .mockRejectedValueOnce(new Error('integrity check failed'))
-        .mockResolvedValueOnce({ text: 'Decrypted body' });
+        .mockResolvedValueOnce(decrypted);
 
-      const result = await decryptBody(
-        'encrypted-text',
-        [wrongKey, rightKey],
+      const result = await decryptEnvelopeWithServerKey(
+        envelope,
         serverPrivateKey,
       );
 
       expect(mockedDecryptEmailHybrid).toHaveBeenCalledTimes(2);
-      expect(result).toBe('Decrypted body');
+      expect(result.body).toBe('Hello world');
     });
 
     it('When none of the wrapped keys match the server, then an error is thrown', async () => {
+      const envelope = newEncryptionBlock({
+        wrappedKeys: [newEncryptedWrappedKey(), newEncryptedWrappedKey()],
+      });
       mockedDecryptEmailHybrid.mockRejectedValue(
         new Error('integrity check failed'),
       );
 
       await expect(
-        decryptBody(
-          'encrypted-text',
-          [newEncryptedWrappedKey(), newEncryptedWrappedKey()],
-          serverPrivateKey,
-        ),
+        decryptEnvelopeWithServerKey(envelope, serverPrivateKey),
       ).rejects.toThrow();
     });
 
     it('When the wrapped keys array is empty, then an error is thrown immediately', async () => {
+      const envelope = newEncryptionBlock({ wrappedKeys: [] });
+
       await expect(
-        decryptBody('encrypted-text', [], serverPrivateKey),
+        decryptEnvelopeWithServerKey(envelope, serverPrivateKey),
       ).rejects.toThrow();
 
       expect(mockedDecryptEmailHybrid).not.toHaveBeenCalled();

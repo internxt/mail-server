@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, test, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { AccountService } from '../account/account.service.js';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { MailUsageService } from '../usage/mail-usage.service.js';
 import { StalwartEventsService } from './stalwart-events.service.js';
 import type {
   StalwartEvent,
@@ -34,7 +34,7 @@ function ingestEvent(
 describe('StalwartEventsService', () => {
   let service: StalwartEventsService;
   let accounts: DeepMocked<AccountService>;
-  let bridge: DeepMocked<BridgeClient>;
+  let usage: DeepMocked<MailUsageService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -45,19 +45,15 @@ describe('StalwartEventsService', () => {
 
     service = module.get(StalwartEventsService);
     accounts = module.get(AccountService);
-    bridge = module.get(BridgeClient);
+    usage = module.get(MailUsageService);
   });
 
   describe('handleBatch', () => {
-    it('when an ingest event resolves to a bucket, then creates a bucket entry keyed by accountId:documentId', async () => {
+    test('when an ingest event resolves to a bucket, then tracks the stored message keyed by accountId:documentId', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
-      });
-      bridge.createBucketEntry.mockResolvedValue({
-        id: 'entry-1',
-        maxSpaceBytes: 1000,
-        totalUsedSpaceBytes: 240,
       });
 
       await service.handleBatch({ events: [ingestEvent()] });
@@ -65,12 +61,13 @@ describe('StalwartEventsService', () => {
       expect(
         accounts.findBucketContextByProviderInternalId,
       ).toHaveBeenCalledWith('42');
-      expect(bridge.createBucketEntry).toHaveBeenCalledWith(
-        'user-1',
-        'bucket-1',
-        '42:7',
-        240,
-      );
+      expect(usage.trackStoredMessage).toHaveBeenCalledWith({
+        mailAddressId: 'address-1',
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:7',
+        size: 240,
+      });
     });
 
     it('when the event type is a duplicate, then it is skipped', async () => {
@@ -81,7 +78,7 @@ describe('StalwartEventsService', () => {
       expect(
         accounts.findBucketContextByProviderInternalId,
       ).not.toHaveBeenCalled();
-      expect(bridge.createBucketEntry).not.toHaveBeenCalled();
+      expect(usage.trackStoredMessage).not.toHaveBeenCalled();
     });
 
     it('when the event type is not a message-ingest, then it is skipped', async () => {
@@ -95,37 +92,34 @@ describe('StalwartEventsService', () => {
       expect(
         accounts.findBucketContextByProviderInternalId,
       ).not.toHaveBeenCalled();
-      expect(bridge.createBucketEntry).not.toHaveBeenCalled();
+      expect(usage.trackStoredMessage).not.toHaveBeenCalled();
     });
 
-    it('when no account resolves for the event, then no bucket entry is created', async () => {
+    test('when no account resolves for the event, then no message is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue(null);
 
       await service.handleBatch({ events: [ingestEvent()] });
 
-      expect(bridge.createBucketEntry).not.toHaveBeenCalled();
+      expect(usage.trackStoredMessage).not.toHaveBeenCalled();
     });
 
-    it('when the resolved address has no network bucket, then no bucket entry is created', async () => {
+    test('when the resolved address has no network bucket, then no message is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: null,
       });
 
       await service.handleBatch({ events: [ingestEvent()] });
 
-      expect(bridge.createBucketEntry).not.toHaveBeenCalled();
+      expect(usage.trackStoredMessage).not.toHaveBeenCalled();
     });
 
-    it('when the batch has several events, then each ingest event is processed', async () => {
+    test('when the batch has several events, then each ingest event is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
+        mailAddressId: 'address-1',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
-      });
-      bridge.createBucketEntry.mockResolvedValue({
-        id: 'entry-1',
-        maxSpaceBytes: 1000,
-        totalUsedSpaceBytes: 240,
       });
 
       await service.handleBatch({
@@ -135,18 +129,12 @@ describe('StalwartEventsService', () => {
         ],
       });
 
-      expect(bridge.createBucketEntry).toHaveBeenCalledTimes(2);
-      expect(bridge.createBucketEntry).toHaveBeenCalledWith(
-        'user-1',
-        'bucket-1',
-        '42:7',
-        240,
+      expect(usage.trackStoredMessage).toHaveBeenCalledTimes(2);
+      expect(usage.trackStoredMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ entryKey: '42:7' }),
       );
-      expect(bridge.createBucketEntry).toHaveBeenCalledWith(
-        'user-1',
-        'bucket-1',
-        '42:8',
-        240,
+      expect(usage.trackStoredMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ entryKey: '42:8' }),
       );
     });
   });

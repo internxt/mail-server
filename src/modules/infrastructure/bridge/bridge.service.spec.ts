@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, test, expect, beforeEach, vi } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { ConfigService } from '@nestjs/config';
@@ -189,7 +189,7 @@ describe('BridgeClient', () => {
   });
 
   describe('createBucketEntry', () => {
-    it('when Bridge returns 200, then signs a token, POSTs key and size, and returns the entry', async () => {
+    test('when Bridge returns 200, then signs a token, POSTs only the size, and returns the entry', async () => {
       const entry = {
         id: 'entry-1',
         maxSpaceBytes: 1000,
@@ -201,19 +201,14 @@ describe('BridgeClient', () => {
         body: { text: () => Promise.resolve(JSON.stringify(entry)) },
       });
 
-      const result = await service.createBucketEntry(
-        'user-1',
-        'bucket-1',
-        '42:7',
-        240,
-      );
+      const result = await service.createBucketEntry('user-1', 'bucket-1', 240);
 
       expect(result).toStrictEqual(entry);
       expect(httpRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'POST',
           path: '/v2/gateway/users/user-1/buckets/bucket-1/entries',
-          body: JSON.stringify({ key: '42:7', size: 240 }),
+          body: JSON.stringify({ size: 240 }),
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
           }) as unknown,
@@ -229,7 +224,7 @@ describe('BridgeClient', () => {
       });
 
       const error: unknown = await service
-        .createBucketEntry('user-1', 'bucket-1', '42:7', 240)
+        .createBucketEntry('user-1', 'bucket-1', 240)
         .catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(BridgeApiError);
@@ -242,19 +237,25 @@ describe('BridgeClient', () => {
   });
 
   describe('deleteBucketEntry', () => {
-    it('when Bridge returns 200, then signs a token and DELETEs the url-encoded entry key', async () => {
+    test('when Bridge returns 200, then signs a token, DELETEs by entry id, and returns the snapshot', async () => {
+      const snapshot = { maxSpaceBytes: 1000, totalUsedSpaceBytes: 0 };
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
         statusCode: 200,
-        body: { text: () => Promise.resolve('') },
+        body: { text: () => Promise.resolve(JSON.stringify(snapshot)) },
       });
 
-      await service.deleteBucketEntry('user-1', 'bucket-1', '42:7');
+      const result = await service.deleteBucketEntry(
+        'user-1',
+        'bucket-1',
+        'entry-1',
+      );
 
+      expect(result).toStrictEqual(snapshot);
       expect(httpRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'DELETE',
-          path: '/v2/gateway/users/user-1/buckets/bucket-1/entries/42%3A7',
+          path: '/v2/gateway/users/user-1/buckets/bucket-1/entries/entry-1',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
           }) as unknown,
@@ -270,7 +271,7 @@ describe('BridgeClient', () => {
       });
 
       const error: unknown = await service
-        .deleteBucketEntry('user-1', 'bucket-1', '42:7')
+        .deleteBucketEntry('user-1', 'bucket-1', 'entry-1')
         .catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(BridgeApiError);
@@ -279,6 +280,49 @@ describe('BridgeClient', () => {
       }
       expect(error.statusCode).toBe(404);
       expect(error.details).toBe('entry not found');
+    });
+  });
+
+  describe('getUserUsage', () => {
+    it('when Bridge returns 200, then signs a gateway token, GETs the usage, and returns the snapshot', async () => {
+      const snapshot = { maxSpaceBytes: 5000, totalUsedSpaceBytes: 1200 };
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 200,
+        body: { text: () => Promise.resolve(JSON.stringify(snapshot)) },
+      });
+
+      const result = await service.getUserUsage('user-1');
+
+      expect(result).toStrictEqual(snapshot);
+      expect(httpRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'GET',
+          path: '/v2/gateway/users/user-1/usage',
+          headers: expect.objectContaining({
+            authorization: 'Bearer signed-jwt',
+          }) as unknown,
+        }),
+      );
+    });
+
+    it('when Bridge returns a non-200 status, then throws BridgeApiError with statusCode and details', async () => {
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 500,
+        body: { text: () => Promise.resolve('internal error') },
+      });
+
+      const error: unknown = await service
+        .getUserUsage('user-1')
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BridgeApiError);
+      if (!(error instanceof BridgeApiError)) {
+        throw new Error('expected BridgeApiError');
+      }
+      expect(error.statusCode).toBe(500);
+      expect(error.details).toBe('internal error');
     });
   });
 });

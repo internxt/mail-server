@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MailProvider } from '../../email/mail-provider.port.js';
+import {
+  DraftUpdateConflictError,
+  MailProvider,
+} from '../../email/mail-provider.port.js';
 import type {
   DeleteEmailResult,
   DraftEmailDto,
@@ -15,7 +18,11 @@ import type {
   ThreadingHeaders,
 } from '../../email/email.types.js';
 import { decodeStalwartIdBig } from '../stalwart/stalwart-id.codec.js';
-import { JMAP_QUOTA_CAPABILITIES, JmapService } from './jmap.service.js';
+import {
+  JMAP_QUOTA_CAPABILITIES,
+  JmapError,
+  JmapService,
+} from './jmap.service.js';
 import type {
   DownloadAttachmentPayload,
   DownloadAttachmentResponse,
@@ -71,6 +78,17 @@ interface TimedCache<T> {
 }
 
 const CACHE_TTL_MS = 60_000;
+
+const UPDATE_DRAFT_MAX_ATTEMPTS = 3;
+
+const isStateMismatchError = (err: unknown): boolean =>
+  err instanceof JmapError &&
+  Array.isArray(err.details) &&
+  err.details.some(
+    (invocation) =>
+      Array.isArray(invocation) &&
+      (invocation[1] as { type?: string } | null)?.type === 'stateMismatch',
+  );
 
 @Injectable()
 export class JmapMailProvider extends MailProvider {
@@ -649,52 +667,92 @@ export class JmapMailProvider extends MailProvider {
       email: identity.email,
     });
 
-    const existingDraft = await this.getDraft(userEmail, draftId);
-
-    if (!existingDraft) {
-      return null;
-    }
-
-    const setResponse = await this.jmap.request<JmapSetResponse<JmapEmail>>(
-      userEmail,
-      [
+    for (let attempt = 1; attempt <= UPDATE_DRAFT_MAX_ATTEMPTS; attempt++) {
+      const getResponse = await this.jmap.request<JmapGetResponse<JmapEmail>>(
+        userEmail,
         [
-          'Email/set',
-          {
-            accountId,
-            destroy: [draftId],
-            create: { draft: emailCreate },
-          },
-          'r0',
+          [
+            'Email/get',
+            { accountId, ids: [draftId], properties: ['id', 'keywords'] },
+            'r0',
+          ],
         ],
-      ],
-    );
-
-    const setResult = setResponse.methodResponses[0]![1];
-
-    if (setResult.notDestroyed?.[draftId]) {
-      throw new Error(
-        `Failed to update draft: ${setResult.notDestroyed[draftId].description}`,
       );
+
+      const getResult = getResponse.methodResponses[0]![1];
+      const existing = getResult.list[0];
+      if (!existing?.keywords?.['$draft']) {
+        return null;
+      }
+
+      let setResult: JmapSetResponse<JmapEmail>;
+      try {
+        const setResponse = await this.jmap.request<JmapSetResponse<JmapEmail>>(
+          userEmail,
+          [
+            [
+              'Email/set',
+              {
+                accountId,
+                ifInState: getResult.state,
+                destroy: [draftId],
+                create: { draft: emailCreate },
+              },
+              'r0',
+            ],
+          ],
+        );
+        setResult = setResponse.methodResponses[0]![1];
+      } catch (err) {
+        if (isStateMismatchError(err)) {
+          if (attempt < UPDATE_DRAFT_MAX_ATTEMPTS) continue;
+          throw new DraftUpdateConflictError(draftId);
+        }
+        throw err;
+      }
+
+      const createdId = setResult.created?.['draft']?.id;
+
+      if (setResult.notDestroyed?.[draftId]) {
+        if (createdId) {
+          await this.jmap
+            .request(userEmail, [
+              ['Email/set', { accountId, destroy: [createdId] }, 'r0'],
+            ])
+            .catch((cleanupErr) => {
+              this.logger.warn(
+                `Failed to clean up recreated draft ${createdId} after a partial update: ${
+                  cleanupErr instanceof Error
+                    ? cleanupErr.message
+                    : String(cleanupErr)
+                }`,
+              );
+            });
+        }
+        throw new Error(
+          `Failed to update draft: ${setResult.notDestroyed[draftId].description}`,
+        );
+      }
+
+      if (setResult.notCreated?.['draft']) {
+        throw new Error(
+          `Failed to update draft: ${setResult.notCreated['draft'].description}`,
+        );
+      }
+
+      if (!createdId) {
+        throw new Error('Failed to recreate draft after destroy');
+      }
+
+      const updatedDraft = await this.getEmail(userEmail, createdId);
+      if (!updatedDraft) {
+        throw new Error('Failed to fetch the updated draft');
+      }
+
+      return updatedDraft;
     }
 
-    if (setResult.notCreated?.['draft']) {
-      throw new Error(
-        `Failed to update draft: ${setResult.notCreated['draft'].description}`,
-      );
-    }
-
-    const createdId = setResult.created?.['draft']?.id;
-    if (!createdId) {
-      throw new Error('Failed to recreate draft after destroy');
-    }
-
-    const updatedDraft = await this.getEmail(userEmail, createdId);
-    if (!updatedDraft) {
-      throw new Error('Failed to fetch the updated draft');
-    }
-
-    return updatedDraft;
+    throw new DraftUpdateConflictError(draftId);
   }
 
   async discardDraft(userEmail: string, id: string): Promise<void> {
@@ -784,7 +842,7 @@ export class JmapMailProvider extends MailProvider {
   }
 
   private buildEntryKey(accountId: string, emailId: string): string {
-    const numericAccountId = decodeStalwartIdBig(accountId);
+    const numericAccountId = decodeStalwartIdBig(accountId) & 0xffffffffn;
     const documentId = decodeStalwartIdBig(emailId) & 0xffffffffn;
     return `${numericAccountId}:${documentId}`;
   }

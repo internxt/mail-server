@@ -15,6 +15,7 @@ import { GatewayModule } from './modules/gateway/gateway.module';
 import { HttpGlobalExceptionFilter } from './common/filters/http-global-exception.filter';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { StalwartEventsModule } from './modules/stalwart-events/stalwart-events.module';
+import { MtaHooksModule } from './modules/mta-hooks/mta-hooks.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { StalwartEventsModule } from './modules/stalwart-events/stalwart-events.
     AddressesModule,
     GatewayModule,
     StalwartEventsModule,
+    MtaHooksModule,
   ],
   controllers: [],
   providers: [

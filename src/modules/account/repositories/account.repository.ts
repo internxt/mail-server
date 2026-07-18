@@ -42,12 +42,26 @@ export class AccountRepository {
     return this.toDomain(model);
   }
 
-  async delete(id: string): Promise<void> {
-    await this.accountModel.destroy({ where: { id } });
+  async delete(id: string, options?: { force?: boolean }): Promise<void> {
+    await this.accountModel.destroy({ where: { id }, force: options?.force });
   }
 
   async setNetworkBucketId(id: string, networkBucketId: string): Promise<void> {
     await this.accountModel.update({ networkBucketId }, { where: { id } });
+  }
+
+  async suspend(id: string): Promise<void> {
+    await this.accountModel.update(
+      { status: MailAccountState.Suspended, suspendedAt: new Date() },
+      { where: { id } },
+    );
+  }
+
+  async reactivate(id: string): Promise<void> {
+    await this.accountModel.update(
+      { status: MailAccountState.Active, suspendedAt: null },
+      { where: { id } },
+    );
   }
 
   private toDomain(model: MailAccountModel): MailAccount {

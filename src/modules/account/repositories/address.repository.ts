@@ -13,6 +13,7 @@ import { MailProviderAccountModel } from '../models/mail-provider-account.model.
 const MAX_BATCH_LOOKUP = 50;
 
 export interface ProviderAccountBucketContext {
+  mailAddressId: string;
   userUuid: string;
   networkBucketId: string | null;
 }
@@ -110,6 +111,7 @@ export class AddressRepository {
     if (!model?.account) return null;
 
     return {
+      mailAddressId: model.id,
       userUuid: model.account.userId,
       networkBucketId: model.networkBucketId,
     };
@@ -132,6 +134,7 @@ export class AddressRepository {
     if (!link?.address?.account) return null;
 
     return {
+      mailAddressId: link.address.id,
       userUuid: link.address.account.userId,
       networkBucketId: link.address.networkBucketId,
     };
@@ -167,8 +170,8 @@ export class AddressRepository {
     return model.id;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.addressModel.destroy({ where: { id } });
+  async delete(id: string, options?: { force?: boolean }): Promise<void> {
+    await this.addressModel.destroy({ where: { id }, force: options?.force });
   }
 
   async setNetworkBucketId(id: string, networkBucketId: string): Promise<void> {
