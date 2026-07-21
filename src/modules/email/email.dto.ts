@@ -138,6 +138,57 @@ export class SendEmailRequestDto {
   draftId?: string;
 }
 
+export class ReplyEmailRequestDto {
+  @ApiProperty({
+    type: [EmailAddressDto],
+    description: 'Primary recipients (at least one required)',
+  })
+  to!: EmailAddressDto[];
+
+  @ApiPropertyOptional({ type: [EmailAddressDto] })
+  cc?: EmailAddressDto[];
+
+  @ApiPropertyOptional({ type: [EmailAddressDto] })
+  bcc?: EmailAddressDto[];
+
+  @ApiPropertyOptional({
+    example: 'Re: Weekly sync notes',
+    description:
+      'Subject of the reply. Optional — when omitted, a `Re:`-prefixed subject ' +
+      'is derived from the original email.',
+  })
+  subject?: string;
+
+  @ApiPropertyOptional({
+    example: 'Thanks, sounds good!',
+    description: 'Plain-text version of the email body',
+  })
+  textBody?: string;
+
+  @ApiPropertyOptional({
+    example: '<p>Thanks, sounds good!</p>',
+    description: 'HTML version of the email body',
+  })
+  htmlBody?: string;
+
+  @ApiPropertyOptional({ type: EncryptionBlockDto })
+  encryption?: EncryptionBlockDto;
+
+  @ApiPropertyOptional({ type: [AttachmentRefDto] })
+  attachments?: AttachmentRefDto[];
+
+  @ApiPropertyOptional({ enum: ['INTERNXT', 'EXTERNAL'], example: 'INTERNXT' })
+  deliveryMode?: MailDeliveryMode;
+
+  @ApiPropertyOptional({
+    example: 'Ma1f09b…',
+    description:
+      'JMAP id of the draft being sent as this reply. When present, the draft ' +
+      'is destroyed after the reply is sent.',
+  })
+  draftId?: string;
+}
+
 export class LookupRecipientKeysRequestDto {
   @ApiProperty({
     type: [String],

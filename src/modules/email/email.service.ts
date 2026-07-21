@@ -12,6 +12,7 @@ import {
   DraftUpdateConflictError,
   MailProvider,
 } from './mail-provider.port.js';
+import { ensureRePrefix } from './threading.js';
 import type {
   DraftEmailDto,
   Email,
@@ -19,9 +20,11 @@ import type {
   EmailListResponse,
   EmailSummary,
   ListEmails,
+  MailDeliveryMode,
   MailQuota,
   Mailbox,
   MailboxType,
+  ReplyEmailDto,
   SearchEmailDto,
   SendEmailDto,
   ThreadingHeaders,
@@ -154,11 +157,43 @@ export class EmailService {
     userEmail: string,
     dto: SendEmailDto,
   ): Promise<{ id: string }> {
+    return this.dispatchInternal(userEmail, dto);
+  }
+
+  async sendExternalEmail(
+    userEmail: string,
+    dto: SendEmailDto,
+  ): Promise<{ id: string }> {
+    return this.dispatchExternal(userEmail, dto);
+  }
+
+  async replyEmail(
+    userEmail: string,
+    parentEmailId: string,
+    dto: ReplyEmailDto,
+    deliveryMode?: MailDeliveryMode,
+  ): Promise<{ id: string }> {
+    const isExternalDeliveryMode = deliveryMode === 'EXTERNAL';
+    const threading = await this.resolveThreading(userEmail, parentEmailId);
+
+    const withSubject: SendEmailDto = {
+      ...dto,
+      subject: dto.subject?.trim() || ensureRePrefix(threading.parentSubject),
+    };
+
+    return isExternalDeliveryMode
+      ? this.dispatchExternal(userEmail, withSubject, threading)
+      : this.dispatchInternal(userEmail, withSubject, threading);
+  }
+
+  private async dispatchInternal(
+    userEmail: string,
+    dto: SendEmailDto,
+    threading?: ThreadingHeaders,
+  ): Promise<{ id: string }> {
     if (dto.to.length === 0) {
       throw new BadRequestException('At least one recipient is required');
     }
-
-    const threading = await this.resolveThreading(userEmail, dto);
 
     if (dto.encryption) {
       dto = {
@@ -171,15 +206,14 @@ export class EmailService {
     return this.mail.sendEmail(userEmail, dto, threading);
   }
 
-  async sendExternalEmail(
+  private async dispatchExternal(
     userEmail: string,
     dto: SendEmailDto,
+    threading?: ThreadingHeaders,
   ): Promise<{ id: string }> {
     if (dto.to.length === 0) {
       throw new BadRequestException('At least one recipient is required');
     }
-
-    const threading = await this.resolveThreading(userEmail, dto);
 
     const serverPrivateKey = Buffer.from(
       this.configService.getOrThrow<string>('crypto.serverPrivateKey'),
@@ -214,7 +248,6 @@ export class EmailService {
       references: threading?.references,
     });
 
-    // Need to save the mail to Sent manually as the smtp service does not save it for us
     await this.mail.saveToSent(
       userEmail,
       {
@@ -223,6 +256,7 @@ export class EmailService {
         htmlBody: undefined,
       },
       threading,
+      messageId,
     );
 
     return { id: messageId };
@@ -230,17 +264,15 @@ export class EmailService {
 
   private async resolveThreading(
     userEmail: string,
-    dto: SendEmailDto,
-  ): Promise<ThreadingHeaders | undefined> {
-    if (!dto.inReplyToEmailId) return undefined;
+    parentEmailId: string,
+  ): Promise<ThreadingHeaders> {
     const threading = await this.mail.getThreadingHeaders(
       userEmail,
-      dto.inReplyToEmailId,
+      parentEmailId,
     );
+
     if (!threading) {
-      throw new NotFoundException(
-        `Replied email ${dto.inReplyToEmailId} not found`,
-      );
+      throw new NotFoundException(`Replied email ${parentEmailId} not found`);
     }
     return threading;
   }

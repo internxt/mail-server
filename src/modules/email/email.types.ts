@@ -104,9 +104,17 @@ export interface SendEmailDto {
   draftId?: string;
 }
 
+export type ReplyEmailDto = Omit<
+  SendEmailDto,
+  'subject' | 'inReplyToEmailId'
+> & {
+  subject?: string;
+};
+
 export interface ThreadingHeaders {
   messageId: string[];
   references: string[];
+  parentSubject: string;
 }
 
 export interface DraftEmailDto {

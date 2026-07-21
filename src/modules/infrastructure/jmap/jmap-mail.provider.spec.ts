@@ -4,7 +4,10 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { JmapMailProvider } from './jmap-mail.provider.js';
 import { JmapError, JmapService } from './jmap.service.js';
-import { DraftUpdateConflictError } from '../../email/mail-provider.port.js';
+import {
+  DraftUpdateConflictError,
+  MissingMessageIdError,
+} from '../../email/mail-provider.port.js';
 import {
   newJmapMailbox,
   newJmapEmail,
@@ -1053,6 +1056,7 @@ describe('JmapMailProvider', () => {
         messageId: ['<parent@example.com>'],
         inReplyTo: ['<grandparent@example.com>'],
         references: ['<root@example.com>', '<grandparent@example.com>'],
+        subject: 'Weekly sync notes',
       });
       jmapService.request.mockResolvedValue(jmapResponse({ list: [parent] }));
 
@@ -1068,6 +1072,7 @@ describe('JmapMailProvider', () => {
           '<grandparent@example.com>',
           '<parent@example.com>',
         ],
+        parentSubject: 'Weekly sync notes',
       });
     });
 
@@ -1082,16 +1087,13 @@ describe('JmapMailProvider', () => {
       expect(result).toBeNull();
     });
 
-    it('when the parent email has no message id, then it returns null because there is nothing to thread against', async () => {
+    it('when the parent email has no message id, then an error indicating so is thrown', async () => {
       const parent = newJmapEmail({ messageId: null });
       jmapService.request.mockResolvedValue(jmapResponse({ list: [parent] }));
 
-      const result = await provider.getThreadingHeaders(
-        'user@test.com',
-        parent.id,
-      );
-
-      expect(result).toBeNull();
+      await expect(
+        provider.getThreadingHeaders('user@test.com', parent.id),
+      ).rejects.toBeInstanceOf(MissingMessageIdError);
     });
 
     it('when the parent email already contains its own id in its references, then duplicates are removed from the resulting reference chain', async () => {
@@ -1135,6 +1137,7 @@ describe('JmapMailProvider', () => {
       const threading = {
         messageId: ['<parent@example.com>'],
         references: ['<parent@example.com>'],
+        parentSubject: 'Weekly sync notes',
       };
 
       await provider.sendEmail('user@test.com', dto, threading);
@@ -1171,6 +1174,7 @@ describe('JmapMailProvider', () => {
       const threading = {
         messageId: ['<parent@example.com>'],
         references: ['<root@example.com>', '<parent@example.com>'],
+        parentSubject: 'Weekly sync notes',
       };
 
       await provider.saveToSent('user@test.com', dto, threading);
