@@ -364,45 +364,102 @@ describe('EmailService', () => {
       );
     });
 
-    it('when replying to an existing email, then the reply is delivered into the same conversation', async () => {
-      const dto = newSendEmailDto({ inReplyToEmailId: 'parent-id' });
-      const threading = {
-        messageId: ['<parent@example.com>'],
-        references: ['<parent@example.com>'],
-      };
-      provider.getThreadingHeaders.mockResolvedValue(threading);
-      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
-
-      await service.sendEmail(userEmail, dto);
-
-      expect(provider.getThreadingHeaders).toHaveBeenCalledWith(
-        userEmail,
-        'parent-id',
-      );
-      expect(provider.sendEmail).toHaveBeenCalledWith(
-        userEmail,
-        dto,
-        threading,
-      );
-    });
-
-    it('when replying to an email that no longer exists, then the user is told the original was not found', async () => {
-      const dto = newSendEmailDto({ inReplyToEmailId: 'missing-id' });
-      provider.getThreadingHeaders.mockResolvedValue(null);
-
-      await expect(service.sendEmail(userEmail, dto)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(provider.sendEmail).not.toHaveBeenCalled();
-    });
-
-    it('when sending an email that is not a reply, then no conversation is looked up', async () => {
+    test('When sending an email, then no conversation is looked up because sends are not threaded', async () => {
       const dto = newSendEmailDto();
       provider.sendEmail.mockResolvedValue({ id: 'plain-id' });
 
       await service.sendEmail(userEmail, dto);
 
       expect(provider.getThreadingHeaders).not.toHaveBeenCalled();
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        dto,
+        undefined,
+      );
+    });
+  });
+
+  describe('Replying an email', () => {
+    const PARENT_ID = 'parent-id';
+    const THREADING = {
+      messageId: ['<parent@example.com>'],
+      references: ['<root@example.com>', '<parent@example.com>'],
+      parentSubject: 'Weekly sync notes',
+    };
+
+    test('When replying, then the reply is delivered into the same conversation', async () => {
+      const dto = newSendEmailDto();
+      provider.getThreadingHeaders.mockResolvedValue(THREADING);
+      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await service.replyEmail(userEmail, PARENT_ID, dto);
+
+      expect(provider.getThreadingHeaders).toHaveBeenCalledWith(
+        userEmail,
+        PARENT_ID,
+      );
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({ to: dto.to }),
+        THREADING,
+      );
+    });
+
+    test('When the reply omits a subject, then a "Re:"-prefixed subject is derived from the original', async () => {
+      const dto = newSendEmailDto({ subject: undefined });
+      provider.getThreadingHeaders.mockResolvedValue(THREADING);
+      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await service.replyEmail(userEmail, PARENT_ID, dto);
+
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({ subject: 'Re: Weekly sync notes' }),
+        THREADING,
+      );
+    });
+
+    test('When the reply provides a subject, then it is used as-is', async () => {
+      const dto = newSendEmailDto({ subject: 'A different subject' });
+      provider.getThreadingHeaders.mockResolvedValue(THREADING);
+      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await service.replyEmail(userEmail, PARENT_ID, dto);
+
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({ subject: 'A different subject' }),
+        THREADING,
+      );
+    });
+
+    test('When the original email does not exist, then an error indicating so is thrown', async () => {
+      const dto = newSendEmailDto();
+      provider.getThreadingHeaders.mockResolvedValue(null);
+
+      await expect(
+        service.replyEmail(userEmail, 'missing-id', dto),
+      ).rejects.toThrow(NotFoundException);
+      expect(provider.sendEmail).not.toHaveBeenCalled();
+    });
+
+    test('When is an external delivery (3rd party users), then the reply is dispatched over SMTP with the threading headers', async () => {
+      const dto = newSendEmailDto({ encryption: undefined });
+      provider.getThreadingHeaders.mockResolvedValue(THREADING);
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      smtp.sendRaw.mockResolvedValue({ messageId: '<reply-sent@example.com>' });
+      provider.saveToSent.mockResolvedValue({ id: 'sent-id' });
+
+      await service.replyEmail(userEmail, PARENT_ID, dto, 'EXTERNAL');
+
+      expect(smtp.sendRaw).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inReplyTo: THREADING.messageId[0],
+          references: THREADING.references,
+        }),
+      );
     });
   });
 
@@ -509,6 +566,7 @@ describe('EmailService', () => {
           textBody: expect.stringContaining('INTERNXT-ENCRYPTED-EMAIL-v1'),
         }),
         undefined,
+        'msg-2',
       );
       expect(result).toEqual({ id: 'msg-2' });
     });
@@ -538,47 +596,26 @@ describe('EmailService', () => {
       );
     });
 
-    it('when replying to an external recipient, then the conversation thread is carried through SMTP and the saved copy', async () => {
+    test('When delivering externally, then the Sent copy reuses the Message-ID assigned by SMTP so both copies thread together', async () => {
       const dto = newSendEmailDto({
-        inReplyToEmailId: 'parent-id',
-        textBody: 'replying out',
+        textBody: 'sending out',
         encryption: undefined,
       });
-      const threading = {
-        messageId: ['<parent@example.com>'],
-        references: ['<grandparent@example.com>', '<parent@example.com>'],
-      };
-      provider.getThreadingHeaders.mockResolvedValue(threading);
+      const smtpMessageId = '<delivered@external.com>';
       configService.getOrThrow.mockReturnValue(
         Buffer.from('server-priv-key').toString('base64'),
       );
-      smtp.sendRaw.mockResolvedValue({ messageId: 'msg-3' });
-      provider.saveToSent.mockResolvedValue({ id: 'sent-3' });
+      smtp.sendRaw.mockResolvedValue({ messageId: smtpMessageId });
+      provider.saveToSent.mockResolvedValue({ id: 'sent-id' });
 
       await service.sendExternalEmail(userEmail, dto);
 
-      expect(smtp.sendRaw).toHaveBeenCalledWith(
-        expect.objectContaining({
-          inReplyTo: '<parent@example.com>',
-          references: ['<grandparent@example.com>', '<parent@example.com>'],
-        }),
-      );
       expect(provider.saveToSent).toHaveBeenCalledWith(
         userEmail,
         expect.any(Object),
-        threading,
+        undefined,
+        smtpMessageId,
       );
-    });
-
-    it('when replying to an external recipient and the original no longer exists, then the reply is rejected before reaching SMTP', async () => {
-      const dto = newSendEmailDto({ inReplyToEmailId: 'missing-id' });
-      provider.getThreadingHeaders.mockResolvedValue(null);
-
-      await expect(service.sendExternalEmail(userEmail, dto)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(smtp.sendRaw).not.toHaveBeenCalled();
-      expect(provider.saveToSent).not.toHaveBeenCalled();
     });
   });
 

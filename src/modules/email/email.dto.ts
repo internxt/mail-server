@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmail } from 'class-validator';
 import type { MailboxType, MailDeliveryMode } from './email.types.js';
 import { MailDomainStatus } from '../account/domain/mail-domain.domain.js';
@@ -136,6 +136,19 @@ export class SendEmailRequestDto {
       'after the email is sent so it no longer appears in the Drafts folder.',
   })
   draftId?: string;
+}
+
+export class ReplyEmailRequestDto extends OmitType(SendEmailRequestDto, [
+  'inReplyToEmailId',
+  'subject',
+] as const) {
+  @ApiPropertyOptional({
+    example: 'Re: Weekly sync notes',
+    description:
+      'Subject of the reply. Optional — when omitted, a `Re:`-prefixed subject ' +
+      'is derived from the original email.',
+  })
+  subject?: string;
 }
 
 export class LookupRecipientKeysRequestDto {

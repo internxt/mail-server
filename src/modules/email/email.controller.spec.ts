@@ -113,6 +113,40 @@ describe('EmailController', () => {
     });
   });
 
+  describe('reply', () => {
+    const PARENT_ID = 'parent-id';
+    const baseDto = {
+      to: [{ email: 'alice@internxt.me' }],
+    };
+
+    test('When replying, then the parent id from the path and delivery mode are forwarded to the service', async () => {
+      const dto = { ...baseDto, deliveryMode: 'EXTERNAL' as const };
+      emailService.replyEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await controller.reply(userEmail, PARENT_ID, dto);
+
+      expect(emailService.replyEmail).toHaveBeenCalledWith(
+        userEmail,
+        PARENT_ID,
+        dto,
+        'EXTERNAL',
+      );
+    });
+
+    test('When replying without a delivery mode, then it is forwarded as undefined so the service defaults to internal', async () => {
+      emailService.replyEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await controller.reply(userEmail, PARENT_ID, baseDto);
+
+      expect(emailService.replyEmail).toHaveBeenCalledWith(
+        userEmail,
+        PARENT_ID,
+        baseDto,
+        undefined,
+      );
+    });
+  });
+
   describe('getThread', () => {
     it('when the user opens an email, then the entire conversation around it is returned', async () => {
       const emails = [

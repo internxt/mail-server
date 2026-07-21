@@ -1,3 +1,4 @@
+import { UnprocessableEntityException } from '@nestjs/common';
 import {
   type DownloadAttachmentPayload,
   type DownloadAttachmentResponse,
@@ -22,6 +23,17 @@ export class DraftUpdateConflictError extends Error {
   constructor(draftId: string) {
     super(`Draft ${draftId} was modified concurrently, retry the save`);
     this.name = 'DraftUpdateConflictError';
+
+    Object.setPrototypeOf(this, DraftUpdateConflictError.prototype);
+  }
+}
+
+export class MissingMessageIdError extends UnprocessableEntityException {
+  constructor(parentId: string) {
+    super(`Original email ${parentId} has no Message-ID; cannot thread reply`);
+    this.name = 'MissingMessageIdError';
+
+    Object.setPrototypeOf(this, MissingMessageIdError.prototype);
   }
 }
 
@@ -43,6 +55,7 @@ export abstract class MailProvider {
     userEmail: string,
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
+    messageId?: string,
   ): Promise<{ id: string }>;
   abstract getThreadingHeaders(
     userEmail: string,

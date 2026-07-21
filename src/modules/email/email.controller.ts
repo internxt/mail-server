@@ -41,6 +41,7 @@ import {
   LookupRecipientKeysRequestDto,
   LookupRecipientKeysResponseDto,
   MailboxResponseDto,
+  ReplyEmailRequestDto,
   SearchEmailQueryDto,
   MailDomainDto,
   SendEmailRequestDto,
@@ -230,6 +231,29 @@ export class EmailController {
       return this.emailService.sendExternalEmail(email, dto);
     }
     return this.emailService.sendEmail(email, dto);
+  }
+
+  @Post(':id/reply')
+  @ApiOperation({
+    summary: 'Reply to an email',
+    description: 'Sends a reply to a given email',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'JMAP id of the email being replied to',
+  })
+  @ApiBody({ type: ReplyEmailRequestDto })
+  @ApiOkResponse({
+    type: EmailCreatedResponseDto,
+    description: 'Reply sent successfully',
+  })
+  @ApiNotFoundResponse({ description: 'Original email not found' })
+  reply(
+    @MailAddress('address') email: string,
+    @Param('id') id: string,
+    @Body() dto: ReplyEmailRequestDto,
+  ) {
+    return this.emailService.replyEmail(email, id, dto, dto.deliveryMode);
   }
 
   @Post('drafts')

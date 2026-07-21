@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   DraftUpdateConflictError,
   MailProvider,
+  MissingMessageIdError,
 } from '../../email/mail-provider.port.js';
 import type {
   DeleteEmailResult,
@@ -484,6 +485,7 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
+    messageId?: string,
   ): Promise<{ id: string }> {
     const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail),
@@ -496,6 +498,7 @@ export class JmapMailProvider extends MailProvider {
       sentMailboxId,
       { name: identity.name, email: identity.email },
       threading,
+      messageId,
     );
 
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
@@ -538,7 +541,13 @@ export class JmapMailProvider extends MailProvider {
           {
             accountId,
             ids: [parentId],
-            properties: ['id', 'messageId', 'inReplyTo', 'references'],
+            properties: [
+              'id',
+              'messageId',
+              'inReplyTo',
+              'references',
+              'subject',
+            ],
           },
           'r0',
         ],
@@ -549,7 +558,11 @@ export class JmapMailProvider extends MailProvider {
     if (!parent) return null;
 
     const messageId = parent.messageId ?? [];
-    if (messageId.length === 0) return null;
+    const isMessageIdEmpty = messageId.length === 0;
+
+    if (isMessageIdEmpty) {
+      throw new MissingMessageIdError(parentId);
+    }
 
     const seen = new Set<string>();
     const references: string[] = [];
@@ -564,7 +577,7 @@ export class JmapMailProvider extends MailProvider {
       }
     }
 
-    return { messageId, references };
+    return { messageId, references, parentSubject: parent.subject ?? '' };
   }
 
   async getThread(userEmail: string, emailId: string): Promise<Email[]> {

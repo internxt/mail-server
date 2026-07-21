@@ -17,6 +17,7 @@ import type {
   Mailbox as JmapMailbox,
   MailboxRole,
 } from './jmap.types.js';
+import { generateMessageId } from '../../email/threading.js';
 
 const JMAP_ROLE_TO_MAILBOX_TYPE: Record<string, MailboxType> = {
   inbox: 'inbox',
@@ -143,6 +144,21 @@ function mapAttachmentsToJmap(attachments: EmailAttachment[]): EmailBodyPart[] {
   }));
 }
 
+/**
+ * Attaches the RFC 5322 threading headers (`In-Reply-To` / `References`) that
+ * make the receiving server group this message into the parent's conversation.
+ * A no-op for brand-new emails (no `threading`), which must not reference any
+ * prior message.
+ */
+function applyThreadingHeaders(
+  email: JmapEmailCreate,
+  threading?: ThreadingHeaders,
+): void {
+  if (!threading) return;
+  email.inReplyTo = threading.messageId;
+  email.references = threading.references;
+}
+
 function applyBodyParts(
   email: JmapEmailCreate,
   textBody?: string,
@@ -177,23 +193,24 @@ export function mapSendDtoToJmapCreate(
   mailboxId: string,
   from: EmailAddress,
   threading?: ThreadingHeaders,
+  messageId?: string,
 ): JmapEmailCreate {
+  const messageIdToSend = messageId ?? generateMessageId(from.email);
+
   const email: JmapEmailCreate = {
     mailboxIds: { [mailboxId]: true },
     from: [from],
     to: dto.to,
     subject: dto.subject,
     keywords: { $seen: true },
+    messageId: [messageIdToSend],
   };
 
   if (dto.cc) email.cc = dto.cc;
   if (dto.bcc) email.bcc = dto.bcc;
   if (dto.attachments?.length)
     email.attachments = mapAttachmentsToJmap(dto.attachments);
-  if (threading) {
-    email.inReplyTo = threading.messageId;
-    email.references = threading.references;
-  }
+  applyThreadingHeaders(email, threading);
   applyBodyParts(email, dto.textBody, dto.htmlBody);
 
   return email;
