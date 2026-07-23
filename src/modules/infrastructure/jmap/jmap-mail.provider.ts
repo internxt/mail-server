@@ -547,6 +547,10 @@ export class JmapMailProvider extends MailProvider {
               'inReplyTo',
               'references',
               'subject',
+              'from',
+              'replyTo',
+              'to',
+              'cc',
             ],
           },
           'r0',
@@ -577,7 +581,15 @@ export class JmapMailProvider extends MailProvider {
       }
     }
 
-    return { messageId, references, parentSubject: parent.subject ?? '' };
+    return {
+      messageId,
+      references,
+      parentSubject: parent.subject ?? '',
+      parentFrom: parent.from ?? [],
+      parentReplyTo: parent.replyTo ?? [],
+      parentTo: parent.to ?? [],
+      parentCc: parent.cc ?? [],
+    };
   }
 
   async getThread(userEmail: string, emailId: string): Promise<Email[]> {

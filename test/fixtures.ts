@@ -10,6 +10,7 @@ import type {
   SearchEmailDto,
   EncryptedWrappedKey,
   EncryptionBlock,
+  ThreadingHeaders,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import {
@@ -186,6 +187,21 @@ export function newDraftEmailDto(
     to: [newEmailAddress()],
     subject: random.sentence({ words: 3 }),
     textBody: random.paragraph(),
+    ...attrs,
+  };
+}
+
+export function newThreadingHeaders(
+  attrs?: Partial<ThreadingHeaders>,
+): ThreadingHeaders {
+  return {
+    messageId: ['<parent@example.com>'],
+    references: ['<root@example.com>', '<parent@example.com>'],
+    parentSubject: 'Weekly sync notes',
+    parentFrom: [{ email: 'sender@example.com' }],
+    parentReplyTo: [],
+    parentTo: [{ email: 'me@example.com' }],
+    parentCc: [],
     ...attrs,
   };
 }

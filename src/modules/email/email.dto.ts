@@ -141,6 +141,7 @@ export class SendEmailRequestDto {
 export class ReplyEmailRequestDto extends OmitType(SendEmailRequestDto, [
   'inReplyToEmailId',
   'subject',
+  'to',
 ] as const) {
   @ApiPropertyOptional({
     example: 'Re: Weekly sync notes',
@@ -149,6 +150,15 @@ export class ReplyEmailRequestDto extends OmitType(SendEmailRequestDto, [
       'is derived from the original email.',
   })
   subject?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'When true, replies to everyone: the other participants of the original ' +
+      '(its To and Cc, minus yourself) are added to Cc. The recipient (To) is ' +
+      'always derived from the original message — the caller never sends it.',
+  })
+  replyAll?: boolean;
 }
 
 export class LookupRecipientKeysRequestDto {

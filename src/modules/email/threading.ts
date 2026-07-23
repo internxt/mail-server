@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { EmailAddress, ThreadingHeaders } from './email.types.js';
 
 const RE_PREFIX = /^\s*re\s*:\s*/i;
 
@@ -18,4 +19,53 @@ export function ensureRePrefix(parentSubject: string): string {
     return base.replace(RE_PREFIX, 'Re: ');
   }
   return `Re: ${base}`;
+}
+
+export interface ReplyRecipients {
+  to: EmailAddress[];
+  cc: EmailAddress[];
+}
+
+export function deriveReplyRecipients(
+  threading: ThreadingHeaders,
+  self: string,
+  replyAll: boolean,
+  extraCc: EmailAddress[] = [],
+): ReplyRecipients {
+  const to = uniqueAddresses(
+    threading.parentReplyTo.length
+      ? threading.parentReplyTo
+      : threading.parentFrom,
+    [self],
+  );
+
+  const excludeFromCc = [self, ...to.map((a) => a.email)];
+
+  const replyAllCc = replyAll
+    ? [...threading.parentTo, ...threading.parentCc]
+    : [];
+
+  const cc = uniqueAddresses([...replyAllCc, ...extraCc], excludeFromCc);
+
+  return { to, cc };
+}
+
+function emailKey(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function uniqueAddresses(
+  addresses: EmailAddress[],
+  exclude: string[] = [],
+): EmailAddress[] {
+  const excludedKeys = exclude.map(emailKey);
+  const seen = new Set(excludedKeys);
+  const result: EmailAddress[] = [];
+  for (const addr of addresses) {
+    const key = emailKey(addr.email);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(addr);
+  }
+  return result;
 }

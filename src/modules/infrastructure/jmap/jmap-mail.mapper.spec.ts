@@ -18,6 +18,7 @@ import {
   newSendEmailDto,
   newDraftEmailDto,
   newEmailAddress,
+  newThreadingHeaders,
 } from '../../../../test/fixtures.js';
 
 describe('Mapper for JMAP', () => {
@@ -553,11 +554,7 @@ describe('Mapper for JMAP', () => {
 
     test('when sending a reply, then the email is created with the in-reply-to and references headers so the receiver groups it in the same conversation', () => {
       const dto = newSendEmailDto();
-      const threading = {
-        messageId: ['<parent@example.com>'],
-        references: ['<root@example.com>', '<parent@example.com>'],
-        parentSubject: 'Weekly sync notes',
-      };
+      const threading = newThreadingHeaders();
 
       const result = mapSendDtoToJmapCreate(
         dto,

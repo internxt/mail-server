@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AccountService } from '../account/account.service.js';
@@ -12,7 +13,7 @@ import {
   DraftUpdateConflictError,
   MailProvider,
 } from './mail-provider.port.js';
-import { ensureRePrefix } from './threading.js';
+import { deriveReplyRecipients, ensureRePrefix } from './threading.js';
 import type {
   DraftEmailDto,
   Email,
@@ -176,14 +177,38 @@ export class EmailService {
     const isExternalDeliveryMode = deliveryMode === 'EXTERNAL';
     const threading = await this.resolveThreading(userEmail, parentEmailId);
 
-    const withSubject: SendEmailDto = {
-      ...dto,
-      subject: dto.subject?.trim() || ensureRePrefix(threading.parentSubject),
-    };
+    const composed = this.composeReply(userEmail, dto, threading);
 
     return isExternalDeliveryMode
-      ? this.dispatchExternal(userEmail, withSubject, threading)
-      : this.dispatchInternal(userEmail, withSubject, threading);
+      ? this.dispatchExternal(userEmail, composed, threading)
+      : this.dispatchInternal(userEmail, composed, threading);
+  }
+
+  private composeReply(
+    self: string,
+    dto: ReplyEmailDto,
+    threading: ThreadingHeaders,
+  ): SendEmailDto {
+    const { to, cc } = deriveReplyRecipients(
+      threading,
+      self,
+      dto.replyAll ?? false,
+      dto.cc,
+    );
+    const isToEmpty = to.length === 0;
+
+    if (isToEmpty) {
+      throw new UnprocessableEntityException(
+        'Cannot determine a reply recipient: the original email has no sender',
+      );
+    }
+
+    return {
+      ...dto,
+      to,
+      cc,
+      subject: dto.subject?.trim() || ensureRePrefix(threading.parentSubject),
+    };
   }
 
   private async dispatchInternal(

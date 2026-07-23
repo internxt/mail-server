@@ -116,7 +116,7 @@ describe('EmailController', () => {
   describe('reply', () => {
     const PARENT_ID = 'parent-id';
     const baseDto = {
-      to: [{ email: 'alice@internxt.me' }],
+      textBody: 'Sounds good!',
     };
 
     test('When replying, then the parent id from the path and delivery mode are forwarded to the service', async () => {

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
@@ -26,6 +27,7 @@ import {
   newSearchEmailDto,
   newEncryptionBlock,
   newEncryptedWrappedKey,
+  newThreadingHeaders,
 } from '../../../test/fixtures.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
 import {
@@ -381,18 +383,22 @@ describe('EmailService', () => {
 
   describe('Replying an email', () => {
     const PARENT_ID = 'parent-id';
-    const THREADING = {
-      messageId: ['<parent@example.com>'],
-      references: ['<root@example.com>', '<parent@example.com>'],
-      parentSubject: 'Weekly sync notes',
-    };
+    const SENDER = { email: 'sender@example.com' };
+    const OTHER = { email: 'other@example.com' };
+    // Original: from=sender, to=[me, other], cc=[] — so a reply goes to the
+    // sender and a reply-all also cc's `other` (never `me`).
+    const THREADING = newThreadingHeaders({
+      parentFrom: [SENDER],
+      parentReplyTo: [],
+      parentTo: [{ email: userEmail }, OTHER],
+      parentCc: [],
+    });
 
-    test('When replying, then the reply is delivered into the same conversation', async () => {
-      const dto = newSendEmailDto();
+    test('When replying, then the recipient is derived from the original sender, not the caller', async () => {
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
       provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
 
-      await service.replyEmail(userEmail, PARENT_ID, dto);
+      await service.replyEmail(userEmail, PARENT_ID, { textBody: 'ok' });
 
       expect(provider.getThreadingHeaders).toHaveBeenCalledWith(
         userEmail,
@@ -400,17 +406,49 @@ describe('EmailService', () => {
       );
       expect(provider.sendEmail).toHaveBeenCalledWith(
         userEmail,
-        expect.objectContaining({ to: dto.to }),
+        expect.objectContaining({ to: [SENDER], cc: [] }),
+        THREADING,
+      );
+    });
+
+    test('When replying to all the users involved in a conversation, then the other participants are cc’d and the caller is excluded', async () => {
+      provider.getThreadingHeaders.mockResolvedValue(THREADING);
+      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await service.replyEmail(userEmail, PARENT_ID, {
+        textBody: 'ok',
+        replyAll: true,
+      });
+
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({ to: [SENDER], cc: [OTHER] }),
+        THREADING,
+      );
+    });
+
+    test('When the caller adds extra cc, then it is merged with the derived recipients', async () => {
+      const extra = { email: 'extra@example.com' };
+      provider.getThreadingHeaders.mockResolvedValue(THREADING);
+      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+
+      await service.replyEmail(userEmail, PARENT_ID, {
+        textBody: 'ok',
+        cc: [extra],
+      });
+
+      expect(provider.sendEmail).toHaveBeenCalledWith(
+        userEmail,
+        expect.objectContaining({ to: [SENDER], cc: [extra] }),
         THREADING,
       );
     });
 
     test('When the reply omits a subject, then a "Re:"-prefixed subject is derived from the original', async () => {
-      const dto = newSendEmailDto({ subject: undefined });
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
       provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
 
-      await service.replyEmail(userEmail, PARENT_ID, dto);
+      await service.replyEmail(userEmail, PARENT_ID, { textBody: 'ok' });
 
       expect(provider.sendEmail).toHaveBeenCalledWith(
         userEmail,
@@ -420,11 +458,13 @@ describe('EmailService', () => {
     });
 
     test('When the reply provides a subject, then it is used as-is', async () => {
-      const dto = newSendEmailDto({ subject: 'A different subject' });
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
       provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
 
-      await service.replyEmail(userEmail, PARENT_ID, dto);
+      await service.replyEmail(userEmail, PARENT_ID, {
+        textBody: 'ok',
+        subject: 'A different subject',
+      });
 
       expect(provider.sendEmail).toHaveBeenCalledWith(
         userEmail,
@@ -433,18 +473,27 @@ describe('EmailService', () => {
       );
     });
 
+    test('When the original has no sender to reply to, then the reply is rejected as unprocessable', async () => {
+      provider.getThreadingHeaders.mockResolvedValue(
+        newThreadingHeaders({ parentFrom: [], parentReplyTo: [] }),
+      );
+
+      await expect(
+        service.replyEmail(userEmail, PARENT_ID, { textBody: 'ok' }),
+      ).rejects.toThrow(UnprocessableEntityException);
+      expect(provider.sendEmail).not.toHaveBeenCalled();
+    });
+
     test('When the original email does not exist, then an error indicating so is thrown', async () => {
-      const dto = newSendEmailDto();
       provider.getThreadingHeaders.mockResolvedValue(null);
 
       await expect(
-        service.replyEmail(userEmail, 'missing-id', dto),
+        service.replyEmail(userEmail, 'missing-id', { textBody: 'ok' }),
       ).rejects.toThrow(NotFoundException);
       expect(provider.sendEmail).not.toHaveBeenCalled();
     });
 
     test('When is an external delivery (3rd party users), then the reply is dispatched over SMTP with the threading headers', async () => {
-      const dto = newSendEmailDto({ encryption: undefined });
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
       configService.getOrThrow.mockReturnValue(
         Buffer.from('server-priv-key').toString('base64'),
@@ -452,10 +501,16 @@ describe('EmailService', () => {
       smtp.sendRaw.mockResolvedValue({ messageId: '<reply-sent@example.com>' });
       provider.saveToSent.mockResolvedValue({ id: 'sent-id' });
 
-      await service.replyEmail(userEmail, PARENT_ID, dto, 'EXTERNAL');
+      await service.replyEmail(
+        userEmail,
+        PARENT_ID,
+        { textBody: 'ok' },
+        'EXTERNAL',
+      );
 
       expect(smtp.sendRaw).toHaveBeenCalledWith(
         expect.objectContaining({
+          to: [SENDER],
           inReplyTo: THREADING.messageId[0],
           references: THREADING.references,
         }),

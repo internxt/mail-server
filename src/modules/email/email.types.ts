@@ -106,15 +106,20 @@ export interface SendEmailDto {
 
 export type ReplyEmailDto = Omit<
   SendEmailDto,
-  'subject' | 'inReplyToEmailId'
+  'subject' | 'inReplyToEmailId' | 'to'
 > & {
   subject?: string;
+  replyAll?: boolean;
 };
 
 export interface ThreadingHeaders {
   messageId: string[];
   references: string[];
   parentSubject: string;
+  parentFrom: EmailAddress[];
+  parentReplyTo: EmailAddress[];
+  parentTo: EmailAddress[];
+  parentCc: EmailAddress[];
 }
 
 export interface DraftEmailDto {

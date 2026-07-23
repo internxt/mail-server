@@ -15,6 +15,7 @@ import {
   newJmapQuota,
   newSendEmailDto,
   newDraftEmailDto,
+  newThreadingHeaders,
 } from '../../../../test/fixtures.js';
 import type { JmapResponse } from './jmap.types.js';
 
@@ -1051,12 +1052,19 @@ describe('JmapMailProvider', () => {
   });
 
   describe('getThreadingHeaders', () => {
-    it('when looking up a parent email that exists, then it returns the parent message id together with the full chain of references', async () => {
+    it('when looking up a parent email that exists, then it returns the parent message id together with the full chain of references and the parent addresses', async () => {
+      const from = [{ email: 'sender@example.com' }];
+      const to = [{ email: 'me@example.com' }, { email: 'other@example.com' }];
+      const cc = [{ email: 'cc@example.com' }];
       const parent = newJmapEmail({
         messageId: ['<parent@example.com>'],
         inReplyTo: ['<grandparent@example.com>'],
         references: ['<root@example.com>', '<grandparent@example.com>'],
         subject: 'Weekly sync notes',
+        from,
+        replyTo: [],
+        to,
+        cc,
       });
       jmapService.request.mockResolvedValue(jmapResponse({ list: [parent] }));
 
@@ -1073,6 +1081,10 @@ describe('JmapMailProvider', () => {
           '<parent@example.com>',
         ],
         parentSubject: 'Weekly sync notes',
+        parentFrom: from,
+        parentReplyTo: [],
+        parentTo: to,
+        parentCc: cc,
       });
     });
 
@@ -1134,11 +1146,9 @@ describe('JmapMailProvider', () => {
       );
 
       const dto = newSendEmailDto();
-      const threading = {
-        messageId: ['<parent@example.com>'],
+      const threading = newThreadingHeaders({
         references: ['<parent@example.com>'],
-        parentSubject: 'Weekly sync notes',
-      };
+      });
 
       await provider.sendEmail('user@test.com', dto, threading);
 
@@ -1171,11 +1181,7 @@ describe('JmapMailProvider', () => {
       );
 
       const dto = newSendEmailDto();
-      const threading = {
-        messageId: ['<parent@example.com>'],
-        references: ['<root@example.com>', '<parent@example.com>'],
-        parentSubject: 'Weekly sync notes',
-      };
+      const threading = newThreadingHeaders();
 
       await provider.saveToSent('user@test.com', dto, threading);
 
