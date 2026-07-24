@@ -626,7 +626,7 @@ export class JmapMailProvider extends MailProvider {
             name: 'Thread/get',
             path: '/list/*/emailIds',
           },
-          properties: EMAIL_DETAIL_PROPERTIES,
+          properties: [...EMAIL_DETAIL_PROPERTIES, 'messageId'],
           fetchTextBodyValues: true,
           fetchHTMLBodyValues: true,
         },
@@ -641,7 +641,9 @@ export class JmapMailProvider extends MailProvider {
     const emailsResult = response
       .methodResponses[2]![1] as JmapGetResponse<JmapEmail>;
 
-    return emailsResult.list
+    const inboxMailboxId = await this.resolveMailboxId(userEmail, 'inbox');
+
+    return dedupeByMessageId(emailsResult.list, inboxMailboxId)
       .map(mapJmapEmailToDetail)
       .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
   }
@@ -1019,6 +1021,39 @@ export class JmapMailProvider extends MailProvider {
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
   }
+}
+
+function dedupeByMessageId(
+  emails: JmapEmail[],
+  inboxMailboxId: string,
+): JmapEmail[] {
+  const byMessageId = new Map<string, JmapEmail>();
+  const result: JmapEmail[] = [];
+
+  for (const email of emails) {
+    const messageId = email.messageId?.[0]?.trim().toLowerCase();
+    if (!messageId) {
+      result.push(email);
+      continue;
+    }
+
+    const existing = byMessageId.get(messageId);
+    if (!existing) {
+      byMessageId.set(messageId, email);
+      result.push(email);
+      continue;
+    }
+
+    const isExistingInInbox = !!existing.mailboxIds[inboxMailboxId];
+    const isCandidateInInbox = !!email.mailboxIds[inboxMailboxId];
+    if (isCandidateInInbox && !isExistingInInbox) {
+      const index = result.indexOf(existing);
+      result[index] = email;
+      byMessageId.set(messageId, email);
+    }
+  }
+
+  return result;
 }
 
 function uniqueParticipants(thread: JmapEmail[]): EmailAddress[] {

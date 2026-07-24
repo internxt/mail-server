@@ -36,7 +36,6 @@ export function deriveReplyRecipients(
     threading.parentReplyTo.length
       ? threading.parentReplyTo
       : threading.parentFrom,
-    [self],
   );
 
   const excludeFromCc = [self, ...to.map((a) => a.email)];
