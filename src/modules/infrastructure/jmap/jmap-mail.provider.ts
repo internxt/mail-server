@@ -1031,7 +1031,7 @@ function dedupeByMessageId(
   const result: JmapEmail[] = [];
 
   for (const email of emails) {
-    const messageId = email.messageId?.[0]?.trim().toLowerCase();
+    const messageId = email.messageId?.[0]?.trim();
     if (!messageId) {
       result.push(email);
       continue;
