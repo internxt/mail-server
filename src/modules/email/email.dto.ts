@@ -144,6 +144,15 @@ export class ReplyEmailRequestDto extends OmitType(SendEmailRequestDto, [
   'to',
 ] as const) {
   @ApiPropertyOptional({
+    type: [EmailAddressDto],
+    description:
+      'Recipients. Optional — when omitted, derived from the original ' +
+      "message's sender (its Reply-To, falling back to From). When given, " +
+      'used as-is, e.g. after the caller edited the pre-filled recipient.',
+  })
+  to?: EmailAddressDto[];
+
+  @ApiPropertyOptional({
     example: 'Re: Weekly sync notes',
     description:
       'Subject of the reply. Optional — when omitted, a `Re:`-prefixed subject ' +
@@ -155,8 +164,8 @@ export class ReplyEmailRequestDto extends OmitType(SendEmailRequestDto, [
     example: false,
     description:
       'When true, replies to everyone: the other participants of the original ' +
-      '(its To and Cc, minus yourself) are added to Cc. The recipient (To) is ' +
-      'always derived from the original message — the caller never sends it.',
+      '(its To and Cc, minus yourself and anyone already in To) are added to ' +
+      'Cc.',
   })
   replyAll?: boolean;
 }

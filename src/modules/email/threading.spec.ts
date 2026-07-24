@@ -140,15 +140,31 @@ describe('Threading helpers', () => {
       expect(result.cc).toEqual([{ email: 'BOB@example.com' }]);
     });
 
-    test('When the original was sent by self, then self is never a recipient and to comes back empty', () => {
+    test('When the original was sent by self (a note to self), then the reply goes back to self', () => {
       const threading = newThreadingHeaders({
         parentFrom: [{ email: SELF }],
         parentReplyTo: [],
+        parentTo: [{ email: SELF }],
+        parentCc: [],
       });
 
       const result = deriveReplyRecipients(threading, SELF, false);
 
-      expect(result.to).toEqual([]);
+      expect(result).toEqual({ to: [{ email: SELF }], cc: [] });
+    });
+
+    test('When replying to all and self is among the participants, then self is still excluded from cc', () => {
+      const threading = newThreadingHeaders({
+        parentFrom: [A],
+        parentReplyTo: [],
+        parentTo: [{ email: SELF }, B],
+        parentCc: [{ email: SELF }],
+      });
+
+      const result = deriveReplyRecipients(threading, SELF, true);
+
+      expect(result.to).toEqual([A]);
+      expect(result.cc).toEqual([B]);
     });
   });
 });
