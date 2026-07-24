@@ -109,6 +109,7 @@ export type ReplyEmailDto = Omit<
   'subject' | 'inReplyToEmailId' | 'to'
 > & {
   subject?: string;
+  to?: EmailAddress[];
   replyAll?: boolean;
 };
 

@@ -31,12 +31,15 @@ export function deriveReplyRecipients(
   self: string,
   replyAll: boolean,
   extraCc: EmailAddress[] = [],
+  explicitTo?: EmailAddress[],
 ): ReplyRecipients {
-  const to = uniqueAddresses(
-    threading.parentReplyTo.length
-      ? threading.parentReplyTo
-      : threading.parentFrom,
-  );
+  const to = explicitTo?.length
+    ? uniqueAddresses(explicitTo)
+    : uniqueAddresses(
+        threading.parentReplyTo.length
+          ? threading.parentReplyTo
+          : threading.parentFrom,
+      );
 
   const excludeFromCc = [self, ...to.map((a) => a.email)];
 

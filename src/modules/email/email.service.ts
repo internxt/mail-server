@@ -194,6 +194,7 @@ export class EmailService {
       self,
       dto.replyAll ?? false,
       dto.cc,
+      dto.to,
     );
     const isToEmpty = to.length === 0;
 
