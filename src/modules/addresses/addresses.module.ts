@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { AccountModule } from '../account/account.module.js';
 import { AddressesController } from './addresses.controller.js';
+import { ThrottlerGuard } from '../../common/guards/throttler.guard.js';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { AddressesController } from './addresses.controller.js';
     }),
   ],
   controllers: [AddressesController],
-  providers: [],
+  providers: [ThrottlerGuard],
 })
 export class AddressesModule {}
