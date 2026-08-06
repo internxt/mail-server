@@ -29,7 +29,6 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/cli": "^11.0.16",
     "@nestjs/common": "^11.1.15",
     "@nestjs/config": "^4.0.3",
@@ -40,7 +39,6 @@
     "@nestjs/platform-express": "^11.1.15",
     "@nestjs/sequelize": "^11.0.1",
     "@nestjs/swagger": "^11.4.6",
-    "@nestjs/throttler": "^6.5.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "cross-env": "^10.1.0",
@@ -48,7 +46,6 @@
     "helmet": "^8.1.0",
     "html-to-text": "^10.0.0",
     "internxt-crypto": "^1.6.0",
-    "ioredis": "^5.10.1",
     "nanoid": "^5.1.16",
     "nestjs-pino": "^4.6.0",
     "nodemailer": "^9.0.3",
