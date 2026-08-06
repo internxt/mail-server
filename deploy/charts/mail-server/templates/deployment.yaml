@@ -53,8 +53,6 @@ spec:
               value: {{ .Values.paymentsApiUrl | quote }}
             - name: BRIDGE_API_URL
               value: {{ .Values.bridgeApiUrl | quote }}
-            - name: REDIS_URL
-              value: {{ .Values.redisUrl | quote }}
             - name: MTA_HOOKS_USERNAME
               value: {{ .Values.mta.hooksUsername | quote }}
             - name: STALWART_WEBHOOK_USERNAME
