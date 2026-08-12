@@ -35,6 +35,7 @@ import type {
   MailboxRole,
   Identity,
   JmapQuota,
+  JmapSession,
 } from '../src/modules/infrastructure/jmap/jmap.types.js';
 import type { DeepMocked } from '@golevelup/ts-vitest';
 import type { MailQuota } from '../src/modules/email/email.types.js';
@@ -385,6 +386,24 @@ export function newJmapIdentity(attrs?: Partial<Identity>): Identity {
     textSignature: '',
     htmlSignature: '',
     mayDelete: true,
+    ...attrs,
+  };
+}
+
+export function newJmapSession(attrs?: Partial<JmapSession>): JmapSession {
+  const accountId = randomId();
+  const baseUrl = 'https://mail.test';
+
+  return {
+    capabilities: {},
+    accounts: {},
+    primaryAccounts: { 'urn:ietf:params:jmap:mail': accountId },
+    username: random.email(),
+    apiUrl: `${baseUrl}/jmap/`,
+    downloadUrl: `${baseUrl}/jmap/download/{accountId}/{blobId}/{name}`,
+    uploadUrl: `${baseUrl}/jmap/upload/{accountId}/`,
+    eventSourceUrl: `${baseUrl}/jmap/eventsource/`,
+    state: 'session-state-0',
     ...attrs,
   };
 }

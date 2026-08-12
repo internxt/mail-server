@@ -36,12 +36,10 @@ export const JMAP_QUOTA_CAPABILITIES = [
   JMAP_CAPABILITY_QUOTA,
 ] as const;
 
-const SESSION_TTL_MS = 30_000;
-
-interface CachedSession {
-  session: JmapSession;
-  expiresAt: number;
-}
+export type JmapRequestOptions = {
+  using?: readonly string[];
+  session?: JmapSession;
+};
 
 @Injectable()
 export class JmapService implements OnModuleInit, OnModuleDestroy {
@@ -49,7 +47,6 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   private readonly stalwartUrl: string;
   private readonly masterUser: string;
   private readonly masterPassword: string;
-  private readonly sessionCache = new Map<string, CachedSession>(); // TODO: Implement cache ?
   private httpClient!: Client;
   private blobClient!: Client;
 
@@ -90,12 +87,17 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     return `Basic ${credentials}`;
   }
 
-  async getSession(userEmail: string): Promise<JmapSession> {
-    const cached = this.sessionCache.get(userEmail);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.session;
+  private requireMailAccountId(session: JmapSession): ID {
+    const accountId = session.primaryAccounts?.[JMAP_CAPABILITY_MAIL];
+
+    if (!accountId) {
+      throw new JmapError('No primary mail account found', session);
     }
 
+    return accountId;
+  }
+
+  async getSession(userEmail: string): Promise<JmapSession> {
     this.logger.debug(
       `JMAP session request: url=${this.stalwartUrl}/jmap/session user=${userEmail}%${this.masterUser}`,
     );
@@ -118,29 +120,22 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const data = JSON.parse(text) as JmapSession;
-
-    this.sessionCache.set(userEmail, {
-      session: data,
-      expiresAt: Date.now() + SESSION_TTL_MS,
-    });
-
-    return data;
+    return JSON.parse(text) as JmapSession;
   }
 
   async request<T = unknown>(
     userEmail: string,
     methodCalls: JmapMethodCall[],
-    using: readonly string[] = JMAP_MAIL_CAPABILITIES,
+    { using = JMAP_MAIL_CAPABILITIES, session }: JmapRequestOptions = {},
   ): Promise<JmapResponse<JmapInvocation<T>[]>> {
-    const session = await this.getSession(userEmail);
+    const jmapSession = session ?? (await this.getSession(userEmail));
 
     const requestBody: JmapRequest = {
       using: using as string[],
       methodCalls,
     };
 
-    const apiPath = new URL(session.apiUrl).pathname;
+    const apiPath = new URL(jmapSession.apiUrl).pathname;
 
     const { statusCode, body } = await this.httpClient.request({
       method: 'POST',
@@ -171,25 +166,22 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     return response;
   }
 
-  async getPrimaryAccountId(userEmail: string): Promise<ID> {
-    const session = await this.getSession(userEmail);
-    const accountId = session.primaryAccounts?.[JMAP_CAPABILITY_MAIL];
-
-    if (!accountId) {
-      throw new JmapError('No primary mail account found', session);
-    }
-
-    return accountId;
+  async getPrimaryAccountId(
+    userEmail: string,
+    session?: JmapSession,
+  ): Promise<ID> {
+    return this.requireMailAccountId(
+      session ?? (await this.getSession(userEmail)),
+    );
   }
 
   async uploadAttachment({
     userEmail,
     blob,
   }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
-    const accountId = await this.getPrimaryAccountId(userEmail);
-    const { name, buffer, mimeType } = blob;
-
     const session = await this.getSession(userEmail);
+    const accountId = this.requireMailAccountId(session);
+    const { name, buffer, mimeType } = blob;
     const fileName = name ?? 'attachment';
 
     const uploadUrl = session.uploadUrl

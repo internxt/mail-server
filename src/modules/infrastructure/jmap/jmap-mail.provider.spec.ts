@@ -3,7 +3,11 @@ import { Readable } from 'node:stream';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { JmapMailProvider } from './jmap-mail.provider.js';
-import { JmapError, JmapService } from './jmap.service.js';
+import {
+  JMAP_QUOTA_CAPABILITIES,
+  JmapError,
+  JmapService,
+} from './jmap.service.js';
 import {
   DraftUpdateConflictError,
   MissingMessageIdError,
@@ -13,6 +17,7 @@ import {
   newJmapEmail,
   newJmapIdentity,
   newJmapQuota,
+  newJmapSession,
   newSendEmailDto,
   newDraftEmailDto,
   newThreadingHeaders,
@@ -42,6 +47,9 @@ describe('JmapMailProvider', () => {
   let jmapService: DeepMocked<JmapService>;
 
   const accountId = 'account-123';
+  const session = newJmapSession({
+    primaryAccounts: { 'urn:ietf:params:jmap:mail': accountId },
+  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -53,6 +61,7 @@ describe('JmapMailProvider', () => {
     provider = module.get<JmapMailProvider>(JmapMailProvider);
     jmapService = module.get(JmapService);
 
+    jmapService.getSession.mockResolvedValue(session);
     jmapService.getPrimaryAccountId.mockResolvedValue(accountId);
   });
 
@@ -1380,6 +1389,92 @@ describe('JmapMailProvider', () => {
       const result = await provider.getThread('user@test.com', 'missing-id');
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('JMAP session reuse', () => {
+    function requestsWithoutTheSession() {
+      return jmapService.request.mock.calls.filter(
+        ([, , options]) => options?.session !== session,
+      );
+    }
+
+    test('When an operation issues one JMAP request, then the session is fetched once and forwarded', async () => {
+      jmapService.request.mockResolvedValue(
+        jmapResponse({ list: [newJmapEmail()] }),
+      );
+
+      await provider.getEmail('user@test.com', 'email-1');
+
+      expect(jmapService.getSession).toHaveBeenCalledTimes(1);
+      expect(requestsWithoutTheSession()).toHaveLength(0);
+    });
+
+    test('When an operation resolves a mailbox before querying, then both requests share one session', async () => {
+      const inboxMailbox = newJmapMailbox({ role: 'inbox' });
+      const rep = newJmapEmail({ threadId: 'thread-1' });
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [inboxMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { ids: [rep.id], total: 1 },
+          { list: [rep] },
+          { list: [{ id: 'thread-1', emailIds: [rep.id] }] },
+          { list: [rep] },
+        ),
+      );
+
+      await provider.listEmails({
+        userEmail: 'user@test.com',
+        mailbox: 'inbox',
+        limit: 20,
+        position: 0,
+      });
+
+      expect(jmapService.request).toHaveBeenCalledTimes(2);
+      expect(jmapService.getSession).toHaveBeenCalledTimes(1);
+      expect(requestsWithoutTheSession()).toHaveLength(0);
+    });
+
+    test('When an operation fans out to identity and mailbox lookups, then all requests share one session', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { created: { draft: { id: 'created-email-id' } } },
+          { created: { submission: { id: 'sub-id' } } },
+        ),
+      );
+
+      await provider.sendEmail('user@test.com', newSendEmailDto());
+
+      expect(jmapService.request).toHaveBeenCalledTimes(3);
+      expect(jmapService.getSession).toHaveBeenCalledTimes(1);
+      expect(requestsWithoutTheSession()).toHaveLength(0);
+    });
+
+    test('When an operation needs non-default capabilities, then the session is forwarded alongside them', async () => {
+      jmapService.request.mockResolvedValue(
+        jmapResponse({ list: [newJmapQuota()] }),
+      );
+
+      await provider.getQuota('user@test.com');
+
+      expect(jmapService.getSession).toHaveBeenCalledTimes(1);
+      expect(jmapService.request).toHaveBeenCalledWith(
+        'user@test.com',
+        expect.anything(),
+        { using: JMAP_QUOTA_CAPABILITIES, session },
+      );
     });
   });
 });

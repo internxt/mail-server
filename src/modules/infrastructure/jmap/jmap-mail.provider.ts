@@ -30,6 +30,7 @@ import type {
   Email as JmapEmail,
   Identity,
   JmapQuota,
+  JmapSession,
   Mailbox as JmapMailbox,
   JmapGetResponse,
   JmapQueryResponse,
@@ -105,11 +106,13 @@ export class JmapMailProvider extends MailProvider {
   }
 
   async getMailboxes(userEmail: string): Promise<Mailbox[]> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const response = await this.jmap.request<JmapGetResponse<JmapMailbox>>(
       userEmail,
       [['Mailbox/get', { accountId }, 'r0']],
+      { session },
     );
 
     const jmapMailboxes = response.methodResponses[0]![1].list;
@@ -126,12 +129,13 @@ export class JmapMailProvider extends MailProvider {
     limit,
     unread,
   }: ListEmails): Promise<EmailListResponse> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const unreadKeyword = unread ? { notKeyword: '$seen' } : undefined;
 
     const mailboxFilter = mailbox
-      ? { inMailbox: await this.resolveMailboxId(userEmail, mailbox) }
+      ? { inMailbox: await this.resolveMailboxId(userEmail, mailbox, session) }
       : undefined;
 
     const filter =
@@ -142,6 +146,7 @@ export class JmapMailProvider extends MailProvider {
     if (mailbox === 'drafts') {
       return this.queryEmails(
         userEmail,
+        session,
         accountId,
         limit,
         position,
@@ -152,6 +157,7 @@ export class JmapMailProvider extends MailProvider {
 
     return this.queryEmailsCollapsedByThread(
       userEmail,
+      session,
       accountId,
       limit,
       position,
@@ -162,6 +168,7 @@ export class JmapMailProvider extends MailProvider {
 
   private async queryEmails(
     userEmail: string,
+    session: JmapSession,
     accountId: string,
     limit: number,
     position: number,
@@ -186,18 +193,22 @@ export class JmapMailProvider extends MailProvider {
       queryParams.position = position;
     }
 
-    const response = await this.jmap.request(userEmail, [
-      ['Email/query', queryParams, 'r0'],
+    const response = await this.jmap.request(
+      userEmail,
       [
-        'Email/get',
-        {
-          accountId,
-          '#ids': { resultOf: 'r0', name: 'Email/query', path: '/ids' },
-          properties: EMAIL_LIST_PROPERTIES,
-        },
-        'r1',
+        ['Email/query', queryParams, 'r0'],
+        [
+          'Email/get',
+          {
+            accountId,
+            '#ids': { resultOf: 'r0', name: 'Email/query', path: '/ids' },
+            properties: EMAIL_LIST_PROPERTIES,
+          },
+          'r1',
+        ],
       ],
-    ]);
+      { session },
+    );
 
     const queryResult = response.methodResponses[0]![1] as JmapQueryResponse;
     const getResult = response
@@ -216,6 +227,7 @@ export class JmapMailProvider extends MailProvider {
 
   private async queryEmailsCollapsedByThread(
     userEmail: string,
+    session: JmapSession,
     accountId: string,
     limit: number,
     position: number,
@@ -241,43 +253,47 @@ export class JmapMailProvider extends MailProvider {
       queryParams.position = position;
     }
 
-    const response = await this.jmap.request(userEmail, [
-      ['Email/query', queryParams, 'r0'],
+    const response = await this.jmap.request(
+      userEmail,
       [
-        'Email/get',
-        {
-          accountId,
-          '#ids': { resultOf: 'r0', name: 'Email/query', path: '/ids' },
-          properties: EMAIL_LIST_PROPERTIES,
-        },
-        'r1',
-      ],
-      [
-        'Thread/get',
-        {
-          accountId,
-          '#ids': {
-            resultOf: 'r1',
-            name: 'Email/get',
-            path: '/list/*/threadId',
+        ['Email/query', queryParams, 'r0'],
+        [
+          'Email/get',
+          {
+            accountId,
+            '#ids': { resultOf: 'r0', name: 'Email/query', path: '/ids' },
+            properties: EMAIL_LIST_PROPERTIES,
           },
-        },
-        'r2',
-      ],
-      [
-        'Email/get',
-        {
-          accountId,
-          '#ids': {
-            resultOf: 'r2',
-            name: 'Thread/get',
-            path: '/list/*/emailIds',
+          'r1',
+        ],
+        [
+          'Thread/get',
+          {
+            accountId,
+            '#ids': {
+              resultOf: 'r1',
+              name: 'Email/get',
+              path: '/list/*/threadId',
+            },
           },
-          properties: ['id', 'threadId', 'from', 'receivedAt'],
-        },
-        'r3',
+          'r2',
+        ],
+        [
+          'Email/get',
+          {
+            accountId,
+            '#ids': {
+              resultOf: 'r2',
+              name: 'Thread/get',
+              path: '/list/*/emailIds',
+            },
+            properties: ['id', 'threadId', 'from', 'receivedAt'],
+          },
+          'r3',
+        ],
       ],
-    ]);
+      { session },
+    );
 
     const queryResult = response.methodResponses[0]![1] as JmapQueryResponse;
     const representatives = (
@@ -319,7 +335,8 @@ export class JmapMailProvider extends MailProvider {
   }
 
   async getEmail(userEmail: string, id: string): Promise<Email | null> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
       userEmail,
@@ -336,6 +353,7 @@ export class JmapMailProvider extends MailProvider {
           'r0',
         ],
       ],
+      { session },
     );
 
     const email = response.methodResponses[0]![1].list[0];
@@ -349,7 +367,8 @@ export class JmapMailProvider extends MailProvider {
     const bodies = new Map<string, string | null>();
     if (ids.length === 0) return bodies;
 
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
       userEmail,
@@ -365,6 +384,7 @@ export class JmapMailProvider extends MailProvider {
           'r0',
         ],
       ],
+      { session },
     );
 
     for (const email of response.methodResponses[0]![1].list) {
@@ -389,10 +409,12 @@ export class JmapMailProvider extends MailProvider {
     position: number;
     filter: SearchEmailFilter;
   }) {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     return this.queryEmails(
       userEmail,
+      session,
       accountId,
       limit,
       position,
@@ -406,10 +428,11 @@ export class JmapMailProvider extends MailProvider {
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
   ): Promise<{ id: string }> {
+    const session = await this.jmap.getSession(userEmail);
     const [accountId, identity, sentMailboxId] = await Promise.all([
-      this.jmap.getPrimaryAccountId(userEmail),
-      this.resolveIdentity(userEmail),
-      this.resolveMailboxId(userEmail, 'sent'),
+      this.jmap.getPrimaryAccountId(userEmail, session),
+      this.resolveIdentity(userEmail, session),
+      this.resolveMailboxId(userEmail, 'sent', session),
     ]);
 
     const emailCreate = mapSendDtoToJmapCreate(
@@ -419,30 +442,34 @@ export class JmapMailProvider extends MailProvider {
       threading,
     );
 
-    const response = await this.jmap.request(userEmail, [
+    const response = await this.jmap.request(
+      userEmail,
       [
-        'Email/set',
-        {
-          accountId,
-          create: { draft: emailCreate },
-          ...(dto.draftId && { destroy: [dto.draftId] }),
-        },
-        'r0',
-      ],
-      [
-        'EmailSubmission/set',
-        {
-          accountId,
-          create: {
-            submission: {
-              identityId: identity.id,
-              emailId: '#draft',
+        [
+          'Email/set',
+          {
+            accountId,
+            create: { draft: emailCreate },
+            ...(dto.draftId && { destroy: [dto.draftId] }),
+          },
+          'r0',
+        ],
+        [
+          'EmailSubmission/set',
+          {
+            accountId,
+            create: {
+              submission: {
+                identityId: identity.id,
+                emailId: '#draft',
+              },
             },
           },
-        },
-        'r1',
+          'r1',
+        ],
       ],
-    ]);
+      { session },
+    );
 
     const emailResult = response
       .methodResponses[0]![1] as JmapSetResponse<JmapEmail>;
@@ -459,11 +486,13 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     accountId: string,
     draftId: string,
+    session: JmapSession,
   ): Promise<void> {
     try {
       const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
         userEmail,
         [['Email/set', { accountId, destroy: [draftId] }, 'r0']],
+        { session },
       );
       const notDestroyed =
         response.methodResponses[0]![1].notDestroyed?.[draftId];
@@ -487,10 +516,11 @@ export class JmapMailProvider extends MailProvider {
     threading?: ThreadingHeaders,
     messageId?: string,
   ): Promise<{ id: string }> {
+    const session = await this.jmap.getSession(userEmail);
     const [accountId, identity, sentMailboxId] = await Promise.all([
-      this.jmap.getPrimaryAccountId(userEmail),
-      this.resolveIdentity(userEmail),
-      this.resolveMailboxId(userEmail, 'sent'),
+      this.jmap.getPrimaryAccountId(userEmail, session),
+      this.resolveIdentity(userEmail, session),
+      this.resolveMailboxId(userEmail, 'sent', session),
     ]);
 
     const emailCreate = mapSendDtoToJmapCreate(
@@ -513,6 +543,7 @@ export class JmapMailProvider extends MailProvider {
           'r0',
         ],
       ],
+      { session },
     );
 
     const createdId = response.methodResponses[0]![1].created?.['sent']?.id;
@@ -521,7 +552,7 @@ export class JmapMailProvider extends MailProvider {
     }
 
     if (dto.draftId) {
-      await this.destroyDraft(userEmail, accountId, dto.draftId);
+      await this.destroyDraft(userEmail, accountId, dto.draftId, session);
     }
 
     return { id: createdId };
@@ -531,7 +562,8 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     parentId: string,
   ): Promise<ThreadingHeaders | null> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
       userEmail,
@@ -556,6 +588,7 @@ export class JmapMailProvider extends MailProvider {
           'r0',
         ],
       ],
+      { session },
     );
 
     const parent = response.methodResponses[0]![1].list[0];
@@ -593,46 +626,51 @@ export class JmapMailProvider extends MailProvider {
   }
 
   async getThread(userEmail: string, emailId: string): Promise<Email[]> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
-    const response = await this.jmap.request(userEmail, [
+    const response = await this.jmap.request(
+      userEmail,
       [
-        'Email/get',
-        {
-          accountId,
-          ids: [emailId],
-          properties: ['id', 'threadId'],
-        },
-        'r0',
-      ],
-      [
-        'Thread/get',
-        {
-          accountId,
-          '#ids': {
-            resultOf: 'r0',
-            name: 'Email/get',
-            path: '/list/*/threadId',
+        [
+          'Email/get',
+          {
+            accountId,
+            ids: [emailId],
+            properties: ['id', 'threadId'],
           },
-        },
-        'r1',
-      ],
-      [
-        'Email/get',
-        {
-          accountId,
-          '#ids': {
-            resultOf: 'r1',
-            name: 'Thread/get',
-            path: '/list/*/emailIds',
+          'r0',
+        ],
+        [
+          'Thread/get',
+          {
+            accountId,
+            '#ids': {
+              resultOf: 'r0',
+              name: 'Email/get',
+              path: '/list/*/threadId',
+            },
           },
-          properties: [...EMAIL_DETAIL_PROPERTIES, 'messageId'],
-          fetchTextBodyValues: true,
-          fetchHTMLBodyValues: true,
-        },
-        'r2',
+          'r1',
+        ],
+        [
+          'Email/get',
+          {
+            accountId,
+            '#ids': {
+              resultOf: 'r1',
+              name: 'Thread/get',
+              path: '/list/*/emailIds',
+            },
+            properties: [...EMAIL_DETAIL_PROPERTIES, 'messageId'],
+            fetchTextBodyValues: true,
+            fetchHTMLBodyValues: true,
+          },
+          'r2',
+        ],
       ],
-    ]);
+      { session },
+    );
 
     const firstLookup = response
       .methodResponses[0]![1] as JmapGetResponse<JmapEmail>;
@@ -641,7 +679,11 @@ export class JmapMailProvider extends MailProvider {
     const emailsResult = response
       .methodResponses[2]![1] as JmapGetResponse<JmapEmail>;
 
-    const inboxMailboxId = await this.resolveMailboxId(userEmail, 'inbox');
+    const inboxMailboxId = await this.resolveMailboxId(
+      userEmail,
+      'inbox',
+      session,
+    );
 
     return dedupeByMessageId(emailsResult.list, inboxMailboxId)
       .map(mapJmapEmailToDetail)
@@ -649,10 +691,11 @@ export class JmapMailProvider extends MailProvider {
   }
 
   async saveDraft(userEmail: string, dto: DraftEmailDto): Promise<Email> {
+    const session = await this.jmap.getSession(userEmail);
     const [accountId, identity, draftsMailboxId] = await Promise.all([
-      this.jmap.getPrimaryAccountId(userEmail),
-      this.resolveIdentity(userEmail),
-      this.resolveMailboxId(userEmail, 'drafts'),
+      this.jmap.getPrimaryAccountId(userEmail, session),
+      this.resolveIdentity(userEmail, session),
+      this.resolveMailboxId(userEmail, 'drafts', session),
     ]);
 
     const emailCreate = mapDraftDtoToJmapCreate(dto, draftsMailboxId, {
@@ -663,6 +706,7 @@ export class JmapMailProvider extends MailProvider {
     const setResponse = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
       [['Email/set', { accountId, create: { draft: emailCreate } }, 'r0']],
+      { session },
     );
 
     const createdId = setResponse.methodResponses[0]![1].created?.['draft']?.id;
@@ -683,10 +727,11 @@ export class JmapMailProvider extends MailProvider {
     draftId: string,
     dto: DraftEmailDto,
   ): Promise<Email | null> {
+    const session = await this.jmap.getSession(userEmail);
     const [accountId, identity, draftsMailboxId] = await Promise.all([
-      this.jmap.getPrimaryAccountId(userEmail),
-      this.resolveIdentity(userEmail),
-      this.resolveMailboxId(userEmail, 'drafts'),
+      this.jmap.getPrimaryAccountId(userEmail, session),
+      this.resolveIdentity(userEmail, session),
+      this.resolveMailboxId(userEmail, 'drafts', session),
     ]);
 
     const emailCreate = mapDraftDtoToJmapCreate(dto, draftsMailboxId, {
@@ -704,6 +749,7 @@ export class JmapMailProvider extends MailProvider {
             'r0',
           ],
         ],
+        { session },
       );
 
       const getResult = getResponse.methodResponses[0]![1];
@@ -728,6 +774,7 @@ export class JmapMailProvider extends MailProvider {
               'r0',
             ],
           ],
+          { session },
         );
         setResult = setResponse.methodResponses[0]![1];
       } catch (err) {
@@ -783,10 +830,12 @@ export class JmapMailProvider extends MailProvider {
   }
 
   async discardDraft(userEmail: string, id: string): Promise<void> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
       userEmail,
       [['Email/set', { accountId, destroy: [id] }, 'r0']],
+      { session },
     );
     const notDestroyed = response.methodResponses[0]![1].notDestroyed?.[id];
     if (notDestroyed) {
@@ -807,27 +856,33 @@ export class JmapMailProvider extends MailProvider {
     id: string,
     target: MailboxType,
   ): Promise<void> {
+    const session = await this.jmap.getSession(userEmail);
     const [accountId, targetMailboxId] = await Promise.all([
-      this.jmap.getPrimaryAccountId(userEmail),
-      this.resolveMailboxId(userEmail, target),
+      this.jmap.getPrimaryAccountId(userEmail, session),
+      this.resolveMailboxId(userEmail, target, session),
     ]);
 
-    await this.jmap.request<JmapSetResponse<JmapEmail>>(userEmail, [
+    await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
       [
-        'Email/set',
-        {
-          accountId,
-          update: {
-            [id]: { mailboxIds: { [targetMailboxId]: true } },
+        [
+          'Email/set',
+          {
+            accountId,
+            update: {
+              [id]: { mailboxIds: { [targetMailboxId]: true } },
+            },
           },
-        },
-        'r0',
+          'r0',
+        ],
       ],
-    ]);
+      { session },
+    );
   }
 
   async deleteEmail(userEmail: string, id: string): Promise<DeleteEmailResult> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const response = await this.jmap.request<JmapGetResponse<JmapEmail>>(
       userEmail,
@@ -838,32 +893,43 @@ export class JmapMailProvider extends MailProvider {
           'r0',
         ],
       ],
+      { session },
     );
 
     const email = response.methodResponses[0]![1].list[0];
     if (!email) return { deletedEntryKey: null };
 
-    const trashMailboxId = await this.resolveMailboxId(userEmail, 'trash');
+    const trashMailboxId = await this.resolveMailboxId(
+      userEmail,
+      'trash',
+      session,
+    );
     const isInTrash = !!email.mailboxIds[trashMailboxId];
 
     if (isInTrash) {
-      await this.jmap.request<JmapSetResponse<JmapEmail>>(userEmail, [
-        ['Email/set', { accountId, destroy: [id] }, 'r0'],
-      ]);
+      await this.jmap.request<JmapSetResponse<JmapEmail>>(
+        userEmail,
+        [['Email/set', { accountId, destroy: [id] }, 'r0']],
+        { session },
+      );
 
       return { deletedEntryKey: this.buildEntryKey(accountId, id) };
     }
 
-    await this.jmap.request<JmapSetResponse<JmapEmail>>(userEmail, [
+    await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
       [
-        'Email/set',
-        {
-          accountId,
-          update: { [id]: { mailboxIds: { [trashMailboxId]: true } } },
-        },
-        'r0',
+        [
+          'Email/set',
+          {
+            accountId,
+            update: { [id]: { mailboxIds: { [trashMailboxId]: true } } },
+          },
+          'r0',
+        ],
       ],
-    ]);
+      { session },
+    );
 
     return { deletedEntryKey: null };
   }
@@ -911,12 +977,13 @@ export class JmapMailProvider extends MailProvider {
   }
 
   async getQuota(userEmail: string): Promise<MailQuota> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const response = await this.jmap.request<JmapGetResponse<JmapQuota>>(
       userEmail,
       [['Quota/get', { accountId }, 'r0']],
-      JMAP_QUOTA_CAPABILITIES,
+      { using: JMAP_QUOTA_CAPABILITIES, session },
     );
 
     const quotas = response.methodResponses[0]![1].list;
@@ -934,25 +1001,31 @@ export class JmapMailProvider extends MailProvider {
     keyword: string,
     value: boolean,
   ): Promise<void> {
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const session = await this.jmap.getSession(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
-    await this.jmap.request<JmapSetResponse<JmapEmail>>(userEmail, [
+    await this.jmap.request<JmapSetResponse<JmapEmail>>(
+      userEmail,
       [
-        'Email/set',
-        {
-          accountId,
-          update: {
-            [id]: { [`keywords/${keyword}`]: value ? true : null },
+        [
+          'Email/set',
+          {
+            accountId,
+            update: {
+              [id]: { [`keywords/${keyword}`]: value ? true : null },
+            },
           },
-        },
-        'r0',
+          'r0',
+        ],
       ],
-    ]);
+      { session },
+    );
   }
 
   private async resolveMailboxId(
     userEmail: string,
     type: MailboxType,
+    session: JmapSession,
   ): Promise<string> {
     const cached = this.mailboxCache.get(userEmail);
     if (cached && cached.expiresAt > Date.now()) {
@@ -960,10 +1033,11 @@ export class JmapMailProvider extends MailProvider {
       if (id) return id;
     }
 
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
     const response = await this.jmap.request<JmapGetResponse<JmapMailbox>>(
       userEmail,
       [['Mailbox/get', { accountId }, 'r0']],
+      { session },
     );
 
     const jmapMailboxes = response.methodResponses[0]![1].list;
@@ -977,17 +1051,21 @@ export class JmapMailProvider extends MailProvider {
     return id;
   }
 
-  private async resolveIdentity(userEmail: string): Promise<Identity> {
+  private async resolveIdentity(
+    userEmail: string,
+    session: JmapSession,
+  ): Promise<Identity> {
     const cached = this.identityCache.get(userEmail);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.value;
     }
 
-    const accountId = await this.jmap.getPrimaryAccountId(userEmail);
+    const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
 
     const response = await this.jmap.request<JmapGetResponse<Identity>>(
       userEmail,
       [['Identity/get', { accountId }, 'r0']],
+      { session },
     );
 
     const identity = response.methodResponses[0]![1].list[0];
