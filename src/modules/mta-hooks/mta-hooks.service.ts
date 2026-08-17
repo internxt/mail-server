@@ -97,6 +97,14 @@ export class MtaHooksService {
     const { maxSpaceBytes, totalUsedSpaceBytes } =
       await this.bridgeClient.getUserUsage(userUuid);
 
+    if (!Number.isFinite(maxSpaceBytes)) {
+      this.logger.warn(
+        `${LOG_TAG} decision=accept reason=fail-open cause=unusable-quota ` +
+          `address='${address}' userUuid='${userUuid}' maxSpaceBytes=${maxSpaceBytes}`,
+      );
+      return false;
+    }
+
     const projected = totalUsedSpaceBytes + incomingSize;
     const overQuota = projected > maxSpaceBytes;
 

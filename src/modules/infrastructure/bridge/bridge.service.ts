@@ -13,6 +13,8 @@ import type {
   UserSpaceSnapshot,
 } from './bridge.types.js';
 
+const LOG_TAG = '[bridge-usage]';
+
 @Injectable()
 export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BridgeClient.name);
@@ -130,7 +132,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    return JSON.parse(text) as BucketEntry;
+    return this.parseSnapshot<BucketEntry>(text, userUuid);
   }
 
   async deleteBucketEntry(
@@ -159,7 +161,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    return JSON.parse(text) as UserSpaceSnapshot;
+    return this.parseSnapshot<UserSpaceSnapshot>(text, userUuid);
   }
 
   async getUserUsage(userUuid: string): Promise<UserSpaceSnapshot> {
@@ -184,7 +186,35 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    return JSON.parse(text) as UserSpaceSnapshot;
+    return this.parseSnapshot<UserSpaceSnapshot>(text, userUuid);
+  }
+
+  /**
+   * Bridge tracks `totalUsedSpaceBytes` as an incremental counter with no floor,
+   * so uploads that were never counted (or counted twice on delete) can drive it
+   * negative — production has been observed at -609824950177 for a single user.
+   *
+   * Guarantees `totalUsedSpaceBytes` is a finite, non-negative number.
+   * `maxSpaceBytes` stays as Bridge reported it: there is no safe default for a
+   * quota, so callers own that policy (SMTP fails open, provisioning throws).
+   */
+  private parseSnapshot<T extends UserSpaceSnapshot>(
+    text: string,
+    userUuid: string,
+  ): T {
+    const snapshot = JSON.parse(text) as T;
+    const { totalUsedSpaceBytes } = snapshot;
+
+    if (!Number.isFinite(totalUsedSpaceBytes) || totalUsedSpaceBytes < 0) {
+      this.logger.warn(
+        { userUuid, totalUsedSpaceBytes },
+        `${LOG_TAG} untrusted totalUsedSpaceBytes; clamping to 0`,
+      );
+
+      return { ...snapshot, totalUsedSpaceBytes: 0 };
+    }
+
+    return snapshot;
   }
 
   private signGatewayToken(userUuid: string): string {

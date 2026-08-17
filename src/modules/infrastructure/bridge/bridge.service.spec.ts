@@ -324,5 +324,55 @@ describe('BridgeClient', () => {
       expect(error.statusCode).toBe(500);
       expect(error.details).toBe('internal error');
     });
+
+    it.each(['-609824950177', 'null', '1e999'])(
+      'when Bridge reports totalUsedSpaceBytes=%s, then clamps it to 0 and preserves maxSpaceBytes',
+      async (untrusted) => {
+        jwtService.sign.mockReturnValue('signed-jwt');
+        httpRequest.mockResolvedValue({
+          statusCode: 200,
+          body: {
+            text: () =>
+              Promise.resolve(
+                `{"maxSpaceBytes":293064171264,"totalUsedSpaceBytes":${untrusted}}`,
+              ),
+          },
+        });
+
+        const result = await service.getUserUsage('user-1');
+
+        expect(result).toStrictEqual({
+          maxSpaceBytes: 293064171264,
+          totalUsedSpaceBytes: 0,
+        });
+      },
+    );
+  });
+
+  describe('createBucketEntry', () => {
+    it('when Bridge returns a negative totalUsedSpaceBytes, then clamps it while keeping the entry id', async () => {
+      jwtService.sign.mockReturnValue('signed-jwt');
+      httpRequest.mockResolvedValue({
+        statusCode: 200,
+        body: {
+          text: () =>
+            Promise.resolve(
+              JSON.stringify({
+                id: 'entry-1',
+                maxSpaceBytes: 5000,
+                totalUsedSpaceBytes: -42,
+              }),
+            ),
+        },
+      });
+
+      const result = await service.createBucketEntry('user-1', 'bucket-1', 100);
+
+      expect(result).toStrictEqual({
+        id: 'entry-1',
+        maxSpaceBytes: 5000,
+        totalUsedSpaceBytes: 0,
+      });
+    });
   });
 });

@@ -166,6 +166,20 @@ describe('MtaHooksService', () => {
       expect(result).toStrictEqual({ action: 'accept' });
     });
 
+    test('when Bridge reports a non-finite maxSpaceBytes, then fails open and accepts', async () => {
+      accountService.findUserIdByAddress.mockResolvedValue('user-1');
+      bridgeClient.getUserUsage.mockResolvedValue({
+        maxSpaceBytes: Number.NaN,
+        totalUsedSpaceBytes: 2000,
+      });
+
+      const result = await service.handleRcpt(
+        buildRequest(['jane@inxt.com'], { size: 500 }),
+      );
+
+      expect(result).toStrictEqual({ action: 'accept' });
+    });
+
     test('when the request carries no recipients, then accepts without lookups', async () => {
       const result = await service.handleRcpt({
         context: { stage: 'rcpt' },
