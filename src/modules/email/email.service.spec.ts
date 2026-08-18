@@ -28,6 +28,8 @@ import {
   newEncryptionBlock,
   newEncryptedWrappedKey,
   newThreadingHeaders,
+  newSendEmailResult,
+  newUpdateDraftResult,
 } from '../../../test/fixtures.js';
 import { ENCRYPTED_PREFIX, packEnvelope } from './email-encryption.js';
 import {
@@ -48,6 +50,11 @@ describe('EmailService', () => {
   let configService: DeepMocked<ConfigService>;
   let usage: DeepMocked<MailUsageService>;
   const userEmail = 'test@example.com';
+  const BUCKET_CONTEXT = {
+    mailAddressId: 'address-1',
+    userUuid: 'user-1',
+    networkBucketId: 'bucket-1',
+  };
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -312,7 +319,9 @@ describe('EmailService', () => {
   describe('sendEmail', () => {
     it('when sending an email with recipients, then it gets delivered through the mail provider', async () => {
       const dto = newSendEmailDto();
-      provider.sendEmail.mockResolvedValue({ id: 'created-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'created-id' }),
+      );
 
       const result = await service.sendEmail(userEmail, dto);
 
@@ -336,7 +345,9 @@ describe('EmailService', () => {
     it('when sending an end-to-end encrypted email, then the encrypted payload is delivered and the plain HTML body is discarded', async () => {
       const encryption = newEncryptionBlock();
       const dto = newSendEmailDto({ encryption, htmlBody: '<p>original</p>' });
-      provider.sendEmail.mockResolvedValue({ id: 'enc-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'enc-id' }),
+      );
 
       await service.sendEmail(userEmail, dto);
 
@@ -355,7 +366,9 @@ describe('EmailService', () => {
 
     it('when sending a plain email, then the body is delivered as the user wrote it', async () => {
       const dto = newSendEmailDto({ htmlBody: '<p>hello</p>' });
-      provider.sendEmail.mockResolvedValue({ id: 'plain-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'plain-id' }),
+      );
 
       await service.sendEmail(userEmail, dto);
 
@@ -368,7 +381,9 @@ describe('EmailService', () => {
 
     test('When sending an email, then no conversation is looked up because sends are not threaded', async () => {
       const dto = newSendEmailDto();
-      provider.sendEmail.mockResolvedValue({ id: 'plain-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'plain-id' }),
+      );
 
       await service.sendEmail(userEmail, dto);
 
@@ -396,7 +411,9 @@ describe('EmailService', () => {
 
     test('When replying, then the recipient is derived from the original sender, not the caller', async () => {
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
-      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'reply-id' }),
+      );
 
       await service.replyEmail(userEmail, PARENT_ID, { textBody: 'ok' });
 
@@ -413,7 +430,9 @@ describe('EmailService', () => {
 
     test('When replying to all the users involved in a conversation, then the other participants are cc’d and the caller is excluded', async () => {
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
-      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'reply-id' }),
+      );
 
       await service.replyEmail(userEmail, PARENT_ID, {
         textBody: 'ok',
@@ -430,7 +449,9 @@ describe('EmailService', () => {
     test('When the caller adds extra cc, then it is merged with the derived recipients', async () => {
       const extra = { email: 'extra@example.com' };
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
-      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'reply-id' }),
+      );
 
       await service.replyEmail(userEmail, PARENT_ID, {
         textBody: 'ok',
@@ -446,7 +467,9 @@ describe('EmailService', () => {
 
     test('When the reply omits a subject, then a "Re:"-prefixed subject is derived from the original', async () => {
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
-      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'reply-id' }),
+      );
 
       await service.replyEmail(userEmail, PARENT_ID, { textBody: 'ok' });
 
@@ -459,7 +482,9 @@ describe('EmailService', () => {
 
     test('When the reply provides a subject, then it is used as-is', async () => {
       provider.getThreadingHeaders.mockResolvedValue(THREADING);
-      provider.sendEmail.mockResolvedValue({ id: 'reply-id' });
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'reply-id' }),
+      );
 
       await service.replyEmail(userEmail, PARENT_ID, {
         textBody: 'ok',
@@ -499,7 +524,9 @@ describe('EmailService', () => {
         Buffer.from('server-priv-key').toString('base64'),
       );
       smtp.sendRaw.mockResolvedValue({ messageId: '<reply-sent@example.com>' });
-      provider.saveToSent.mockResolvedValue({ id: 'sent-id' });
+      provider.saveToSent.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-id' }),
+      );
 
       await service.replyEmail(
         userEmail,
@@ -541,7 +568,9 @@ describe('EmailService', () => {
         Buffer.from('server-priv-key').toString('base64'),
       );
       smtp.sendRaw.mockResolvedValue({ messageId: 'msg-1' });
-      provider.saveToSent.mockResolvedValue({ id: 'sent-1' });
+      provider.saveToSent.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-1' }),
+      );
 
       const result = await service.sendExternalEmail(userEmail, dto);
 
@@ -599,7 +628,9 @@ describe('EmailService', () => {
       });
       mockedDecrypt.mockResolvedValue(new Uint8Array([9, 9, 9]));
       smtp.sendRaw.mockResolvedValue({ messageId: 'msg-2' });
-      provider.saveToSent.mockResolvedValue({ id: 'sent-2' });
+      provider.saveToSent.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-2' }),
+      );
 
       const result = await service.sendExternalEmail(userEmail, dto);
 
@@ -639,7 +670,9 @@ describe('EmailService', () => {
         attachmentsSessionKey: new Uint8Array([1, 2, 3, 4]),
       });
       smtp.sendRaw.mockResolvedValue({ messageId: 'msg-html' });
-      provider.saveToSent.mockResolvedValue({ id: 'sent-html' });
+      provider.saveToSent.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-html' }),
+      );
 
       await service.sendExternalEmail(userEmail, dto);
 
@@ -661,7 +694,9 @@ describe('EmailService', () => {
         Buffer.from('server-priv-key').toString('base64'),
       );
       smtp.sendRaw.mockResolvedValue({ messageId: smtpMessageId });
-      provider.saveToSent.mockResolvedValue({ id: 'sent-id' });
+      provider.saveToSent.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-id' }),
+      );
 
       await service.sendExternalEmail(userEmail, dto);
 
@@ -734,7 +769,9 @@ describe('EmailService', () => {
     it('when called, then delegates to provider', async () => {
       const dto = newDraftEmailDto();
       const updatedDraft = newEmail({ isDraft: true });
-      provider.updateDraft.mockResolvedValue(updatedDraft);
+      provider.updateDraft.mockResolvedValue(
+        newUpdateDraftResult({ draft: updatedDraft }),
+      );
 
       const result = await service.updateDraft(userEmail, 'draft-id', dto);
 
@@ -752,7 +789,9 @@ describe('EmailService', () => {
         encryption,
         htmlBody: '<p>original</p>',
       });
-      provider.updateDraft.mockResolvedValue(newEmail({ isDraft: true }));
+      provider.updateDraft.mockResolvedValue(
+        newUpdateDraftResult({ draft: newEmail({ isDraft: true }) }),
+      );
 
       await service.updateDraft(userEmail, 'draft-id', dto);
 
@@ -792,7 +831,7 @@ describe('EmailService', () => {
     test('When the user discards an existing draft, then it is removed from their mailbox', async () => {
       const draft = newEmail({ isDraft: true });
       provider.getDraft.mockResolvedValue(draft);
-      provider.discardDraft.mockResolvedValue(undefined);
+      provider.discardDraft.mockResolvedValue({ deletedEntryKey: null });
 
       await service.discardDraft(userEmail, draft.id);
 
@@ -835,11 +874,9 @@ describe('EmailService', () => {
 
     it('when the message is permanently destroyed, then releases the quota entry on the address bucket', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
-      accountService.findBucketContextByAddress.mockResolvedValue({
-        mailAddressId: 'address-1',
-        userUuid: 'user-1',
-        networkBucketId: 'bucket-1',
-      });
+      accountService.findBucketContextByAddress.mockResolvedValue(
+        BUCKET_CONTEXT,
+      );
 
       await service.deleteEmail(userEmail, 'email-id');
 
@@ -868,16 +905,97 @@ describe('EmailService', () => {
 
     it('when releasing the quota entry fails, then the deletion still succeeds', async () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
-      accountService.findBucketContextByAddress.mockResolvedValue({
-        mailAddressId: 'address-1',
-        userUuid: 'user-1',
-        networkBucketId: 'bucket-1',
-      });
+      accountService.findBucketContextByAddress.mockResolvedValue(
+        BUCKET_CONTEXT,
+      );
       usage.releaseStoredMessage.mockRejectedValue(new Error('Bridge down'));
 
       await expect(
         service.deleteEmail(userEmail, 'email-id'),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('quota release on the compose paths', () => {
+    beforeEach(() => {
+      accountService.findBucketContextByAddress.mockResolvedValue(
+        BUCKET_CONTEXT,
+      );
+    });
+
+    it('when sending consumes a draft, then the draft quota entry is released', async () => {
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-id', deletedEntryKey: '42:7' }),
+      );
+
+      await service.sendEmail(userEmail, newSendEmailDto({ draftId: 'c' }));
+
+      expect(usage.releaseStoredMessage).toHaveBeenCalledWith({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:7',
+      });
+    });
+
+    it('when sending does not consume a draft, then no quota entry is released', async () => {
+      provider.sendEmail.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-id' }),
+      );
+
+      await service.sendEmail(userEmail, newSendEmailDto());
+
+      expect(usage.releaseStoredMessage).not.toHaveBeenCalled();
+    });
+
+    it('when an externally delivered email consumes a draft, then the draft quota entry is released', async () => {
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      smtp.sendRaw.mockResolvedValue({ messageId: 'smtp-id' });
+      provider.saveToSent.mockResolvedValue(
+        newSendEmailResult({ id: 'sent-id', deletedEntryKey: '42:8' }),
+      );
+
+      await service.sendExternalEmail(
+        userEmail,
+        newSendEmailDto({ draftId: 'c' }),
+      );
+
+      expect(usage.releaseStoredMessage).toHaveBeenCalledWith({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:8',
+      });
+    });
+
+    it('when a draft is updated, then the replaced draft quota entry is released', async () => {
+      provider.updateDraft.mockResolvedValue(
+        newUpdateDraftResult({
+          draft: newEmail({ isDraft: true }),
+          deletedEntryKey: '42:9',
+        }),
+      );
+
+      await service.updateDraft(userEmail, 'draft-id', newDraftEmailDto());
+
+      expect(usage.releaseStoredMessage).toHaveBeenCalledWith({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:9',
+      });
+    });
+
+    it('when a draft is discarded, then its quota entry is released', async () => {
+      provider.getDraft.mockResolvedValue(newEmail({ isDraft: true }));
+      provider.discardDraft.mockResolvedValue({ deletedEntryKey: '42:10' });
+
+      await service.discardDraft(userEmail, 'draft-id');
+
+      expect(usage.releaseStoredMessage).toHaveBeenCalledWith({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:10',
+      });
     });
   });
 

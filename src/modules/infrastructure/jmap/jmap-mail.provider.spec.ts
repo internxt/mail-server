@@ -345,7 +345,10 @@ describe('JmapMailProvider', () => {
       const dto = newSendEmailDto();
       const result = await provider.sendEmail('user@test.com', dto);
 
-      expect(result).toEqual({ id: 'created-email-id' });
+      expect(result).toEqual({
+        id: 'created-email-id',
+        deletedEntryKey: null,
+      });
     });
 
     it('When email creation fails, then it throws', async () => {
@@ -372,6 +375,7 @@ describe('JmapMailProvider', () => {
     test('When sending from an existing draft, then the new email is created with the latest content and the previous draft is removed in the same operation', async () => {
       const sentMailbox = newJmapMailbox({ role: 'sent' });
       const identity = newJmapIdentity();
+      jmapService.getPrimaryAccountId.mockResolvedValue('b');
 
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [identity] }),
@@ -386,15 +390,50 @@ describe('JmapMailProvider', () => {
         ),
       );
 
-      const dto = newSendEmailDto({ draftId: 'old-draft-id' });
+      const dto = newSendEmailDto({ draftId: 'c' });
       const result = await provider.sendEmail('user@test.com', dto);
 
       const lastCall = jmapService.request.mock.calls.at(-1)!;
       const [emailSetName, emailSetArgs] = lastCall[1][0]!;
       expect(emailSetName).toBe('Email/set');
-      expect(emailSetArgs['destroy']).toEqual(['old-draft-id']);
+      expect(emailSetArgs['destroy']).toEqual(['c']);
       expect(emailSetArgs['create']).toBeDefined();
-      expect(result).toEqual({ id: 'sent-email-id' });
+      expect(result).toEqual({
+        id: 'sent-email-id',
+        deletedEntryKey: '1:2',
+      });
+    });
+
+    test('When the draft could not be destroyed while sending, then no quota entry key is returned so its usage is not released', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+      jmapService.getPrimaryAccountId.mockResolvedValue('b');
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          {
+            created: { draft: { id: 'sent-email-id' } },
+            notDestroyed: { c: { type: 'notFound' } },
+          },
+          { created: { submission: { id: 'sub-id' } } },
+        ),
+      );
+
+      const result = await provider.sendEmail(
+        'user@test.com',
+        newSendEmailDto({ draftId: 'c' }),
+      );
+
+      expect(result).toEqual({
+        id: 'sent-email-id',
+        deletedEntryKey: null,
+      });
     });
 
     test('When sending without a draftId, then the Email/set call does not include any destroy operation', async () => {
@@ -511,11 +550,18 @@ describe('JmapMailProvider', () => {
       expect(result).toBeNull();
     });
 
-    test('When the draft is updated, then the updated email is returned to the user', async () => {
+    test('When the draft is updated, then the new draft is returned and the destroyed one comes back as a quota entry key', async () => {
       const draftsMailbox = newJmapMailbox({ role: 'drafts' });
       const identity = newJmapIdentity();
-      const existingDraft = newJmapEmail({ keywords: { $draft: true } });
-      const updatedDraft = newJmapEmail({ keywords: { $draft: true } });
+      const existingDraft = newJmapEmail({
+        id: 'c',
+        keywords: { $draft: true },
+      });
+      const updatedDraft = newJmapEmail({
+        id: 'd',
+        keywords: { $draft: true },
+      });
+      jmapService.getPrimaryAccountId.mockResolvedValue('b');
 
       jmapService.request.mockResolvedValueOnce(
         jmapResponse({ list: [identity] }),
@@ -540,7 +586,8 @@ describe('JmapMailProvider', () => {
       );
 
       expect(result).not.toBeNull();
-      expect(result!.id).toBe(updatedDraft.id);
+      expect(result!.draft.id).toBe(updatedDraft.id);
+      expect(result!.deletedEntryKey).toBe('1:2');
     });
 
     test('When the draft is updated, then the destroy+create is guarded with ifInState from the prior read', async () => {
@@ -614,7 +661,7 @@ describe('JmapMailProvider', () => {
         newDraftEmailDto(),
       );
 
-      expect(result!.id).toBe(updatedDraft.id);
+      expect(result!.draft.id).toBe(updatedDraft.id);
       const setCalls = jmapService.request.mock.calls.filter(
         (call) => call[1][0]![0] === 'Email/set',
       );
@@ -694,17 +741,30 @@ describe('JmapMailProvider', () => {
   });
 
   describe('Discarding Draft', () => {
-    test('When discarding a draft, then the draft is removed from the user mailbox', async () => {
+    test('When discarding a draft, then the draft is removed from the user mailbox and its quota entry key is returned', async () => {
+      jmapService.getPrimaryAccountId.mockResolvedValue('b');
       jmapService.request.mockResolvedValueOnce(
-        jmapResponse({ destroyed: ['draft-1'] }),
+        jmapResponse({ destroyed: ['c'] }),
       );
 
-      await provider.discardDraft('user@test.com', 'draft-1');
+      const result = await provider.discardDraft('user@test.com', 'c');
 
       const lastCall = jmapService.request.mock.calls.at(-1)!;
       const [methodName, methodArgs] = lastCall[1][0]!;
       expect(methodName).toBe('Email/set');
-      expect(methodArgs['destroy']).toEqual(['draft-1']);
+      expect(methodArgs['destroy']).toEqual(['c']);
+      expect(result).toEqual({ deletedEntryKey: '1:2' });
+    });
+
+    test('When the discarded draft id cannot be decoded, then no quota entry key is returned instead of failing the discard', async () => {
+      jmapService.getPrimaryAccountId.mockResolvedValue('account-123');
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ destroyed: ['draft-1'] }),
+      );
+
+      await expect(
+        provider.discardDraft('user@test.com', 'draft-1'),
+      ).resolves.toEqual({ deletedEntryKey: null });
     });
 
     test('When the draft cannot be removed, then the user gets an error describing the reason', async () => {

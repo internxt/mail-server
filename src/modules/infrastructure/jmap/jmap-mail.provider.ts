@@ -15,8 +15,11 @@ import type {
   Mailbox,
   MailboxType,
   SearchEmailFilter,
+  QuotaEntryKey,
   SendEmailDto,
+  SendEmailResult,
   ThreadingHeaders,
+  UpdateDraftResult,
 } from '../../email/email.types.js';
 import { decodeStalwartIdBig } from '../stalwart/stalwart-id.codec.js';
 import {
@@ -427,7 +430,7 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
-  ): Promise<{ id: string }> {
+  ): Promise<SendEmailResult> {
     const session = await this.jmap.getSession(userEmail);
     const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail, session),
@@ -479,7 +482,29 @@ export class JmapMailProvider extends MailProvider {
       throw new Error('Failed to create email for sending');
     }
 
-    return { id: createdId };
+    return {
+      id: createdId,
+      deletedEntryKey: dto.draftId
+        ? this.entryKeyIfDestroyed(accountId, dto.draftId, emailResult)
+        : null,
+    };
+  }
+
+  private entryKeyIfDestroyed(
+    accountId: string,
+    emailId: string,
+    result: JmapSetResponse<JmapEmail>,
+  ): QuotaEntryKey | null {
+    const notDestroyed = result.notDestroyed?.[emailId];
+
+    if (notDestroyed) {
+      this.logger.warn(
+        `Could not destroy message ${emailId}: ${notDestroyed.description ?? notDestroyed.type}`,
+      );
+      return null;
+    }
+
+    return this.buildEntryKey(accountId, emailId);
   }
 
   private async destroyDraft(
@@ -487,26 +512,26 @@ export class JmapMailProvider extends MailProvider {
     accountId: string,
     draftId: string,
     session: JmapSession,
-  ): Promise<void> {
+  ): Promise<QuotaEntryKey | null> {
     try {
       const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
         userEmail,
         [['Email/set', { accountId, destroy: [draftId] }, 'r0']],
         { session },
       );
-      const notDestroyed =
-        response.methodResponses[0]![1].notDestroyed?.[draftId];
-      if (notDestroyed) {
-        this.logger.warn(
-          `Could not destroy draft ${draftId} after sending: ${notDestroyed.description ?? notDestroyed.type}`,
-        );
-      }
+
+      return this.entryKeyIfDestroyed(
+        accountId,
+        draftId,
+        response.methodResponses[0]![1],
+      );
     } catch (err) {
       this.logger.warn(
         `Failed to destroy draft ${draftId} after sending: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
+      return null;
     }
   }
 
@@ -515,7 +540,7 @@ export class JmapMailProvider extends MailProvider {
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
     messageId?: string,
-  ): Promise<{ id: string }> {
+  ): Promise<SendEmailResult> {
     const session = await this.jmap.getSession(userEmail);
     const [accountId, identity, sentMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail, session),
@@ -551,11 +576,12 @@ export class JmapMailProvider extends MailProvider {
       throw new Error('Failed to save email to Sent');
     }
 
-    if (dto.draftId) {
-      await this.destroyDraft(userEmail, accountId, dto.draftId, session);
-    }
-
-    return { id: createdId };
+    return {
+      id: createdId,
+      deletedEntryKey: dto.draftId
+        ? await this.destroyDraft(userEmail, accountId, dto.draftId, session)
+        : null,
+    };
   }
 
   async getThreadingHeaders(
@@ -726,7 +752,7 @@ export class JmapMailProvider extends MailProvider {
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
-  ): Promise<Email | null> {
+  ): Promise<UpdateDraftResult | null> {
     const session = await this.jmap.getSession(userEmail);
     const [accountId, identity, draftsMailboxId] = await Promise.all([
       this.jmap.getPrimaryAccountId(userEmail, session),
@@ -823,13 +849,19 @@ export class JmapMailProvider extends MailProvider {
         throw new Error('Failed to fetch the updated draft');
       }
 
-      return updatedDraft;
+      return {
+        draft: updatedDraft,
+        deletedEntryKey: this.buildEntryKey(accountId, draftId),
+      };
     }
 
     throw new DraftUpdateConflictError(draftId);
   }
 
-  async discardDraft(userEmail: string, id: string): Promise<void> {
+  async discardDraft(
+    userEmail: string,
+    id: string,
+  ): Promise<DeleteEmailResult> {
     const session = await this.jmap.getSession(userEmail);
     const accountId = await this.jmap.getPrimaryAccountId(userEmail, session);
     const response = await this.jmap.request<JmapSetResponse<JmapEmail>>(
@@ -843,6 +875,8 @@ export class JmapMailProvider extends MailProvider {
         `Failed to discard draft ${id}: ${notDestroyed.description ?? notDestroyed.type}`,
       );
     }
+
+    return { deletedEntryKey: this.buildEntryKey(accountId, id) };
   }
 
   async getDraft(userEmail: string, id: string): Promise<Email | null> {
@@ -934,10 +968,22 @@ export class JmapMailProvider extends MailProvider {
     return { deletedEntryKey: null };
   }
 
-  private buildEntryKey(accountId: string, emailId: string): string {
-    const numericAccountId = decodeStalwartIdBig(accountId) & 0xffffffffn;
-    const documentId = decodeStalwartIdBig(emailId) & 0xffffffffn;
-    return `${numericAccountId}:${documentId}`;
+  private buildEntryKey(
+    accountId: string,
+    emailId: string,
+  ): QuotaEntryKey | null {
+    try {
+      const numericAccountId = decodeStalwartIdBig(accountId) & 0xffffffffn;
+      const documentId = decodeStalwartIdBig(emailId) & 0xffffffffn;
+      return `${numericAccountId}:${documentId}`;
+    } catch (err) {
+      this.logger.error(
+        `Could not derive a quota entry key from account '${accountId}' and email '${emailId}': ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      return null;
+    }
   }
 
   async markAsRead(
