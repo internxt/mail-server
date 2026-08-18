@@ -27,8 +27,10 @@ import type {
   MailboxType,
   ReplyEmailDto,
   SearchEmailDto,
+  QuotaEntryKey,
   SendEmailDto,
   ThreadingHeaders,
+  UpdateDraftResult,
 } from './email.types.js';
 import {
   isEncryptedBody,
@@ -229,7 +231,15 @@ export class EmailService {
       };
     }
 
-    return this.mail.sendEmail(userEmail, dto, threading);
+    const { id, deletedEntryKey } = await this.mail.sendEmail(
+      userEmail,
+      dto,
+      threading,
+    );
+
+    await this.releaseQuotaEntry(userEmail, deletedEntryKey);
+
+    return { id };
   }
 
   private async dispatchExternal(
@@ -274,7 +284,7 @@ export class EmailService {
       references: threading?.references,
     });
 
-    await this.mail.saveToSent(
+    const { deletedEntryKey } = await this.mail.saveToSent(
       userEmail,
       {
         ...dto,
@@ -284,6 +294,8 @@ export class EmailService {
       threading,
       messageId,
     );
+
+    await this.releaseQuotaEntry(userEmail, deletedEntryKey);
 
     return { id: messageId };
   }
@@ -352,7 +364,7 @@ export class EmailService {
     draftId: string,
     dto: DraftEmailDto,
   ): Promise<Email> {
-    let result: Email | null;
+    let result: UpdateDraftResult | null;
     try {
       result = await this.mail.updateDraft(
         userEmail,
@@ -368,7 +380,10 @@ export class EmailService {
     if (!result) {
       throw new NotFoundException(`Draft ${draftId} not found`);
     }
-    return result;
+
+    await this.releaseQuotaEntry(userEmail, result.deletedEntryKey);
+
+    return result.draft;
   }
 
   private packDraftEnvelope(dto: DraftEmailDto): DraftEmailDto {
@@ -389,7 +404,9 @@ export class EmailService {
     if (!draft) {
       throw new NotFoundException(`Draft ${id} not found`);
     }
-    await this.mail.discardDraft(userEmail, id);
+    const { deletedEntryKey } = await this.mail.discardDraft(userEmail, id);
+
+    await this.releaseQuotaEntry(userEmail, deletedEntryKey);
   }
 
   moveEmail(userEmail: string, id: string, target: MailboxType): Promise<void> {
@@ -398,27 +415,28 @@ export class EmailService {
 
   async deleteEmail(userEmail: string, id: string): Promise<void> {
     const { deletedEntryKey } = await this.mail.deleteEmail(userEmail, id);
-    if (!deletedEntryKey) return;
 
     await this.releaseQuotaEntry(userEmail, deletedEntryKey);
   }
 
   private async releaseQuotaEntry(
     userEmail: string,
-    entryKey: string,
+    entryKey: QuotaEntryKey | null,
   ): Promise<void> {
-    const context =
-      await this.accountService.findBucketContextByAddress(userEmail);
-
-    if (!context?.networkBucketId) {
-      this.logger.warn(
-        { userEmail, entryKey },
-        'Destroyed message has no network bucket; skipping quota release',
-      );
-      return;
-    }
+    if (!entryKey) return;
 
     try {
+      const context =
+        await this.accountService.findBucketContextByAddress(userEmail);
+
+      if (!context?.networkBucketId) {
+        this.logger.warn(
+          { userEmail, entryKey },
+          'Destroyed message has no network bucket; skipping quota release',
+        );
+        return;
+      }
+
       await this.usage.releaseStoredMessage({
         userUuid: context.userUuid,
         bucketId: context.networkBucketId,

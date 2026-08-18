@@ -11,6 +11,8 @@ import type {
   EncryptedWrappedKey,
   EncryptionBlock,
   ThreadingHeaders,
+  SendEmailResult,
+  UpdateDraftResult,
 } from '../src/modules/email/email.types.js';
 import type { UserPayload } from '../src/modules/auth/jwt-payload.dto.js';
 import {
@@ -438,6 +440,26 @@ export function newMailQuota(attrs?: Partial<MailQuota>): MailQuota {
   return {
     used: random.natural({ min: 0, max: 1_000_000_000 }),
     limit: random.natural({ min: 1_000_000_000, max: 10_000_000_000 }),
+    ...attrs,
+  };
+}
+
+export function newSendEmailResult(
+  attrs?: Partial<SendEmailResult>,
+): SendEmailResult {
+  return {
+    id: randomId(),
+    deletedEntryKey: null,
+    ...attrs,
+  };
+}
+
+export function newUpdateDraftResult(
+  attrs?: Partial<UpdateDraftResult>,
+): UpdateDraftResult {
+  return {
+    draft: newEmail({ isDraft: true }),
+    deletedEntryKey: null,
     ...attrs,
   };
 }

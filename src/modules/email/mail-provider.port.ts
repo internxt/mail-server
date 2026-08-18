@@ -16,7 +16,9 @@ import type {
   MailboxType,
   SearchEmailDto,
   SendEmailDto,
+  SendEmailResult,
   ThreadingHeaders,
+  UpdateDraftResult,
 } from './email.types.js';
 
 export class DraftUpdateConflictError extends Error {
@@ -49,14 +51,14 @@ export abstract class MailProvider {
     userEmail: string,
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
-  ): Promise<{ id: string }>;
+  ): Promise<SendEmailResult>;
   abstract search(params: SearchEmailDto): Promise<EmailListResponse>;
   abstract saveToSent(
     userEmail: string,
     dto: SendEmailDto,
     threading?: ThreadingHeaders,
     messageId?: string,
-  ): Promise<{ id: string }>;
+  ): Promise<SendEmailResult>;
   abstract getThreadingHeaders(
     userEmail: string,
     parentId: string,
@@ -67,9 +69,12 @@ export abstract class MailProvider {
     userEmail: string,
     draftId: string,
     dto: DraftEmailDto,
-  ): Promise<Email | null>;
+  ): Promise<UpdateDraftResult | null>;
   abstract getDraft(userEmail: string, id: string): Promise<Email | null>;
-  abstract discardDraft(userEmail: string, id: string): Promise<void>;
+  abstract discardDraft(
+    userEmail: string,
+    id: string,
+  ): Promise<DeleteEmailResult>;
   abstract moveEmail(
     userEmail: string,
     id: string,

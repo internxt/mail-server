@@ -22,8 +22,20 @@ export interface Mailbox {
 
 export type MailDeliveryMode = 'INTERNXT' | 'EXTERNAL';
 
-export interface DeleteEmailResult {
-  deletedEntryKey: string | null;
+export type QuotaEntryKey = string;
+
+export interface DestroyedMessage {
+  deletedEntryKey: QuotaEntryKey | null;
+}
+
+export type DeleteEmailResult = DestroyedMessage;
+
+export interface SendEmailResult extends DestroyedMessage {
+  id: string;
+}
+
+export interface UpdateDraftResult extends DestroyedMessage {
+  draft: Email;
 }
 
 export interface EncryptedSummaryFields {
