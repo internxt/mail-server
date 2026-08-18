@@ -78,6 +78,10 @@ export class MailUsageService {
     );
   }
 
+  async getChargedBytes(userUuid: string): Promise<number> {
+    return this.entries.sumSizeByUserUuid(userUuid);
+  }
+
   async releaseStoredMessage(
     params: ReleaseStoredMessageParams,
   ): Promise<void> {
