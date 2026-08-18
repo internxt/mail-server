@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { UniqueConstraintError } from 'sequelize';
+import { col, fn, UniqueConstraintError } from 'sequelize';
+import { MailAccountModel } from '../../account/models/mail-account.model.js';
+import { MailAddressModel } from '../../account/models/mail-address.model.js';
 import {
   MailBucketEntry,
   type MailBucketEntryAttributes,
@@ -47,6 +49,32 @@ export class MailBucketEntryRepository {
 
   async deleteByEntryKey(entryKey: string): Promise<void> {
     await this.entryModel.destroy({ where: { entryKey } });
+  }
+
+  async sumSizeByUserUuid(userUuid: string): Promise<number> {
+    const row = (await this.entryModel.findOne({
+      attributes: [[fn('SUM', col('size')), 'total']],
+      include: [
+        {
+          model: MailAddressModel,
+          attributes: [],
+          required: true,
+          paranoid: false,
+          include: [
+            {
+              model: MailAccountModel,
+              attributes: [],
+              required: true,
+              paranoid: false,
+              where: { userId: userUuid },
+            },
+          ],
+        },
+      ],
+      raw: true,
+    })) as { total: string | number | null } | null;
+
+    return Number(row?.total ?? 0);
   }
 
   private toDomain(model: MailBucketEntryModel): MailBucketEntry {

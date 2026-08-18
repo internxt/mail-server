@@ -22,6 +22,10 @@ import { MailAddressModel } from './mail-address.model.js';
       fields: ['user_id'],
       where: { deleted_at: null },
     },
+    {
+      name: 'mail_accounts_user_id_idx',
+      fields: ['user_id'],
+    },
   ],
 })
 export class MailAccountModel extends Model {

@@ -141,6 +141,23 @@ describe('MailUsageService', () => {
     });
   });
 
+  describe('getChargedBytes', () => {
+    test('when the user has mail stored, then returns the summed pointer sizes', async () => {
+      entries.sumSizeByUserUuid.mockResolvedValue(4096);
+
+      const result = await service.getChargedBytes('user-1');
+
+      expect(entries.sumSizeByUserUuid).toHaveBeenCalledWith('user-1');
+      expect(result).toBe(4096);
+    });
+
+    test('when the user has no mail account, then reports zero rather than failing', async () => {
+      entries.sumSizeByUserUuid.mockResolvedValue(0);
+
+      expect(await service.getChargedBytes('user-without-mail')).toBe(0);
+    });
+  });
+
   describe('releaseStoredMessage', () => {
     test('when the pointer exists, then deletes the bridge entry by id and drops the pointer', async () => {
       entries.findByEntryKey.mockResolvedValue(entry());

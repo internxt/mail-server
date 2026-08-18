@@ -11,6 +11,7 @@ import {
 import {
   ApiBearerAuth,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -18,6 +19,8 @@ import {
 } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { AccountService } from '../account/account.service.js';
+import { MailUsageService } from '../usage/mail-usage.service.js';
+import { AccountUsageResponseDto } from './dto/account-usage.response.dto.js';
 import { GatewayAuthGuard } from './gateway.guard.js';
 
 @ApiTags('Gateway')
@@ -26,7 +29,10 @@ import { GatewayAuthGuard } from './gateway.guard.js';
 @UseGuards(GatewayAuthGuard)
 @Controller('gateway')
 export class GatewayController {
-  constructor(private readonly accountService: AccountService) {}
+  constructor(
+    private readonly accountService: AccountService,
+    private readonly mailUsageService: MailUsageService,
+  ) {}
 
   @Get('addresses/:address')
   @ApiOperation({
@@ -41,6 +47,24 @@ export class GatewayController {
     }
 
     return { address: normalized, userId };
+  }
+
+  @Get('accounts/:uuid/usage')
+  @ApiParam({ name: 'uuid', description: 'The UUID of the account' })
+  @ApiOkResponse({ type: AccountUsageResponseDto })
+  @ApiOperation({
+    summary: 'Get the mail storage charged to a user, in bytes',
+    description:
+      'Reports the mail share of the shared plan counter, so callers can add ' +
+      'it to their own usage and arrive at the same total that gates uploads ' +
+      'and inbound delivery. Returns 0 for users without a mail account.',
+  })
+  async getAccountUsage(
+    @Param('uuid') uuid: string,
+  ): Promise<AccountUsageResponseDto> {
+    const usage = await this.mailUsageService.getChargedBytes(uuid);
+
+    return { userId: uuid, usage };
   }
 
   @Post('accounts/:uuid/suspend')

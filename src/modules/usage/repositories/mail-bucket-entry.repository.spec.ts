@@ -24,6 +24,56 @@ describe('MailBucketEntryRepository', () => {
     entryModel = module.get(getModelToken(MailBucketEntryModel));
   });
 
+  describe('sumSizeByUserUuid', () => {
+    test('when the user has entries, then returns the summed size as a number', async () => {
+      entryModel.findOne.mockResolvedValue({
+        total: '4096',
+      } as unknown as MailBucketEntryModel);
+
+      const result = await repository.sumSizeByUserUuid('user-1');
+
+      expect(result).toBe(4096);
+    });
+
+    test('when the user has no entries, then returns zero instead of null', async () => {
+      entryModel.findOne.mockResolvedValue({
+        total: null,
+      } as unknown as MailBucketEntryModel);
+
+      expect(await repository.sumSizeByUserUuid('user-1')).toBe(0);
+    });
+
+    test('when no row matches at all, then returns zero', async () => {
+      entryModel.findOne.mockResolvedValue(null);
+
+      expect(await repository.sumSizeByUserUuid('user-1')).toBe(0);
+    });
+
+    test('when summing, then includes soft-deleted addresses and accounts', async () => {
+      entryModel.findOne.mockResolvedValue({
+        total: '0',
+      } as unknown as MailBucketEntryModel);
+
+      await repository.sumSizeByUserUuid('user-1');
+
+      expect(entryModel.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: [
+            expect.objectContaining({
+              paranoid: false,
+              include: [
+                expect.objectContaining({
+                  paranoid: false,
+                  where: { userId: 'user-1' },
+                }),
+              ],
+            }),
+          ],
+        }),
+      );
+    });
+  });
+
   describe('create', () => {
     test('when persisting, then returns the entry with size coerced to a number', async () => {
       const now = new Date();
