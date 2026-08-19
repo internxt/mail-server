@@ -5,6 +5,7 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -60,7 +61,7 @@ export class GatewayController {
       'and inbound delivery. Returns 0 for users without a mail account.',
   })
   async getAccountUsage(
-    @Param('uuid') uuid: string,
+    @Param('uuid', ParseUUIDPipe) uuid: string,
   ): Promise<AccountUsageResponseDto> {
     const usage = await this.mailUsageService.getChargedBytes(uuid);
 
@@ -73,7 +74,7 @@ export class GatewayController {
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @ApiNotFoundResponse({ description: 'Account not found' })
   @ApiOperation({ summary: 'Suspend a mail account' })
-  async suspendAccount(@Param('uuid') uuid: string) {
+  async suspendAccount(@Param('uuid', ParseUUIDPipe) uuid: string) {
     await this.accountService.suspendAccount(uuid);
   }
 
@@ -83,7 +84,7 @@ export class GatewayController {
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @ApiNotFoundResponse({ description: 'Account not found' })
   @ApiOperation({ summary: 'Reactivate a mail account' })
-  async reactivateAccount(@Param('uuid') uuid: string) {
+  async reactivateAccount(@Param('uuid', ParseUUIDPipe) uuid: string) {
     await this.accountService.reactivateAccount(uuid);
   }
 }

@@ -12,6 +12,7 @@ import { MailUsageService } from '../usage/mail-usage.service.js';
 import {
   DraftUpdateConflictError,
   MailProvider,
+  SendEmailFailedError,
 } from './mail-provider.port.js';
 import { deriveReplyRecipients, ensureRePrefix } from './threading.js';
 import type {
@@ -231,15 +232,22 @@ export class EmailService {
       };
     }
 
-    const { id, deletedEntryKey } = await this.mail.sendEmail(
-      userEmail,
-      dto,
-      threading,
-    );
+    try {
+      const { id, deletedEntryKey } = await this.mail.sendEmail(
+        userEmail,
+        dto,
+        threading,
+      );
 
-    await this.releaseQuotaEntry(userEmail, deletedEntryKey);
+      await this.releaseQuotaEntry(userEmail, deletedEntryKey);
 
-    return { id };
+      return { id };
+    } catch (error) {
+      if (error instanceof SendEmailFailedError) {
+        await this.releaseQuotaEntry(userEmail, error.deletedEntryKey);
+      }
+      throw error;
+    }
   }
 
   private async dispatchExternal(

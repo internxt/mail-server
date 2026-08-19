@@ -3,6 +3,7 @@ import {
   DraftUpdateConflictError,
   MailProvider,
   MissingMessageIdError,
+  SendEmailFailedError,
 } from '../../email/mail-provider.port.js';
 import type {
   DeleteEmailResult,
@@ -478,15 +479,17 @@ export class JmapMailProvider extends MailProvider {
       .methodResponses[0]![1] as JmapSetResponse<JmapEmail>;
 
     const createdId = emailResult.created?.['draft']?.id;
+    const deletedEntryKey = dto.draftId
+      ? this.entryKeyIfDestroyed(accountId, dto.draftId, emailResult)
+      : null;
+
     if (!createdId) {
-      throw new Error('Failed to create email for sending');
+      throw new SendEmailFailedError(deletedEntryKey);
     }
 
     return {
       id: createdId,
-      deletedEntryKey: dto.draftId
-        ? this.entryKeyIfDestroyed(accountId, dto.draftId, emailResult)
-        : null,
+      deletedEntryKey,
     };
   }
 
