@@ -14,6 +14,7 @@ import { EmailService } from './email.service.js';
 import {
   DraftUpdateConflictError,
   MailProvider,
+  SendEmailFailedError,
 } from './mail-provider.port.js';
 import { AccountService } from '../account/account.service.js';
 import { MailUsageService } from '../usage/mail-usage.service.js';
@@ -996,6 +997,41 @@ describe('EmailService', () => {
         bucketId: 'bucket-1',
         entryKey: '42:10',
       });
+    });
+
+    it('when sending fails after the draft was destroyed, then the draft quota entry is still released and the error propagates', async () => {
+      provider.sendEmail.mockRejectedValue(new SendEmailFailedError('42:11'));
+
+      await expect(
+        service.sendEmail(userEmail, newSendEmailDto({ draftId: 'c' })),
+      ).rejects.toThrow(SendEmailFailedError);
+
+      expect(usage.releaseStoredMessage).toHaveBeenCalledWith({
+        userUuid: 'user-1',
+        bucketId: 'bucket-1',
+        entryKey: '42:11',
+      });
+    });
+
+    it('when sending fails without destroying a draft, then no quota entry is released and the error propagates', async () => {
+      provider.sendEmail.mockRejectedValue(new SendEmailFailedError(null));
+
+      await expect(
+        service.sendEmail(userEmail, newSendEmailDto()),
+      ).rejects.toThrow(SendEmailFailedError);
+
+      expect(usage.releaseStoredMessage).not.toHaveBeenCalled();
+    });
+
+    it('when sending fails for an unrelated reason, then no quota entry is released and the error propagates unchanged', async () => {
+      const error = new Error('JMAP request timed out');
+      provider.sendEmail.mockRejectedValue(error);
+
+      await expect(
+        service.sendEmail(userEmail, newSendEmailDto({ draftId: 'c' })),
+      ).rejects.toThrow(error);
+
+      expect(usage.releaseStoredMessage).not.toHaveBeenCalled();
     });
   });
 
