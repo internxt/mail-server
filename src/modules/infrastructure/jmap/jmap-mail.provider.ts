@@ -507,6 +507,10 @@ export class JmapMailProvider extends MailProvider {
       return null;
     }
 
+    if (!result.destroyed?.includes(emailId)) {
+      return null;
+    }
+
     return this.buildEntryKey(accountId, emailId);
   }
 

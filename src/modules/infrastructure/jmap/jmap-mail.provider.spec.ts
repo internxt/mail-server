@@ -385,7 +385,7 @@ describe('JmapMailProvider', () => {
       );
       jmapService.request.mockResolvedValueOnce(
         jmapMultiResponse(
-          { created: { draft: { id: 'sent-email-id' } } },
+          { created: { draft: { id: 'sent-email-id' } }, destroyed: ['c'] },
           { created: { submission: { id: 'sub-id' } } },
         ),
       );
@@ -401,6 +401,35 @@ describe('JmapMailProvider', () => {
       expect(result).toEqual({
         id: 'sent-email-id',
         deletedEntryKey: '1:2',
+      });
+    });
+
+    test('When the draft is not reported as destroyed even though it is not in notDestroyed, then no quota entry key is returned so its usage is not released', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+      jmapService.getPrimaryAccountId.mockResolvedValue('b');
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse(
+          { created: { draft: { id: 'sent-email-id' } } },
+          { created: { submission: { id: 'sub-id' } } },
+        ),
+      );
+
+      const result = await provider.sendEmail(
+        'user@test.com',
+        newSendEmailDto({ draftId: 'c' }),
+      );
+
+      expect(result).toEqual({
+        id: 'sent-email-id',
+        deletedEntryKey: null,
       });
     });
 
@@ -448,7 +477,10 @@ describe('JmapMailProvider', () => {
         jmapResponse({ list: [sentMailbox] }),
       );
       jmapService.request.mockResolvedValueOnce(
-        jmapMultiResponse({ created: null }, { created: null }),
+        jmapMultiResponse(
+          { created: null, destroyed: ['c'] },
+          { created: null },
+        ),
       );
 
       const dto = newSendEmailDto({ draftId: 'c' });
