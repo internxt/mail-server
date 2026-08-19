@@ -14,6 +14,7 @@ import type {
   MailQuota,
   Mailbox,
   MailboxType,
+  QuotaEntryKey,
   SearchEmailDto,
   SendEmailDto,
   SendEmailResult,
@@ -27,6 +28,15 @@ export class DraftUpdateConflictError extends Error {
     this.name = 'DraftUpdateConflictError';
 
     Object.setPrototypeOf(this, DraftUpdateConflictError.prototype);
+  }
+}
+
+export class SendEmailFailedError extends Error {
+  constructor(public readonly deletedEntryKey: QuotaEntryKey | null) {
+    super('Failed to create email for sending');
+    this.name = 'SendEmailFailedError';
+
+    Object.setPrototypeOf(this, SendEmailFailedError.prototype);
   }
 }
 
