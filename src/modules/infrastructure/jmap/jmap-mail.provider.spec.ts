@@ -436,6 +436,31 @@ describe('JmapMailProvider', () => {
       });
     });
 
+    test('When email creation fails after the draft was destroyed, then it throws carrying the deleted entry key so its usage can still be released', async () => {
+      const sentMailbox = newJmapMailbox({ role: 'sent' });
+      const identity = newJmapIdentity();
+      jmapService.getPrimaryAccountId.mockResolvedValue('b');
+
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [identity] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapResponse({ list: [sentMailbox] }),
+      );
+      jmapService.request.mockResolvedValueOnce(
+        jmapMultiResponse({ created: null }, { created: null }),
+      );
+
+      const dto = newSendEmailDto({ draftId: 'c' });
+
+      await expect(
+        provider.sendEmail('user@test.com', dto),
+      ).rejects.toMatchObject({
+        name: 'SendEmailFailedError',
+        deletedEntryKey: '1:2',
+      });
+    });
+
     test('When sending without a draftId, then the Email/set call does not include any destroy operation', async () => {
       const sentMailbox = newJmapMailbox({ role: 'sent' });
       const identity = newJmapIdentity();
