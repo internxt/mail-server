@@ -15,6 +15,7 @@ import { MailDomain } from './domain/mail-domain.domain.js';
 import { MailAddress } from './domain/mail-address.domain.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
+import { DeletedAddressRepository } from './repositories/deleted-address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 import {
@@ -50,6 +51,7 @@ describe('AccountService', () => {
   let provider: DeepMocked<AccountProvider>;
   let accounts: DeepMocked<AccountRepository>;
   let addresses: DeepMocked<AddressRepository>;
+  let deletedAddresses: DeepMocked<DeletedAddressRepository>;
   let domains: DeepMocked<DomainRepository>;
   let keys: DeepMocked<MailAddressKeysRepository>;
   let bridge: DeepMocked<BridgeClient>;
@@ -67,6 +69,7 @@ describe('AccountService', () => {
     provider = module.get(AccountProvider);
     accounts = module.get(AccountRepository);
     addresses = module.get(AddressRepository);
+    deletedAddresses = module.get(DeletedAddressRepository);
     domains = module.get(DomainRepository);
     keys = module.get(MailAddressKeysRepository);
     bridge = module.get(BridgeClient);
@@ -77,6 +80,7 @@ describe('AccountService', () => {
       maxSpaceBytes: 1000,
       totalUsedSpaceBytes: 0,
     });
+    deletedAddresses.findClaimedByOthers.mockResolvedValue(new Set());
   });
 
   describe('getAccount', () => {
@@ -661,6 +665,20 @@ describe('AccountService', () => {
       expect(provider.createAccount).not.toHaveBeenCalled();
     });
 
+    it('when the address was given up by another user, then throws a conflict', async () => {
+      domains.findByDomain.mockResolvedValue(domain);
+      addresses.findByAddress.mockResolvedValue(null);
+      accounts.findByUserId.mockResolvedValue(null);
+      deletedAddresses.findClaimedByOthers.mockResolvedValue(
+        new Set([params.address]),
+      );
+
+      await expect(service.provisionAccount(params)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(accounts.create).not.toHaveBeenCalled();
+    });
+
     it('when unique collision occurs but no account is visible, then throws a conflict', async () => {
       const uniqueError = new Error('Unique constraint violated');
       uniqueError.name = 'SequelizeUniqueConstraintError';
@@ -813,6 +831,33 @@ describe('AccountService', () => {
         'Stalwart down',
       );
       expect(bridge.deleteMailBucket).not.toHaveBeenCalled();
+      expect(accounts.delete).not.toHaveBeenCalled();
+    });
+
+    it('when the account is destroyed, then every address is tombstoned first', async () => {
+      const addr1 = newMailAddressAttributes({ isDefault: true });
+      const addr2 = newMailAddressAttributes({ isDefault: false });
+      const account = MailAccount.build(
+        newMailAccountAttributes({ addresses: [addr1, addr2] }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.deleteAccount(account.userId);
+
+      expect(deletedAddresses.record).toHaveBeenCalledWith([
+        { address: addr1.address, userId: account.userId },
+        { address: addr2.address, userId: account.userId },
+      ]);
+    });
+
+    it('when tombstoning fails, then the rows are kept so the address stays taken', async () => {
+      const account = MailAccount.build(newMailAccountAttributes());
+      accounts.findByUserId.mockResolvedValue(account);
+      deletedAddresses.record.mockRejectedValue(new Error('DB down'));
+
+      await expect(service.deleteAccount(account.userId)).rejects.toThrow(
+        'DB down',
+      );
       expect(accounts.delete).not.toHaveBeenCalled();
     });
 
@@ -1191,6 +1236,25 @@ describe('AccountService', () => {
       );
     });
 
+    it('when an address is removed, then it is tombstoned so nobody else gets it', async () => {
+      const nonDefaultAddr = newMailAddressAttributes({ isDefault: false });
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          addresses: [
+            newMailAddressAttributes({ isDefault: true }),
+            nonDefaultAddr,
+          ],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.removeAddress(account.userId, nonDefaultAddr.address);
+
+      expect(deletedAddresses.record).toHaveBeenCalledWith([
+        { address: nonDefaultAddr.address, userId: account.userId },
+      ]);
+    });
+
     it('when address is default, then throws UnprocessableEntityException', async () => {
       const defaultAddr = newMailAddressAttributes({ isDefault: true });
       const account = MailAccount.build(
@@ -1239,7 +1303,11 @@ describe('AccountService', () => {
     });
 
     it('when domain is available and address is not taken, return is available', async () => {
-      const res = await service.checkAddressAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability(
+        'username',
+        'domain',
+        'user-1',
+      );
 
       expect(res).toStrictEqual({ available: true, suggestion: null });
 
@@ -1252,7 +1320,11 @@ describe('AccountService', () => {
         newMailDomainAttributes({ domain: 'domain2' }),
       ]);
 
-      const res = await service.checkAddressAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability(
+        'username',
+        'domain',
+        'user-1',
+      );
 
       expect(res).toStrictEqual({
         available: false,
@@ -1267,7 +1339,11 @@ describe('AccountService', () => {
     it('when address is taken, return is not available and suggestion', async () => {
       addresses.findByAddresses.mockResolvedValue(new Set(['username@domain']));
 
-      const res = await service.checkAddressAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability(
+        'username',
+        'domain',
+        'user-1',
+      );
 
       expect(res).toStrictEqual({
         available: false,
@@ -1276,10 +1352,47 @@ describe('AccountService', () => {
       expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);
     });
 
+    it('when an address was given up by another user, then it is not offered', async () => {
+      deletedAddresses.findClaimedByOthers.mockResolvedValue(
+        new Set(['username@domain']),
+      );
+
+      const res = await service.checkAddressAvailability(
+        'username',
+        'domain',
+        'user-1',
+      );
+
+      expect(deletedAddresses.findClaimedByOthers).toHaveBeenCalledWith(
+        taken,
+        'user-1',
+      );
+      expect(res).toStrictEqual({
+        available: false,
+        suggestion: 'username@domain1',
+      });
+    });
+
+    it('when the caller gave the address up themselves, then they may take it back', async () => {
+      deletedAddresses.findClaimedByOthers.mockResolvedValue(new Set());
+
+      const res = await service.checkAddressAvailability(
+        'username',
+        'domain',
+        'user-1',
+      );
+
+      expect(res).toStrictEqual({ available: true, suggestion: null });
+    });
+
     it('when all suggestions are taken, return is not available and no suggestion', async () => {
       addresses.findByAddresses.mockResolvedValue(new Set(taken));
 
-      const res = await service.checkAddressAvailability('username', 'domain');
+      const res = await service.checkAddressAvailability(
+        'username',
+        'domain',
+        'user-1',
+      );
 
       expect(res).toStrictEqual({ available: false, suggestion: null });
       expect(addresses.findByAddresses).toHaveBeenCalledExactlyOnceWith(taken);

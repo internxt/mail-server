@@ -3,10 +3,12 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { AddressesController } from './addresses.controller.js';
 import { AccountService } from '../account/account.service.js';
+import { newUserPayload } from '../../../test/fixtures.js';
 
 describe('AddressesController', () => {
   let controller: AddressesController;
   let accountService: DeepMocked<AccountService>;
+  const user = newUserPayload();
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -26,7 +28,7 @@ describe('AddressesController', () => {
         suggestion: null,
       });
 
-      const result = await controller.checkAvailability({
+      const result = await controller.checkAvailability(user, {
         username: 'alice',
         domain: 'inxt.me',
       });
@@ -34,6 +36,7 @@ describe('AddressesController', () => {
       expect(accountService.checkAddressAvailability).toHaveBeenCalledWith(
         'alice',
         'inxt.me',
+        user.uuid,
       );
       expect(result).toStrictEqual({
         available: true,
@@ -48,7 +51,7 @@ describe('AddressesController', () => {
       suggestion: 'alice1@inxt.me',
     });
 
-    const result = await controller.checkAvailability({
+    const result = await controller.checkAvailability(user, {
       username: 'alice',
       domain: 'inxt.me',
     });
@@ -56,6 +59,7 @@ describe('AddressesController', () => {
     expect(accountService.checkAddressAvailability).toHaveBeenCalledWith(
       'alice',
       'inxt.me',
+      user.uuid,
     );
     expect(result).toStrictEqual({
       available: false,

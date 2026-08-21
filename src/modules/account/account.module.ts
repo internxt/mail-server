@@ -12,11 +12,13 @@ import {
   MailAddressKeysModel,
   MailAccountModel,
   MailAddressModel,
+  MailDeletedAddressModel,
   MailDomainModel,
   MailProviderAccountModel,
 } from './models/index.js';
 import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
+import { DeletedAddressRepository } from './repositories/deleted-address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 
@@ -26,6 +28,7 @@ import { MailAddressKeysRepository } from './repositories/mail-address-keys.repo
       MailAccountModel,
       MailAddressKeysModel,
       MailAddressModel,
+      MailDeletedAddressModel,
       MailDomainModel,
       MailProviderAccountModel,
     ]),
@@ -37,6 +40,7 @@ import { MailAddressKeysRepository } from './repositories/mail-address-keys.repo
   providers: [
     AccountRepository,
     AddressRepository,
+    DeletedAddressRepository,
     DomainRepository,
     MailAddressKeysRepository,
     AccountService,
