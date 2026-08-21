@@ -79,7 +79,10 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
     return JSON.parse(text) as MailBucket;
   }
 
-  async deleteMailBucket(userUuid: string, bucketId: string): Promise<void> {
+  async deleteMailBucket(
+    userUuid: string,
+    bucketId: string,
+  ): Promise<UserSpaceSnapshot> {
     const token = this.signGatewayToken(userUuid);
 
     const { statusCode, body } = await this.httpClient.request({
@@ -93,13 +96,15 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
 
     const text = await body.text();
 
-    if (statusCode !== 204) {
+    if (statusCode !== 200) {
       throw new BridgeApiError(
         `Failed to delete mail bucket '${bucketId}' for user '${userUuid}': HTTP ${statusCode}`,
         statusCode,
         text,
       );
     }
+
+    return JSON.parse(text) as UserSpaceSnapshot;
   }
 
   async createBucketEntry(
@@ -209,4 +214,8 @@ export class BridgeApiError extends Error {
     super(message);
     this.name = 'BridgeApiError';
   }
+}
+
+export function isBridgeNotFound(error: unknown): boolean {
+  return error instanceof BridgeApiError && error.statusCode === 404;
 }

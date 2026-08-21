@@ -17,7 +17,10 @@ import { AccountRepository } from './repositories/account.repository.js';
 import { AddressRepository } from './repositories/address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import {
+  BridgeApiError,
+  BridgeClient,
+} from '../infrastructure/bridge/bridge.service.js';
 import { PaymentsService } from '../infrastructure/payments/payments.service.js';
 import type { Tier } from '../infrastructure/payments/payments.types.js';
 import {
@@ -69,6 +72,11 @@ describe('AccountService', () => {
     bridge = module.get(BridgeClient);
     payments = module.get(PaymentsService);
     config = module.get(ConfigService);
+
+    bridge.deleteMailBucket.mockResolvedValue({
+      maxSpaceBytes: 1000,
+      totalUsedSpaceBytes: 0,
+    });
   });
 
   describe('getAccount', () => {
@@ -599,7 +607,7 @@ describe('AccountService', () => {
       expect(accounts.delete).toHaveBeenCalledWith(createdAccount.id, {
         force: true,
       });
-      expect(accounts.setNetworkBucketId).not.toHaveBeenCalled();
+      expect(addresses.setNetworkBucketId).not.toHaveBeenCalled();
     });
 
     it('when the provider delete fails during rollback, then still hard-deletes the account', async () => {
@@ -670,7 +678,7 @@ describe('AccountService', () => {
   });
 
   describe('deleteAccount', () => {
-    it('when account has addresses, then deletes all principals and account', async () => {
+    it('when account has addresses, then destroys every principal', async () => {
       const addr1 = newMailAddressAttributes({ isDefault: true });
       const addr2 = newMailAddressAttributes({ isDefault: false });
       const account = MailAccount.build(
@@ -686,14 +694,28 @@ describe('AccountService', () => {
       expect(provider.deleteAccount).toHaveBeenCalledWith(
         addr2.providerExternalId,
       );
-      expect(addresses.deleteProviderLink).toHaveBeenCalledWith(addr1.id);
-      expect(addresses.deleteProviderLink).toHaveBeenCalledWith(addr2.id);
-      expect(accounts.delete).toHaveBeenCalledWith(account.id);
     });
 
-    it('when account has a network bucket, then deletes it via the bridge', async () => {
+    it('when the rows are dropped, then they are hard deleted so the cascades fire', async () => {
+      const account = MailAccount.build(newMailAccountAttributes());
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await service.deleteAccount(account.userId);
+
+      expect(accounts.delete).toHaveBeenCalledWith(account.id, { force: true });
+    });
+
+    it('when addresses hold network buckets, then releases each of them', async () => {
+      const addr1 = newMailAddressAttributes({
+        isDefault: true,
+        networkBucketId: 'bucket-1',
+      });
+      const addr2 = newMailAddressAttributes({
+        isDefault: false,
+        networkBucketId: 'bucket-2',
+      });
       const account = MailAccount.build(
-        newMailAccountAttributes({ networkBucketId: 'bucket-1' }),
+        newMailAccountAttributes({ addresses: [addr1, addr2] }),
       );
       accounts.findByUserId.mockResolvedValue(account);
 
@@ -703,12 +725,17 @@ describe('AccountService', () => {
         account.userId,
         'bucket-1',
       );
-      expect(accounts.delete).toHaveBeenCalledWith(account.id);
+      expect(bridge.deleteMailBucket).toHaveBeenCalledWith(
+        account.userId,
+        'bucket-2',
+      );
     });
 
-    it('when account has no network bucket, then does not call the bridge', async () => {
+    it('when there is no network bucket, then does not call the bridge', async () => {
       const account = MailAccount.build(
-        newMailAccountAttributes({ networkBucketId: null }),
+        newMailAccountAttributes({
+          addresses: [newMailAddressAttributes({ networkBucketId: null })],
+        }),
       );
       accounts.findByUserId.mockResolvedValue(account);
 
@@ -717,16 +744,76 @@ describe('AccountService', () => {
       expect(bridge.deleteMailBucket).not.toHaveBeenCalled();
     });
 
-    it('when bridge bucket deletion fails, then logs a warning and still deletes the account', async () => {
+    it('when the bucket is already gone, then treats the 404 as released', async () => {
       const account = MailAccount.build(
-        newMailAccountAttributes({ networkBucketId: 'bucket-1' }),
+        newMailAccountAttributes({
+          addresses: [
+            newMailAddressAttributes({ networkBucketId: 'bucket-1' }),
+          ],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+      bridge.deleteMailBucket.mockRejectedValue(
+        new BridgeApiError('gone', 404, 'not found'),
+      );
+
+      await service.deleteAccount(account.userId);
+
+      expect(accounts.delete).toHaveBeenCalledWith(account.id, { force: true });
+    });
+
+    it('when the bridge refuses to release a bucket, then keeps the rows and rethrows', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          addresses: [
+            newMailAddressAttributes({ networkBucketId: 'bucket-1' }),
+          ],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+      bridge.deleteMailBucket.mockRejectedValue(
+        new BridgeApiError('refused', 409, 'shard-backed'),
+      );
+
+      await expect(service.deleteAccount(account.userId)).rejects.toThrow(
+        BridgeApiError,
+      );
+      expect(accounts.delete).not.toHaveBeenCalled();
+    });
+
+    it('when the bridge is down, then keeps the rows and rethrows', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          addresses: [
+            newMailAddressAttributes({ networkBucketId: 'bucket-1' }),
+          ],
+        }),
       );
       accounts.findByUserId.mockResolvedValue(account);
       bridge.deleteMailBucket.mockRejectedValue(new Error('Bridge down'));
 
-      await service.deleteAccount(account.userId);
+      await expect(service.deleteAccount(account.userId)).rejects.toThrow(
+        'Bridge down',
+      );
+      expect(accounts.delete).not.toHaveBeenCalled();
+    });
 
-      expect(accounts.delete).toHaveBeenCalledWith(account.id);
+    it('when a principal cannot be destroyed, then keeps the rows and the buckets', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          addresses: [
+            newMailAddressAttributes({ networkBucketId: 'bucket-1' }),
+          ],
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+      provider.deleteAccount.mockRejectedValue(new Error('Stalwart down'));
+
+      await expect(service.deleteAccount(account.userId)).rejects.toThrow(
+        'Stalwart down',
+      );
+      expect(bridge.deleteMailBucket).not.toHaveBeenCalled();
+      expect(accounts.delete).not.toHaveBeenCalled();
     });
 
     it('when account does not exist, then throws NotFoundException', async () => {
@@ -759,6 +846,22 @@ describe('AccountService', () => {
         addr2.providerExternalId,
       );
       expect(accounts.suspend).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account is being deleted, then throws ConflictException', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Deleting,
+          suspendedAt: new Date(),
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await expect(service.suspendAccount(account.userId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(provider.suspendAccount).not.toHaveBeenCalled();
+      expect(accounts.suspend).not.toHaveBeenCalled();
     });
 
     it('when account is already suspended, then is a no-op', async () => {
@@ -807,6 +910,22 @@ describe('AccountService', () => {
         addr2.providerExternalId,
       );
       expect(accounts.reactivate).toHaveBeenCalledWith(account.id);
+    });
+
+    it('when account is being deleted, then throws ConflictException', async () => {
+      const account = MailAccount.build(
+        newMailAccountAttributes({
+          status: MailAccountState.Deleting,
+          suspendedAt: new Date(),
+        }),
+      );
+      accounts.findByUserId.mockResolvedValue(account);
+
+      await expect(service.reactivateAccount(account.userId)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(provider.reactivateAccount).not.toHaveBeenCalled();
+      expect(accounts.reactivate).not.toHaveBeenCalled();
     });
 
     it('when account is already active, then is a no-op', async () => {

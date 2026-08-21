@@ -6,6 +6,7 @@ import {
 export enum MailAccountState {
   Active = 'active',
   Suspended = 'suspended',
+  Deleting = 'deleting',
 }
 
 export interface MailAccountAttributes {
@@ -44,5 +45,9 @@ export class MailAccount {
 
   get isSuspended(): boolean {
     return this.status === MailAccountState.Suspended;
+  }
+
+  get isBeingDeleted(): boolean {
+    return this.status === MailAccountState.Deleting;
   }
 }

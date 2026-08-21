@@ -151,11 +151,14 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     return get.list[0] ?? null;
   }
 
-  async deleteAccountByEmail(email: string): Promise<void> {
+  async deleteAccountByEmail(email: string): Promise<boolean> {
     const { local, domain } = splitEmail(email);
     const domainId = await this.resolveDomainId(domain);
     if (!domainId) {
-      throw new StalwartApiError(`Account '${email}' not found`, null);
+      throw new StalwartApiError(
+        `Cannot delete account '${email}': domain '${domain}' is not configured in Stalwart`,
+        { domain },
+      );
     }
 
     const response = await this.jmapCall<
@@ -176,7 +179,7 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     ]);
     const query = response.methodResponses[0]![1] as JmapQueryResponse;
     if (query.ids.length === 0) {
-      throw new StalwartApiError(`Account '${email}' not found`, null);
+      return false;
     }
 
     const set = response
@@ -189,6 +192,8 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
         failed,
       );
     }
+
+    return true;
   }
 
   async suspendAccountByEmail(email: string): Promise<void> {
