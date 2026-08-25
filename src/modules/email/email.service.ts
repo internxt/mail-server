@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { AccountService } from '../account/account.service.js';
 import { MailUsageService } from '../usage/mail-usage.service.js';
 import {
+  AttachmentUploadLimitError,
   DraftUpdateConflictError,
   MailProvider,
   SendEmailFailedError,
@@ -469,10 +472,17 @@ export class EmailService {
     return this.mail.markAsFlagged(userEmail, id, flagged);
   }
 
-  uploadAttachment(
+  async uploadAttachment(
     payload: UploadAttachmentPayload,
   ): Promise<UploadAttachmentResponse> {
-    return this.mail.uploadAttachment(payload);
+    try {
+      return await this.mail.uploadAttachment(payload);
+    } catch (error) {
+      if (error instanceof AttachmentUploadLimitError) {
+        throw new HttpException(error.message, HttpStatus.TOO_MANY_REQUESTS);
+      }
+      throw error;
+    }
   }
 
   downloadAttachment(

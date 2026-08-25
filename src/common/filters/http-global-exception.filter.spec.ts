@@ -60,6 +60,34 @@ describe('HttpGlobalExceptionFilter', () => {
     );
   });
 
+  it('when an HttpException carries upstream details, then they are logged alongside the response', () => {
+    const mockException = Object.assign(
+      new HttpException('Attachment upload limit reached', 429),
+      { details: 'Quota exceeded: blob upload quota' },
+    );
+    const mockHost = createMockArgumentsHost('/email/attachment', 'POST');
+
+    filter.catch(mockException, mockHost);
+
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({
+          details: 'Quota exceeded: blob upload quota',
+        }) as unknown,
+      }),
+      'HTTP_EXCEPTION',
+      'HttpGlobalExceptionFilter',
+    );
+    expect(mockHttpAdapter.reply).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        statusCode: 429,
+        message: 'Attachment upload limit reached',
+      },
+      429,
+    );
+  });
+
   describe('Non-HTTP errors', () => {
     it('when unexpected error is thrown, then logs details and returns 500', () => {
       const mockException = new Error('Unexpected error');
@@ -81,6 +109,67 @@ describe('HttpGlobalExceptionFilter', () => {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'Internal Server Error',
           requestId,
+        }),
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    });
+
+    it('when an upstream error carries details, then the upstream body is logged', () => {
+      const upstreamBody = JSON.stringify({
+        status: 403,
+        title: 'Quota exceeded',
+      });
+      const mockException = Object.assign(new Error('Blob upload failed'), {
+        details: upstreamBody,
+      });
+      const mockHost = createMockArgumentsHost('/email/attachment', 'POST');
+
+      filter.catch(mockException, mockHost);
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.objectContaining({
+            details: upstreamBody,
+          }) as unknown,
+        }),
+        'UNEXPECTED_ERROR',
+        'HttpGlobalExceptionFilter',
+      );
+    });
+
+    it('when the upstream details are an object, then they are serialized for the log', () => {
+      const mockException = Object.assign(new Error('JMAP method error'), {
+        details: [['error', { type: 'stateMismatch' }, 'r0']],
+      });
+      const mockHost = createMockArgumentsHost('/email', 'POST');
+
+      filter.catch(mockException, mockHost);
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.objectContaining({
+            details: '[["error",{"type":"stateMismatch"},"r0"]]',
+          }) as unknown,
+        }),
+        'UNEXPECTED_ERROR',
+        'HttpGlobalExceptionFilter',
+      );
+    });
+
+    it('when the upstream details are unserializable, then logging still succeeds', () => {
+      const circular: Record<string, unknown> = {};
+      circular['self'] = circular;
+      const mockException = Object.assign(new Error('JMAP method error'), {
+        details: circular,
+      });
+      const mockHost = createMockArgumentsHost('/email', 'POST');
+
+      filter.catch(mockException, mockHost);
+
+      expect(mockHttpAdapter.reply).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         }),
         HttpStatus.INTERNAL_SERVER_ERROR,
       );

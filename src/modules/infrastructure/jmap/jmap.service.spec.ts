@@ -151,6 +151,31 @@ describe('JMAP service', () => {
       ).rejects.toBeInstanceOf(JmapError);
     });
 
+    it('when the attachment is rejected upstream, then the failure carries the upstream status and body', async () => {
+      const upstreamBody = {
+        type: 'about:blank',
+        status: 403,
+        title: 'Quota exceeded',
+        detail:
+          'You have exceeded the blob upload quota of 1000 files or 50000000 bytes.',
+      };
+      mockRequest.mockResolvedValueOnce(httpResponse(403, upstreamBody));
+
+      await expect(
+        service.uploadAttachment({
+          userEmail,
+          blob: {
+            name: 'hello.pdf',
+            buffer: Buffer.from('x'),
+            mimeType: 'image/png',
+          },
+        }),
+      ).rejects.toMatchObject({
+        statusCode: 403,
+        details: JSON.stringify(upstreamBody),
+      });
+    });
+
     it('when the user does not have a mail account, then the upload fails with an error', async () => {
       // override the session response queued in beforeEach
       mockRequest.mockReset();

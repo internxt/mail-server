@@ -9,6 +9,7 @@ import {
   JmapService,
 } from './jmap.service.js';
 import {
+  AttachmentUploadLimitError,
   DraftUpdateConflictError,
   MissingMessageIdError,
 } from '../../email/mail-provider.port.js';
@@ -1101,15 +1102,17 @@ describe('JmapMailProvider', () => {
   });
 
   describe('Uploading an attachment', () => {
+    const uploadPayload = {
+      userEmail: 'user@test.com',
+      blob: {
+        name: 'image.jpg',
+        buffer: Buffer.from('binary'),
+        mimeType: 'image/jpeg',
+      },
+    };
+
     it('when a user uploads an attachment, then the file is forwarded for storage and the stored details are returned', async () => {
-      const payload = {
-        userEmail: 'user@test.com',
-        blob: {
-          name: 'image.jpg',
-          buffer: Buffer.from('binary'),
-          mimeType: 'image/jpeg',
-        },
-      };
+      const payload = uploadPayload;
       const storedBlob = {
         accountId: 'acc-1',
         blobId: 'blob-1',
@@ -1122,6 +1125,62 @@ describe('JmapMailProvider', () => {
 
       expect(jmapService.uploadAttachment).toHaveBeenCalledWith(payload);
       expect(result).toBe(storedBlob);
+    });
+
+    it('when the account ran out of upload allowance, then the upload fails with the port limit error', async () => {
+      jmapService.uploadAttachment.mockRejectedValue(
+        new JmapError(
+          'Blob upload failed: HTTP 403',
+          JSON.stringify({
+            type: 'about:blank',
+            status: 403,
+            title: 'Quota exceeded',
+            detail:
+              'You have exceeded the blob upload quota of 1000 files or 50000000 bytes.',
+          }),
+          403,
+        ),
+      );
+
+      await expect(provider.uploadAttachment(uploadPayload)).rejects.toThrow(
+        AttachmentUploadLimitError,
+      );
+    });
+
+    it('when the upload quota error is not reported as JSON, then the raw upstream detail is still recognized', async () => {
+      jmapService.uploadAttachment.mockRejectedValue(
+        new JmapError('Blob upload failed: HTTP 403', 'Quota exceeded', 403),
+      );
+
+      await expect(provider.uploadAttachment(uploadPayload)).rejects.toThrow(
+        AttachmentUploadLimitError,
+      );
+    });
+
+    it('when the upload is forbidden for a reason other than quota, then the original error is propagated', async () => {
+      const forbidden = new JmapError(
+        'Blob upload failed: HTTP 403',
+        JSON.stringify({ status: 403, title: 'Forbidden' }),
+        403,
+      );
+      jmapService.uploadAttachment.mockRejectedValue(forbidden);
+
+      await expect(provider.uploadAttachment(uploadPayload)).rejects.toBe(
+        forbidden,
+      );
+    });
+
+    it('when the upload fails upstream, then the original error is propagated', async () => {
+      const failure = new JmapError(
+        'Blob upload failed: HTTP 500',
+        'server boom',
+        500,
+      );
+      jmapService.uploadAttachment.mockRejectedValue(failure);
+
+      await expect(provider.uploadAttachment(uploadPayload)).rejects.toBe(
+        failure,
+      );
     });
   });
 

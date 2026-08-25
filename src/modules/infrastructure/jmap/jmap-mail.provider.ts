@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  AttachmentUploadLimitError,
   DraftUpdateConflictError,
   MailProvider,
   MissingMessageIdError,
@@ -95,6 +96,30 @@ const isStateMismatchError = (err: unknown): boolean =>
       Array.isArray(invocation) &&
       (invocation[1] as { type?: string } | null)?.type === 'stateMismatch',
   );
+
+const HTTP_FORBIDDEN = 403;
+
+const readJmapErrorDetail = (details: unknown): string | null => {
+  if (typeof details !== 'string' || !details) return null;
+
+  try {
+    const body = JSON.parse(details) as { title?: string; detail?: string };
+
+    return [body?.title, body?.detail].filter(Boolean).join(': ') || details;
+  } catch {
+    return details;
+  }
+};
+
+const uploadLimitDetail = (err: unknown): string | null => {
+  if (!(err instanceof JmapError) || err.statusCode !== HTTP_FORBIDDEN) {
+    return null;
+  }
+
+  const detail = readJmapErrorDetail(err.details);
+
+  return detail && /quota/i.test(detail) ? detail : null;
+};
 
 @Injectable()
 export class JmapMailProvider extends MailProvider {
@@ -1013,14 +1038,22 @@ export class JmapMailProvider extends MailProvider {
     userEmail,
     blob,
   }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
-    return this.jmap.uploadAttachment({
-      userEmail,
-      blob: {
-        name: blob.name,
-        buffer: blob.buffer,
-        mimeType: blob.mimeType,
-      },
-    });
+    try {
+      return await this.jmap.uploadAttachment({
+        userEmail,
+        blob: {
+          name: blob.name,
+          buffer: blob.buffer,
+          mimeType: blob.mimeType,
+        },
+      });
+    } catch (error) {
+      const limitDetail = uploadLimitDetail(error);
+
+      if (limitDetail) throw new AttachmentUploadLimitError();
+
+      throw error;
+    }
   }
 
   async downloadAttachment(
