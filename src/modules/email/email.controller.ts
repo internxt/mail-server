@@ -29,6 +29,7 @@ import {
   ApiParam,
   ApiQuery,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { MailAddress } from '../account/decorators/mail-address.decorator.js';
 import { MailAccountGuard } from '../provisioning/provisioning.guard.js';
@@ -346,6 +347,10 @@ export class EmailController {
   @ApiOkResponse({
     type: UploadAttachmentResponseDto,
     description: 'Upload attachment successfully',
+  })
+  @ApiTooManyRequestsResponse({
+    description:
+      'Upload allowance for the account is exhausted, retry in a few minutes',
   })
   async uploadAttachment(
     @UploadedFiles() files: Express.Multer.File[],

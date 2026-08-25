@@ -205,7 +205,11 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     const text = await body.text();
 
     if (statusCode !== 200 && statusCode !== 201) {
-      throw new JmapError(`Blob upload failed: HTTP ${statusCode}`, text);
+      throw new JmapError(
+        `Blob upload failed: HTTP ${statusCode}`,
+        text,
+        statusCode,
+      );
     }
 
     const data = JSON.parse(text) as {
@@ -265,6 +269,7 @@ export class JmapError extends Error {
   constructor(
     message: string,
     public readonly details: unknown,
+    public readonly statusCode?: number,
   ) {
     super(message);
     this.name = 'JmapError';

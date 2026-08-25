@@ -13,11 +13,35 @@ import type { UserPayload } from '../../modules/auth/jwt-payload.dto.js';
 
 type AuthenticatedRequest = Request & { user?: UserPayload };
 
+const MAX_DETAILS_LENGTH = 2000;
+
 interface ErrorLike {
   name: string;
   message: string;
   stack?: string;
+  details?: string;
   original?: { code?: string };
+}
+
+function toDetails(exception: unknown): string | undefined {
+  const details = (exception as Record<string, unknown> | null)?.['details'];
+
+  if (details == null) return undefined;
+
+  const serialized =
+    typeof details === 'string' ? details : safeStringify(details);
+
+  return serialized.length > MAX_DETAILS_LENGTH
+    ? `${serialized.slice(0, MAX_DETAILS_LENGTH)}…`
+    : serialized;
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function toErrorLike(exception: unknown): ErrorLike {
@@ -27,6 +51,7 @@ function toErrorLike(exception: unknown): ErrorLike {
     message:
       typeof e['message'] === 'string' ? e['message'] : String(exception),
     stack: typeof e['stack'] === 'string' ? e['stack'] : undefined,
+    details: toDetails(exception),
     original:
       e['original'] != null && typeof e['original'] === 'object'
         ? {
@@ -68,9 +93,10 @@ export class HttpGlobalExceptionFilter extends BaseExceptionFilter {
         this.logger.error(
           {
             requestId,
+            name: exception.name,
             path: request.url,
             method: request.method,
-            error: { message: res },
+            error: { message: res, details: toDetails(exception) },
           },
           'HTTP_EXCEPTION',
         );
@@ -215,7 +241,7 @@ export class HttpGlobalExceptionFilter extends BaseExceptionFilter {
         method: request.method,
         body: (request.body ?? {}) as unknown,
         user: { email: request.user?.email, uuid: request.user?.uuid },
-        error: { message: err.message, stack: err.stack },
+        error: { message: err.message, stack: err.stack, details: err.details },
       },
       errorCategory,
     );

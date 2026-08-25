@@ -5,6 +5,8 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -12,6 +14,7 @@ import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { Readable } from 'node:stream';
 import { EmailService } from './email.service.js';
 import {
+  AttachmentUploadLimitError,
   DraftUpdateConflictError,
   MailProvider,
   SendEmailFailedError,
@@ -1046,6 +1049,51 @@ describe('EmailService', () => {
         'email-id',
         true,
       );
+    });
+  });
+
+  describe('uploadAttachment', () => {
+    const payload = {
+      userEmail,
+      blob: {
+        name: 'image.jpg',
+        buffer: Buffer.from('binary'),
+        mimeType: 'image/jpeg',
+      },
+    };
+
+    it('when the attachment is stored, then the stored details are returned', async () => {
+      const stored = {
+        blobId: 'blob-1',
+        size: 6,
+        type: 'image/jpeg',
+      };
+      provider.uploadAttachment.mockResolvedValue(stored);
+
+      await expect(service.uploadAttachment(payload)).resolves.toBe(stored);
+
+      expect(provider.uploadAttachment).toHaveBeenCalledWith(payload);
+    });
+
+    it('when the provider upload limit is reached, then the caller is asked to retry later', async () => {
+      provider.uploadAttachment.mockRejectedValue(
+        new AttachmentUploadLimitError(),
+      );
+
+      await expect(service.uploadAttachment(payload)).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+        message: 'Attachment upload limit reached, please try again later',
+      });
+      await expect(service.uploadAttachment(payload)).rejects.toBeInstanceOf(
+        HttpException,
+      );
+    });
+
+    it('when the upload fails for any other reason, then the error is propagated', async () => {
+      const failure = new Error('upstream is down');
+      provider.uploadAttachment.mockRejectedValue(failure);
+
+      await expect(service.uploadAttachment(payload)).rejects.toBe(failure);
     });
   });
 

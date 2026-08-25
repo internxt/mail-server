@@ -40,6 +40,20 @@ export class SendEmailFailedError extends Error {
   }
 }
 
+/**
+ * The provider refused the upload because the account exhausted the upload
+ * allowance of the provider's current time window. The allowance frees itself
+ * when the window rolls over, so the caller may retry later.
+ */
+export class AttachmentUploadLimitError extends Error {
+  constructor() {
+    super('Attachment upload limit reached, please try again later');
+    this.name = 'AttachmentUploadLimitError';
+
+    Object.setPrototypeOf(this, AttachmentUploadLimitError.prototype);
+  }
+}
+
 export class MissingMessageIdError extends UnprocessableEntityException {
   constructor(parentId: string) {
     super(`Original email ${parentId} has no Message-ID; cannot thread reply`);
