@@ -52,6 +52,7 @@ describe('StalwartEventsService', () => {
     test('when an ingest event resolves to a bucket, then tracks the stored message keyed by accountId:documentId', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
         mailAddressId: 'address-1',
+        address: 'alice@internxt.com',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });
@@ -69,6 +70,63 @@ describe('StalwartEventsService', () => {
         size: 240,
       });
     });
+
+    test('when the message arrived over SMTP, then the delivery headers the provider prepends are billed on top of the reported size', async () => {
+      accounts.findBucketContextByProviderInternalId.mockResolvedValue({
+        mailAddressId: 'address-1',
+        address: 'test@inxt.me',
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
+
+      await service.handleBatch({
+        events: [ingestEvent({ size: 240 }, 'message-ingest.ham')],
+      });
+
+      expect(usage.trackStoredMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ size: 240 + 47 }),
+      );
+    });
+
+    test('when the message was classified as spam, then the longer verdict header is billed', async () => {
+      accounts.findBucketContextByProviderInternalId.mockResolvedValue({
+        mailAddressId: 'address-1',
+        address: 'test@inxt.me',
+        userUuid: 'user-1',
+        networkBucketId: 'bucket-1',
+      });
+
+      await service.handleBatch({
+        events: [ingestEvent({ size: 240 }, 'message-ingest.spam')],
+      });
+
+      expect(usage.trackStoredMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ size: 240 + 48 }),
+      );
+    });
+
+    test.each([
+      ['message-ingest.jmap-append' as const],
+      ['message-ingest.imap-append' as const],
+    ])(
+      'when the message was appended by a client (%s), then the reported size is billed unchanged',
+      async (type) => {
+        accounts.findBucketContextByProviderInternalId.mockResolvedValue({
+          mailAddressId: 'address-1',
+          address: 'test@inxt.me',
+          userUuid: 'user-1',
+          networkBucketId: 'bucket-1',
+        });
+
+        await service.handleBatch({
+          events: [ingestEvent({ size: 240 }, type)],
+        });
+
+        expect(usage.trackStoredMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ size: 240 }),
+        );
+      },
+    );
 
     it('when the event type is a duplicate, then it is skipped', async () => {
       await service.handleBatch({
@@ -106,6 +164,7 @@ describe('StalwartEventsService', () => {
     test('when the resolved address has no network bucket, then no message is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
         mailAddressId: 'address-1',
+        address: 'alice@internxt.com',
         userUuid: 'user-1',
         networkBucketId: null,
       });
@@ -118,6 +177,7 @@ describe('StalwartEventsService', () => {
     test('when the batch has several events, then each ingest event is tracked', async () => {
       accounts.findBucketContextByProviderInternalId.mockResolvedValue({
         mailAddressId: 'address-1',
+        address: 'alice@internxt.com',
         userUuid: 'user-1',
         networkBucketId: 'bucket-1',
       });

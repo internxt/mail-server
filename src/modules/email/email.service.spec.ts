@@ -56,6 +56,7 @@ describe('EmailService', () => {
   const userEmail = 'test@example.com';
   const BUCKET_CONTEXT = {
     mailAddressId: 'address-1',
+    address: userEmail,
     userUuid: 'user-1',
     networkBucketId: 'bucket-1',
   };
@@ -898,6 +899,7 @@ describe('EmailService', () => {
       provider.deleteEmail.mockResolvedValue({ deletedEntryKey: '42:7' });
       accountService.findBucketContextByAddress.mockResolvedValue({
         mailAddressId: 'address-1',
+        address: userEmail,
         userUuid: 'user-1',
         networkBucketId: null,
       });
