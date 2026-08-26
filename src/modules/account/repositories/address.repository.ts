@@ -14,6 +14,7 @@ const MAX_BATCH_LOOKUP = 50;
 
 export interface ProviderAccountBucketContext {
   mailAddressId: string;
+  address: string;
   userUuid: string;
   networkBucketId: string | null;
 }
@@ -112,6 +113,7 @@ export class AddressRepository {
 
     return {
       mailAddressId: model.id,
+      address: model.address,
       userUuid: model.account.userId,
       networkBucketId: model.networkBucketId,
     };
@@ -135,6 +137,7 @@ export class AddressRepository {
 
     return {
       mailAddressId: link.address.id,
+      address: link.address.address,
       userUuid: link.address.account.userId,
       networkBucketId: link.address.networkBucketId,
     };
