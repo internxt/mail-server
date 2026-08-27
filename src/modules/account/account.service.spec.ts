@@ -742,10 +742,12 @@ describe('AccountService', () => {
       expect(bridge.deleteMailBucket).toHaveBeenCalledWith(
         account.userId,
         'bucket-1',
+        addr1.id,
       );
       expect(bridge.deleteMailBucket).toHaveBeenCalledWith(
         account.userId,
         'bucket-2',
+        addr2.id,
       );
     });
 
@@ -1233,6 +1235,7 @@ describe('AccountService', () => {
       expect(bridge.deleteMailBucket).toHaveBeenCalledWith(
         account.userId,
         'bucket-1',
+        nonDefaultAddr.id,
       );
     });
 
