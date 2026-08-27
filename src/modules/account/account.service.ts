@@ -297,7 +297,7 @@ export class AccountService {
 
     await Promise.all(
       account.addresses.map((a) =>
-        this.releaseNetworkBucket(driveUserUuid, a.networkBucketId),
+        this.releaseNetworkBucket(driveUserUuid, a.networkBucketId, a.id),
       ),
     );
 
@@ -529,6 +529,7 @@ export class AccountService {
   private async releaseNetworkBucket(
     userUuid: string,
     networkBucketId: string | null,
+    addressId: string,
   ): Promise<void> {
     if (!networkBucketId) return;
 
@@ -536,6 +537,7 @@ export class AccountService {
       const { totalUsedSpaceBytes } = await this.bridge.deleteMailBucket(
         userUuid,
         networkBucketId,
+        addressId,
       );
       this.logger.log(
         `Deleted network bucket '${networkBucketId}' for '${userUuid}', user now at ${totalUsedSpaceBytes} bytes`,
@@ -556,7 +558,11 @@ export class AccountService {
     address: MailAddress,
   ): Promise<void> {
     try {
-      await this.releaseNetworkBucket(userUuid, address.networkBucketId);
+      await this.releaseNetworkBucket(
+        userUuid,
+        address.networkBucketId,
+        address.id,
+      );
     } catch (error) {
       this.logger.warn(
         `Failed to delete network bucket '${address.networkBucketId}' for '${userUuid}': ${(error as Error).message}`,

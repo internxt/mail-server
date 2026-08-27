@@ -82,12 +82,13 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   async deleteMailBucket(
     userUuid: string,
     bucketId: string,
+    addressId: string,
   ): Promise<UserSpaceSnapshot> {
     const token = this.signGatewayToken(userUuid);
 
     const { statusCode, body } = await this.httpClient.request({
       method: 'DELETE',
-      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}`,
+      path: `${this.basePath}/v2/gateway/users/${encodeURIComponent(userUuid)}/buckets/${encodeURIComponent(bucketId)}?name=${encodeURIComponent(addressId)}`,
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,

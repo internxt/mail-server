@@ -147,7 +147,11 @@ describe('BridgeClient', () => {
         body: { text: () => Promise.resolve(JSON.stringify(snapshot)) },
       });
 
-      const result = await service.deleteMailBucket('user-1', 'bucket-1');
+      const result = await service.deleteMailBucket(
+        'user-1',
+        'bucket-1',
+        'address-1',
+      );
 
       expect(result).toEqual(snapshot);
 
@@ -163,7 +167,7 @@ describe('BridgeClient', () => {
       expect(httpRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'DELETE',
-          path: '/v2/gateway/users/user-1/buckets/bucket-1',
+          path: '/v2/gateway/users/user-1/buckets/bucket-1?name=address-1',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
           }) as unknown,
@@ -179,7 +183,7 @@ describe('BridgeClient', () => {
       });
 
       const error: unknown = await service
-        .deleteMailBucket('user-1', 'bucket-1')
+        .deleteMailBucket('user-1', 'bucket-1', 'address-1')
         .catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(BridgeApiError);
