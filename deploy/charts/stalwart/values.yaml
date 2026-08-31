@@ -22,6 +22,10 @@ ingress:
   clusterIssuer: letsencrypt-prod
   host: mail.inxt.me
   tlsSecretName: stalwart-tls
+  mtaStsHosts:
+    - mta-sts.inxt.me
+    - mta-sts.encrypt.eu
+    - mta-sts.inxt.eu
 
 mailService:
   type: NodePort
