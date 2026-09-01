@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport } from 'nodemailer';
 import type { EmailAddress } from '../../email/email.types.js';
+import { SendRateLimitedError } from '../../email/mail-provider.port.js';
 import Mail from 'nodemailer/lib/mailer/index.js';
 
 export interface SmtpAttachment {
@@ -69,10 +70,49 @@ export class StalwartSmtpService {
       });
       this.logger.debug(`SMTP sent for ${payload.userEmail}: ${messageId}`);
       return { messageId };
+    } catch (error) {
+      const limitDetail = rateLimitDetail(error);
+
+      if (limitDetail) {
+        this.logger.warn(
+          `SMTP rate limit hit for ${payload.userEmail}: ${limitDetail}`,
+        );
+        throw new SendRateLimitedError(limitDetail);
+      }
+
+      throw error;
     } finally {
       transporter.close();
     }
   }
+}
+
+/**
+ * Stalwart answers a throttled send with a transient reply carrying the 4.4.5
+ * enhanced status code, e.g. `452 4.4.5 Rate limit exceeded, try again later.`
+ * When every recipient is rejected nodemailer folds those replies into the
+ * thrown error's message and into a per-recipient `rejectedErrors` list.
+ */
+const RATE_LIMIT_REPLY = /rate limit|\b4\.4\.5\b/i;
+
+interface SmtpReplyError {
+  response?: string;
+  message?: string;
+  rejectedErrors?: SmtpReplyError[];
+}
+
+function rateLimitDetail(error: unknown): string | null {
+  if (error === null || typeof error !== 'object') return null;
+
+  const err = error as SmtpReplyError;
+
+  for (const reply of [err, ...(err.rejectedErrors ?? [])]) {
+    const text = reply.response ?? reply.message;
+
+    if (typeof text === 'string' && RATE_LIMIT_REPLY.test(text)) return text;
+  }
+
+  return null;
 }
 
 function formatAddresses(addresses: EmailAddress[]): (string | Mail.Address)[] {
