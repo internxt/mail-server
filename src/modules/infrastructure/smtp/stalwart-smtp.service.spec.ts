@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { createMock } from '@golevelup/ts-vitest';
 import { StalwartSmtpService } from './stalwart-smtp.service.js';
+import { SendRateLimitedError } from '../../email/mail-provider.port.js';
 
 const mockSendMail = vi.fn();
 const mockClose = vi.fn();
@@ -147,6 +148,59 @@ describe('StalwartSmtpService', () => {
           subject: 'Hello',
         }),
       ).rejects.toThrow('Connection refused');
+    });
+
+    it('When the server throttles the send, then a rate limit error is raised so the caller can ask the user to retry later', async () => {
+      mockSendMail.mockRejectedValue(
+        Object.assign(
+          new Error(
+            "Can't send mail - all recipients were rejected: 452 4.4.5 Rate limit exceeded, try again later.",
+          ),
+          { responseCode: 452 },
+        ),
+      );
+
+      await expect(
+        service.sendRaw({
+          userEmail: 'alice@inxt.me',
+          to: [{ email: 'bob@external.com' }],
+          subject: 'Hello',
+        }),
+      ).rejects.toBeInstanceOf(SendRateLimitedError);
+    });
+
+    it('When only some recipients are throttled, then the per-recipient rejection is still recognized as a rate limit', async () => {
+      mockSendMail.mockRejectedValue(
+        Object.assign(new Error('Message failed'), {
+          rejectedErrors: [
+            { response: '452 4.4.5 Rate limit exceeded, try again later.' },
+          ],
+        }),
+      );
+
+      await expect(
+        service.sendRaw({
+          userEmail: 'alice@inxt.me',
+          to: [{ email: 'bob@external.com' }],
+          subject: 'Hello',
+        }),
+      ).rejects.toBeInstanceOf(SendRateLimitedError);
+    });
+
+    it('When the server rejects the message for an unrelated reason, then it is not mistaken for a rate limit', async () => {
+      mockSendMail.mockRejectedValue(
+        Object.assign(new Error('550 5.1.1 Unknown recipient'), {
+          responseCode: 550,
+        }),
+      );
+
+      await expect(
+        service.sendRaw({
+          userEmail: 'alice@inxt.me',
+          to: [{ email: 'bob@external.com' }],
+          subject: 'Hello',
+        }),
+      ).rejects.not.toBeInstanceOf(SendRateLimitedError);
     });
 
     it('When sending fails, then the connection is always closed to avoid leaks', async () => {

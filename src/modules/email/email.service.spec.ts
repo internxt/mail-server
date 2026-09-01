@@ -18,6 +18,7 @@ import {
   DraftUpdateConflictError,
   MailProvider,
   SendEmailFailedError,
+  SendRateLimitedError,
 } from './mail-provider.port.js';
 import { AccountService } from '../account/account.service.js';
 import { MailUsageService } from '../usage/mail-usage.service.js';
@@ -589,6 +590,27 @@ describe('EmailService', () => {
       );
       expect(provider.saveToSent).toHaveBeenCalled();
       expect(result).toEqual({ id: 'msg-1' });
+    });
+
+    it('when the SMTP server throttles the send, then the client gets a retryable too-many-requests response and no copy is stored in Sent', async () => {
+      const dto = newSendEmailDto({
+        attachments: undefined,
+        encryption: undefined,
+        textBody: 'hello',
+      });
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      smtp.sendRaw.mockRejectedValue(
+        new SendRateLimitedError('452 4.4.5 Rate limit exceeded'),
+      );
+
+      await expect(
+        service.sendExternalEmail(userEmail, dto),
+      ).rejects.toMatchObject({
+        status: HttpStatus.TOO_MANY_REQUESTS,
+      });
+      expect(provider.saveToSent).not.toHaveBeenCalled();
     });
 
     it('when sending an external email with encrypted attachments but no key for the server to decrypt them, then the email is rejected', async () => {

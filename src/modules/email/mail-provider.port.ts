@@ -54,6 +54,20 @@ export class AttachmentUploadLimitError extends Error {
   }
 }
 
+/**
+ * The provider throttled the send because the account exhausted the sending
+ * allowance of the provider's current time window. The allowance frees itself
+ * when the window rolls over, so the caller may retry later.
+ */
+export class SendRateLimitedError extends Error {
+  constructor(public readonly detail: string) {
+    super('Sending rate limit reached, please try again later');
+    this.name = 'SendRateLimitedError';
+
+    Object.setPrototypeOf(this, SendRateLimitedError.prototype);
+  }
+}
+
 export class MissingMessageIdError extends UnprocessableEntityException {
   constructor(parentId: string) {
     super(`Original email ${parentId} has no Message-ID; cannot thread reply`);

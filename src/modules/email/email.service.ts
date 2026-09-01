@@ -16,6 +16,7 @@ import {
   DraftUpdateConflictError,
   MailProvider,
   SendEmailFailedError,
+  SendRateLimitedError,
 } from './mail-provider.port.js';
 import { deriveReplyRecipients, ensureRePrefix } from './threading.js';
 import type {
@@ -51,6 +52,7 @@ import {
 } from '../infrastructure/jmap/jmap.types.js';
 import {
   StalwartSmtpService,
+  type SendRawPayload,
   type SmtpAttachment,
 } from '../infrastructure/smtp/stalwart-smtp.service.js';
 import {
@@ -282,7 +284,7 @@ export class EmailService {
       ? convert(htmlBody, { wordwrap: false })
       : dto.textBody;
 
-    const { messageId } = await this.smtp.sendRaw({
+    const { messageId } = await this.sendThroughSmtp({
       userEmail,
       to: dto.to,
       cc: dto.cc,
@@ -309,6 +311,23 @@ export class EmailService {
     await this.releaseQuotaEntry(userEmail, deletedEntryKey);
 
     return { id: messageId };
+  }
+
+  /**
+   * The draft is left untouched when the send is throttled so the user can
+   * retry once the provider's rate limit window rolls over.
+   */
+  private async sendThroughSmtp(
+    payload: SendRawPayload,
+  ): Promise<{ messageId: string }> {
+    try {
+      return await this.smtp.sendRaw(payload);
+    } catch (error) {
+      if (error instanceof SendRateLimitedError) {
+        throw new HttpException(error.message, HttpStatus.TOO_MANY_REQUESTS);
+      }
+      throw error;
+    }
   }
 
   private async resolveThreading(
