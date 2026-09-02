@@ -26,14 +26,17 @@ ingress:
     - mta-sts.inxt.me
     - mta-sts.encrypt.eu
     - mta-sts.inxt.eu
+  restricted:
+    enabled: true
+    paths:
+      - /
+    allowedCidrs:
+      - 127.0.0.1/32
 
 mailService:
   type: NodePort
   externalTrafficPolicy: Local
   ports:
-    management:
-      port: 8080
-      nodePort: 30742
     smtp:
       port: 25
       nodePort: 32443

@@ -33,7 +33,7 @@ spec:
             - "/etc/stalwart/config.json"
           ports:
             - name: management
-              containerPort: {{ .Values.mailService.ports.management.port }}
+              containerPort: {{ .Values.service.port }}
             - name: https
               containerPort: 443
             - name: smtp
