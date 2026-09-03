@@ -2,5 +2,5 @@ apiVersion: v2
 name: stalwart
 description: Stalwart mail server (v0.16+) — SMTP/IMAP/JMAP
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: 'v0.16'
