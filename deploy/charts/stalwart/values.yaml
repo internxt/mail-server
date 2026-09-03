@@ -32,6 +32,7 @@ ingress:
       - /
     allowedCidrs:
       - 127.0.0.1/32
+      - 213.32.69.40/32
 
 mailService:
   type: NodePort
