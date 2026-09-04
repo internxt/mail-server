@@ -13,6 +13,8 @@ import type {
   UserSpaceSnapshot,
 } from './bridge.types.js';
 
+const INTERNXT_CLIENT = 'mail-server';
+
 @Injectable()
 export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BridgeClient.name);
@@ -62,6 +64,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
         'content-type': 'application/json',
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
       body: JSON.stringify({ name }),
     });
@@ -88,6 +91,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -116,6 +120,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
         'content-type': 'application/json',
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
       body: JSON.stringify({ size }),
     });
@@ -146,6 +151,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -171,6 +177,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -185,6 +192,10 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
     }
 
     return JSON.parse(text) as UserSpaceSnapshot;
+  }
+
+  private clientHeader(): Record<string, string> {
+    return { 'internxt-client': INTERNXT_CLIENT };
   }
 
   private signGatewayToken(userUuid: string): string {

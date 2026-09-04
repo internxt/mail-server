@@ -9,6 +9,8 @@ import { JwtService } from '@nestjs/jwt';
 import { Client } from 'undici';
 import type { Tier } from './payments.types.js';
 
+const INTERNXT_CLIENT = 'mail-server';
+
 @Injectable()
 export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentsService.name);
@@ -56,6 +58,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         'content-type': 'application/json',
         accept: 'application/json',
         authorization: `Bearer ${jwt}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -70,6 +73,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     return JSON.parse(text) as Tier;
+  }
+
+  private clientHeader(): Record<string, string> {
+    return { 'internxt-client': INTERNXT_CLIENT };
   }
 }
 

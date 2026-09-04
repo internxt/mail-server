@@ -60,6 +60,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/usage',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'mail-server',
           }) as unknown,
         }),
       );
@@ -113,6 +114,7 @@ describe('BridgeClient', () => {
           body: JSON.stringify({ name: 'account-1' }),
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'mail-server',
           }) as unknown,
         }),
       );
@@ -163,6 +165,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/buckets/bucket-1',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'mail-server',
           }) as unknown,
         }),
       );
@@ -211,6 +214,7 @@ describe('BridgeClient', () => {
           body: JSON.stringify({ size: 240 }),
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'mail-server',
           }) as unknown,
         }),
       );
@@ -258,6 +262,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/buckets/bucket-1/entries/entry-1',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'mail-server',
           }) as unknown,
         }),
       );
@@ -301,6 +306,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/usage',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'mail-server',
           }) as unknown,
         }),
       );
