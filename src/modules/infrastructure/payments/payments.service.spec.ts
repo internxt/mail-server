@@ -65,6 +65,7 @@ describe('PaymentsService', () => {
           path: '/products/tier',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'mail-server',
           }) as unknown,
         }),
       );
