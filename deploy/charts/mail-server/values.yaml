@@ -21,6 +21,8 @@ resources:
 
 nodeEnv: production
 
+internxtClient: client
+
 paymentsApiUrl: 'https://gateway.internxt.com/payments'
 
 bridgeApiUrl: https://gateway.internxt.com/network

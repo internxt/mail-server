@@ -20,6 +20,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
   private readonly origin: string;
   private readonly basePath: string;
   private readonly signingKey: string;
+  private readonly internxtClient: string;
   private readonly isProduction: boolean;
   private httpClient!: Client;
 
@@ -32,6 +33,9 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       this.configService.getOrThrow<string>('secrets.bridgePrivateGateway'),
       'base64',
     ).toString('utf8');
+    this.internxtClient = this.configService.getOrThrow<string>(
+      'apis.internxtClient',
+    );
     this.isProduction = this.configService.getOrThrow<boolean>('isProduction');
     const parsed = new URL(this.baseUrl);
     this.origin = parsed.origin;
@@ -62,6 +66,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
         'content-type': 'application/json',
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
       body: JSON.stringify({ name }),
     });
@@ -88,6 +93,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -116,6 +122,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
         'content-type': 'application/json',
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
       body: JSON.stringify({ size }),
     });
@@ -146,6 +153,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -171,6 +179,7 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
       headers: {
         accept: 'application/json',
         authorization: `Bearer ${token}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -185,6 +194,10 @@ export class BridgeClient implements OnModuleInit, OnModuleDestroy {
     }
 
     return JSON.parse(text) as UserSpaceSnapshot;
+  }
+
+  private clientHeader(): Record<string, string> {
+    return { 'internxt-client': this.internxtClient };
   }
 
   private signGatewayToken(userUuid: string): string {
