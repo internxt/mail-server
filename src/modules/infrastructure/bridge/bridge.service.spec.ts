@@ -16,6 +16,7 @@ describe('BridgeClient', () => {
     const configService = createMock<ConfigService>();
     configService.getOrThrow.mockImplementation((key: string) => {
       if (key === 'apis.bridge.url') return 'http://bridge.test';
+      if (key === 'apis.internxtClient') return 'client';
       if (key === 'secrets.bridgePrivateGateway')
         return Buffer.from('test-key').toString('base64');
       if (key === 'isProduction') return false;
@@ -60,6 +61,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/usage',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'client',
           }) as unknown,
         }),
       );
@@ -113,6 +115,7 @@ describe('BridgeClient', () => {
           body: JSON.stringify({ name: 'account-1' }),
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'client',
           }) as unknown,
         }),
       );
@@ -163,6 +166,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/buckets/bucket-1',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'client',
           }) as unknown,
         }),
       );
@@ -211,6 +215,7 @@ describe('BridgeClient', () => {
           body: JSON.stringify({ size: 240 }),
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'client',
           }) as unknown,
         }),
       );
@@ -258,6 +263,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/buckets/bucket-1/entries/entry-1',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'client',
           }) as unknown,
         }),
       );
@@ -301,6 +307,7 @@ describe('BridgeClient', () => {
           path: '/v2/gateway/users/user-1/usage',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'client',
           }) as unknown,
         }),
       );

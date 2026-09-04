@@ -16,6 +16,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   private readonly origin: string;
   private readonly basePath: string;
   private readonly jwtSecret: string;
+  private readonly internxtClient: string;
   private httpClient!: Client;
 
   constructor(
@@ -24,6 +25,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   ) {
     this.baseUrl = this.configService.getOrThrow<string>('apis.payments.url');
     this.jwtSecret = this.configService.getOrThrow<string>('secrets.jwt');
+    this.internxtClient = this.configService.getOrThrow<string>(
+      'apis.internxtClient',
+    );
     const parsed = new URL(this.baseUrl);
     this.origin = parsed.origin;
     this.basePath =
@@ -56,6 +60,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         'content-type': 'application/json',
         accept: 'application/json',
         authorization: `Bearer ${jwt}`,
+        ...this.clientHeader(),
       },
     });
 
@@ -70,6 +75,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
 
     return JSON.parse(text) as Tier;
+  }
+
+  private clientHeader(): Record<string, string> {
+    return { 'internxt-client': this.internxtClient };
   }
 }
 

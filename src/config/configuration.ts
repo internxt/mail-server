@@ -41,6 +41,7 @@ export default () => ({
   },
 
   apis: {
+    internxtClient: process.env.INTERNXT_CLIENT,
     payments: {
       url: process.env.PAYMENTS_API_URL ?? '',
     },

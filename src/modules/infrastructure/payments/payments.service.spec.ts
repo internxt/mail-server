@@ -16,6 +16,7 @@ describe('PaymentsService', () => {
     const configService = createMock<ConfigService>();
     configService.getOrThrow.mockImplementation((key: string) => {
       if (key === 'apis.payments.url') return 'http://payments.test';
+      if (key === 'apis.internxtClient') return 'client';
       if (key === 'secrets.jwt') return 'test-secret';
       throw new Error(`unknown key: ${key}`);
     });
@@ -65,6 +66,7 @@ describe('PaymentsService', () => {
           path: '/products/tier',
           headers: expect.objectContaining({
             authorization: 'Bearer signed-jwt',
+            'internxt-client': 'client',
           }) as unknown,
         }),
       );

@@ -49,6 +49,8 @@ spec:
               value: {{ .Values.stalwart.smtpHost | quote }}
             - name: STALWART_SMTP_PORT
               value: {{ .Values.stalwart.smtpPort | quote }}
+            - name: INTERNXT_CLIENT
+              value: {{ .Values.internxtClient | quote }}
             - name: PAYMENTS_API_URL
               value: {{ .Values.paymentsApiUrl | quote }}
             - name: BRIDGE_API_URL
