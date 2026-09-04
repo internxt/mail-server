@@ -54,10 +54,6 @@ export class AccountRepository {
     await this.accountModel.destroy({ where: { id }, force: options?.force });
   }
 
-  async setNetworkBucketId(id: string, networkBucketId: string): Promise<void> {
-    await this.accountModel.update({ networkBucketId }, { where: { id } });
-  }
-
   async suspend(id: string): Promise<void> {
     await this.accountModel.update(
       { status: MailAccountState.Suspended, suspendedAt: new Date() },
@@ -149,7 +145,6 @@ export class AccountRepository {
       userId: model.userId,
       status: model.status as MailAccountState,
       suspendedAt: model.suspendedAt,
-      networkBucketId: model.networkBucketId,
       createdAt: model.createdAt as Date,
       updatedAt: model.updatedAt as Date,
       addresses: (model.addresses ?? []).map(toAddressAttributes),
