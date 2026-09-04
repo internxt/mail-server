@@ -139,14 +139,17 @@ describe('BridgeClient', () => {
   });
 
   describe('deleteMailBucket', () => {
-    it('when Bridge returns 204, then signs a gateway token and DELETEs the bucket', async () => {
+    it('when Bridge returns 200, then signs a gateway token, DELETEs the bucket and returns the snapshot', async () => {
+      const snapshot = { maxSpaceBytes: 1000, totalUsedSpaceBytes: 240 };
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
-        statusCode: 204,
-        body: { text: () => Promise.resolve('') },
+        statusCode: 200,
+        body: { text: () => Promise.resolve(JSON.stringify(snapshot)) },
       });
 
-      await service.deleteMailBucket('user-1', 'bucket-1');
+      const result = await service.deleteMailBucket('user-1', 'bucket-1');
+
+      expect(result).toEqual(snapshot);
 
       expect(jwtService.sign).toHaveBeenCalledWith(
         { payload: { uuid: 'user-1' } },
@@ -168,7 +171,7 @@ describe('BridgeClient', () => {
       );
     });
 
-    it('when Bridge returns a non-204 status, then throws BridgeApiError with statusCode and details', async () => {
+    it('when Bridge returns a non-200 status, then throws BridgeApiError with statusCode and details', async () => {
       jwtService.sign.mockReturnValue('signed-jwt');
       httpRequest.mockResolvedValue({
         statusCode: 404,

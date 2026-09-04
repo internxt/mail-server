@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  BridgeApiError,
   BridgeClient,
+  isBridgeNotFound,
 } from '../infrastructure/bridge/bridge.service.js';
 import {
   DuplicateEntryKeyError,
@@ -103,7 +103,7 @@ export class MailUsageService {
         existing.bridgeEntryId,
       );
     } catch (error) {
-      if (!(error instanceof BridgeApiError && error.statusCode === 404)) {
+      if (!isBridgeNotFound(error)) {
         throw error;
       }
       this.logger.debug(

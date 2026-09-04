@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
+import { QueryTypes } from 'sequelize';
+import { Sequelize } from 'sequelize-typescript';
 import {
   MailAccount,
   MailAccountState,
@@ -9,11 +11,17 @@ import { MailAddressModel } from '../models/mail-address.model.js';
 import { MailProviderAccountModel } from '../models/mail-provider-account.model.js';
 import { toAddressAttributes } from './address.repository.js';
 
+export interface ClaimedAccount {
+  id: string;
+  userId: string;
+}
+
 @Injectable()
 export class AccountRepository {
   constructor(
     @InjectModel(MailAccountModel)
     private readonly accountModel: typeof MailAccountModel,
+    private readonly sequelize: Sequelize,
   ) {}
 
   async findByUserId(userId: string): Promise<MailAccount | null> {
@@ -62,6 +70,77 @@ export class AccountRepository {
       { status: MailAccountState.Active, suspendedAt: null },
       { where: { id } },
     );
+  }
+
+  async claimExpiredSuspended(params: {
+    suspendedBefore: Date;
+    limit: number;
+  }): Promise<ClaimedAccount[]> {
+    return this.runClaim(
+      `UPDATE mail_accounts
+          SET status = :deleting, updated_at = NOW()
+        WHERE id IN (
+          SELECT id
+            FROM mail_accounts
+           WHERE deleted_at IS NULL
+             AND status = :suspended
+             AND suspended_at IS NOT NULL
+             AND suspended_at < :threshold
+           ORDER BY suspended_at
+           LIMIT :limit
+           FOR UPDATE SKIP LOCKED
+        )
+       RETURNING id, user_id AS "userId"`,
+      params.limit,
+      {
+        suspended: MailAccountState.Suspended,
+        threshold: params.suspendedBefore,
+      },
+    );
+  }
+
+  /**
+   * Re-claims accounts left mid-purge by a run that died, so the next one
+   * finishes them instead of leaving them stuck in 'deleting' forever.
+   */
+  async claimStalledDeletions(params: {
+    updatedBefore: Date;
+    limit: number;
+  }): Promise<ClaimedAccount[]> {
+    return this.runClaim(
+      `UPDATE mail_accounts
+          SET status = :deleting, updated_at = NOW()
+        WHERE id IN (
+          SELECT id
+            FROM mail_accounts
+           WHERE deleted_at IS NULL
+             AND status = :deleting
+             AND updated_at < :threshold
+           ORDER BY updated_at
+           LIMIT :limit
+           FOR UPDATE SKIP LOCKED
+        )
+       RETURNING id, user_id AS "userId"`,
+      params.limit,
+      { threshold: params.updatedBefore },
+    );
+  }
+
+  private async runClaim(
+    sql: string,
+    limit: number,
+    replacements: Record<string, string | Date>,
+  ): Promise<ClaimedAccount[]> {
+    if (limit <= 0) return [];
+
+    return this.sequelize.query<ClaimedAccount>(sql, {
+      replacements: {
+        deleting: MailAccountState.Deleting,
+        limit,
+        ...replacements,
+      },
+      type: QueryTypes.SELECT,
+    });
   }
 
   private toDomain(model: MailAccountModel): MailAccount {

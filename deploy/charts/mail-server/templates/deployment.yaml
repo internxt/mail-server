@@ -57,6 +57,8 @@ spec:
               value: {{ .Values.mta.hooksUsername | quote }}
             - name: STALWART_WEBHOOK_USERNAME
               value: {{ .Values.webhook.username | quote }}
+            - name: EXECUTE_JOBS
+              value: {{ .Values.executeCronjobs | quote }}
 
           envFrom:
             - secretRef:

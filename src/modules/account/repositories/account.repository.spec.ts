@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/sequelize';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
+import { QueryTypes } from 'sequelize';
+import { Sequelize } from 'sequelize-typescript';
 import { AccountRepository } from './account.repository.js';
 import { MailAccountModel } from '../models/mail-account.model.js';
 import { MailAddressModel } from '../models/mail-address.model.js';
@@ -11,6 +13,7 @@ import { MailAccountState } from '../domain/mail-account.domain.js';
 describe('AccountRepository', () => {
   let repository: AccountRepository;
   let accountModel: DeepMocked<typeof MailAccountModel>;
+  let sequelize: DeepMocked<Sequelize>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -26,6 +29,7 @@ describe('AccountRepository', () => {
 
     repository = module.get(AccountRepository);
     accountModel = module.get(getModelToken(MailAccountModel));
+    sequelize = module.get(Sequelize);
   });
 
   const buildModel = (overrides: Partial<MailAccountModel> = {}) =>
@@ -165,6 +169,105 @@ describe('AccountRepository', () => {
         { status: MailAccountState.Active, suspendedAt: null },
         { where: { id: 'acc-1' } },
       );
+    });
+  });
+
+  describe('claimExpiredSuspended', () => {
+    const threshold = new Date('2026-08-01T00:00:00.000Z');
+
+    it('when accounts are past retention, then claims them and returns them', async () => {
+      sequelize.query.mockResolvedValue([
+        { id: 'acc-1', userId: 'user-1' },
+      ] as never);
+
+      const claimed = await repository.claimExpiredSuspended({
+        suspendedBefore: threshold,
+        limit: 10,
+      });
+
+      expect(claimed).toEqual([{ id: 'acc-1', userId: 'user-1' }]);
+    });
+
+    it('when claiming, then moves suspended rows into deleting in one statement', async () => {
+      sequelize.query.mockResolvedValue([] as never);
+
+      await repository.claimExpiredSuspended({
+        suspendedBefore: threshold,
+        limit: 10,
+      });
+
+      expect(sequelize.query).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE mail_accounts'),
+        {
+          replacements: {
+            deleting: MailAccountState.Deleting,
+            suspended: MailAccountState.Suspended,
+            threshold,
+            limit: 10,
+          },
+          type: QueryTypes.SELECT,
+        },
+      );
+    });
+
+    it('when claiming, then the statement leases only rows nobody else holds', async () => {
+      sequelize.query.mockResolvedValue([] as never);
+
+      await repository.claimExpiredSuspended({
+        suspendedBefore: threshold,
+        limit: 10,
+      });
+
+      const clauses = [
+        'deleted_at IS NULL',
+        'status = :suspended',
+        'suspended_at < :threshold',
+        'FOR UPDATE SKIP LOCKED',
+        'RETURNING id, user_id AS "userId"',
+      ];
+      for (const clause of clauses) {
+        expect(sequelize.query).toHaveBeenCalledWith(
+          expect.stringContaining(clause),
+          expect.anything(),
+        );
+      }
+    });
+
+    it('when the batch has no room left, then does not touch the database', async () => {
+      const claimed = await repository.claimExpiredSuspended({
+        suspendedBefore: threshold,
+        limit: 0,
+      });
+
+      expect(claimed).toEqual([]);
+      expect(sequelize.query).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('claimStalledDeletions', () => {
+    it('when a claim has gone stale, then takes it back for another run', async () => {
+      const threshold = new Date('2026-08-21T12:00:00.000Z');
+      sequelize.query.mockResolvedValue([
+        { id: 'acc-1', userId: 'user-1' },
+      ] as never);
+
+      const claimed = await repository.claimStalledDeletions({
+        updatedBefore: threshold,
+        limit: 5,
+      });
+
+      expect(sequelize.query).toHaveBeenCalledWith(
+        expect.stringContaining('updated_at < :threshold'),
+        {
+          replacements: {
+            deleting: MailAccountState.Deleting,
+            threshold,
+            limit: 5,
+          },
+          type: QueryTypes.SELECT,
+        },
+      );
+      expect(claimed).toEqual([{ id: 'acc-1', userId: 'user-1' }]);
     });
   });
 });
