@@ -231,12 +231,12 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     ]);
     const set = firstResponse(response);
 
-    this.logger.debug(`[DEBUG] x:Account/set response: ${JSON.stringify(set)}`);
-
     const failed = set.notUpdated?.[account.id];
     if (failed) {
       throw new StalwartApiError(
-        `Failed to ${suspended ? 'suspend' : 'reactivate'} account '${email}': ${failed.type} ${failed.description}`,
+        `Failed to ${suspended ? 'suspend' : 'reactivate'} account ${
+          account.id
+        }: ${failed.type} ${failed.description}`,
         failed,
       );
     }

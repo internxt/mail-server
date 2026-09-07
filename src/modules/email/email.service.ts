@@ -61,6 +61,7 @@ import {
   type DecryptedEnvelope,
 } from './server-crypto.js';
 import type { Readable } from 'node:stream';
+import { scrubPii } from '../../common/logging/pii.js';
 
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -461,7 +462,7 @@ export class EmailService {
 
       if (!context?.networkBucketId) {
         this.logger.warn(
-          { userEmail, entryKey },
+          { userUuid: context?.userUuid, entryKey },
           'Destroyed message has no network bucket; skipping quota release',
         );
         return;
@@ -474,7 +475,9 @@ export class EmailService {
       });
     } catch (error) {
       this.logger.warn(
-        `Failed to release quota entry '${entryKey}' for '${userEmail}': ${(error as Error).message}`,
+        `Failed to release quota entry '${entryKey}': ${scrubPii(
+          (error as Error).message,
+        )}`,
       );
     }
   }

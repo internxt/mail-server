@@ -10,6 +10,7 @@ import { errors as undiciErrors } from 'undici';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { Request, Response } from 'express';
 import type { UserPayload } from '../../modules/auth/jwt-payload.dto.js';
+import { sanitizePath, scrubPii } from '../logging/pii.js';
 
 type AuthenticatedRequest = Request & { user?: UserPayload };
 
@@ -28,8 +29,9 @@ function toDetails(exception: unknown): string | undefined {
 
   if (details == null) return undefined;
 
-  const serialized =
-    typeof details === 'string' ? details : safeStringify(details);
+  const serialized = scrubPii(
+    typeof details === 'string' ? details : safeStringify(details),
+  );
 
   return serialized.length > MAX_DETAILS_LENGTH
     ? `${serialized.slice(0, MAX_DETAILS_LENGTH)}…`
@@ -44,13 +46,20 @@ function safeStringify(value: unknown): string {
   }
 }
 
+function describeBody(body: unknown): string[] {
+  return body != null && typeof body === 'object' && !Array.isArray(body)
+    ? Object.keys(body)
+    : [];
+}
+
 function toErrorLike(exception: unknown): ErrorLike {
   const e = exception as Record<string, unknown>;
   return {
     name: typeof e['name'] === 'string' ? e['name'] : 'UnknownError',
-    message:
+    message: scrubPii(
       typeof e['message'] === 'string' ? e['message'] : String(exception),
-    stack: typeof e['stack'] === 'string' ? e['stack'] : undefined,
+    ),
+    stack: scrubPii(typeof e['stack'] === 'string' ? e['stack'] : undefined),
     details: toDetails(exception),
     original:
       e['original'] != null && typeof e['original'] === 'object'
@@ -94,9 +103,13 @@ export class HttpGlobalExceptionFilter extends BaseExceptionFilter {
           {
             requestId,
             name: exception.name,
-            path: request.url,
+            path: sanitizePath(request.url),
             method: request.method,
-            error: { message: res, details: toDetails(exception) },
+            user: { uuid: request.user?.uuid },
+            error: {
+              message: scrubPii(safeStringify(res)),
+              details: toDetails(exception),
+            },
           },
           'HTTP_EXCEPTION',
         );
@@ -110,7 +123,7 @@ export class HttpGlobalExceptionFilter extends BaseExceptionFilter {
         this.logger.warn(
           {
             requestId,
-            path: request.url,
+            path: sanitizePath(request.url),
             method: request.method,
             errorType: 'QUERY_TIMEOUT',
             user: { uuid: request.user?.uuid },
@@ -162,9 +175,9 @@ export class HttpGlobalExceptionFilter extends BaseExceptionFilter {
       this.logger.error(
         {
           requestId,
-          user: { email: request.user?.email, uuid: request.user?.uuid },
+          user: { uuid: request.user?.uuid },
           method: request.method,
-          path: request.url,
+          path: sanitizePath(request.url),
           error: { message: e.message, stack: e.stack },
         },
         'Unexpected error in HttpGlobalExceptionFilter',
@@ -205,7 +218,7 @@ export class HttpGlobalExceptionFilter extends BaseExceptionFilter {
       {
         requestId,
         name: err.name,
-        path: request.url,
+        path: sanitizePath(request.url),
         errorType: 'DATABASE_CONNECTION_ERROR',
         method: request.method,
         user: { uuid: request.user?.uuid },
@@ -236,11 +249,11 @@ export class HttpGlobalExceptionFilter extends BaseExceptionFilter {
       {
         requestId,
         name: err.name,
-        path: request.url,
+        path: sanitizePath(request.url),
         errorType: errorCategory,
         method: request.method,
-        body: (request.body ?? {}) as unknown,
-        user: { email: request.user?.email, uuid: request.user?.uuid },
+        bodyKeys: describeBody(request.body),
+        user: { uuid: request.user?.uuid },
         error: { message: err.message, stack: err.stack, details: err.details },
       },
       errorCategory,

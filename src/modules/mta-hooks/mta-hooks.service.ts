@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AccountService } from '../account/account.service.js';
 import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import { emailDomain, scrubPii } from '../../common/logging/pii.js';
 import type {
   MtaHookAddress,
   MtaHookEnvelope,
@@ -36,16 +37,17 @@ export class MtaHooksService {
 
     this.logger.log(
       `${LOG_TAG} received stage='${request.context?.stage ?? 'unknown'}' ` +
-        `from='${request.envelope?.from?.address ?? 'none'}' ` +
-        `recipients=[${recipients.map((r) => r.address).join(', ')}] ` +
-        `evaluating='${recipient?.address ?? 'none'}' ` +
-        `mailFromParams=${this.describeParameters(request.envelope?.from)} ` +
-        `rcptParams=${this.describeParameters(recipient)}`,
+        `fromDomain='${emailDomain(request.envelope?.from?.address)}' ` +
+        `recipientCount=${recipients.length} ` +
+        `evaluatingDomain='${emailDomain(recipient?.address)}' ` +
+        `mailFromParams=${this.describeParameterKeys(request.envelope?.from)} ` +
+        `rcptParams=${this.describeParameterKeys(recipient)}`,
     );
 
     if (!recipient) {
       this.logger.warn(
-        `${LOG_TAG} decision=accept reason=no-recipient rawRequest=${JSON.stringify(request)}`,
+        `${LOG_TAG} decision=accept reason=no-recipient ` +
+          `stage='${request.context?.stage ?? 'unknown'}'`,
       );
       return ACCEPT;
     }
@@ -60,17 +62,19 @@ export class MtaHooksService {
       const response = overQuota ? REJECT_OVER_QUOTA : ACCEPT;
 
       this.logger.log(
-        `${LOG_TAG} decision=${response.action} recipient='${recipient.address}' ` +
-          `response=${JSON.stringify(response)}`,
+        `${LOG_TAG} decision=${response.action} recipientDomain='${emailDomain(
+          recipient.address,
+        )}' ` + `response=${JSON.stringify(response)}`,
       );
 
       return response;
     } catch (error) {
       this.logger.error(
-        `${LOG_TAG} decision=accept reason=fail-open recipient='${recipient.address}' ` +
-          `declaredSize=${declaredSize} error=${
-            error instanceof Error ? error.message : String(error)
-          }`,
+        `${LOG_TAG} decision=accept reason=fail-open ` +
+          `recipientDomain='${emailDomain(recipient.address)}' ` +
+          `declaredSize=${declaredSize} error=${scrubPii(
+            error instanceof Error ? error.message : String(error),
+          )}`,
         error instanceof Error ? error.stack : undefined,
       );
       return ACCEPT;
@@ -85,13 +89,14 @@ export class MtaHooksService {
     const userUuid = await this.accountService.findUserIdByAddress(address);
     if (!userUuid) {
       this.logger.log(
-        `${LOG_TAG} lookup miss: address='${address}' resolved to no local user, skipping quota check`,
+        `${LOG_TAG} lookup miss: address on domain '${emailDomain(address)}' ` +
+          `resolved to no local user, skipping quota check`,
       );
       return false;
     }
 
     this.logger.log(
-      `${LOG_TAG} lookup hit: address='${address}' userUuid='${userUuid}', fetching usage from bridge`,
+      `${LOG_TAG} lookup hit: userUuid='${userUuid}', fetching usage from bridge`,
     );
 
     const { maxSpaceBytes, totalUsedSpaceBytes } =
@@ -101,7 +106,7 @@ export class MtaHooksService {
     const overQuota = projected > maxSpaceBytes;
 
     this.logger.log(
-      `${LOG_TAG} quota check: address='${address}' userUuid='${userUuid}' ` +
+      `${LOG_TAG} quota check: userUuid='${userUuid}' ` +
         `used=${totalUsedSpaceBytes} declaredSize=${incomingSize} ` +
         `projected=${projected} max=${maxSpaceBytes} overQuota=${overQuota}`,
     );
@@ -126,13 +131,6 @@ export class MtaHooksService {
       return 0;
     }
     return parsed;
-  }
-
-  private describeParameters(address?: MtaHookAddress | null): string {
-    if (!address?.parameters) {
-      return 'none';
-    }
-    return JSON.stringify(address.parameters);
   }
 
   private describeParameterKeys(address?: MtaHookAddress | null): string {

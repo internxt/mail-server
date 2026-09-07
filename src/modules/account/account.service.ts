@@ -364,7 +364,7 @@ export class AccountService {
       throw error;
     }
 
-    this.logger.log(`Added address '${address}' to account '${userId}'`);
+    this.logger.log(`Added address '${newAddressId}' to account '${userId}'`);
   }
 
   async removeAddress(userId: string, address: string): Promise<void> {
@@ -390,7 +390,9 @@ export class AccountService {
     ]);
     await this.deleteNetworkBucket(userId, addressRecord);
 
-    this.logger.log(`Removed address '${address}' from account '${userId}'`);
+    this.logger.log(
+      `Removed address '${addressRecord.id}' from account '${userId}'`,
+    );
   }
 
   async setPrimaryAddress(userId: string, newAddress: string): Promise<void> {
@@ -410,7 +412,7 @@ export class AccountService {
     await this.addresses.setDefault(addressRecord.id, account.id);
 
     this.logger.log(
-      `Set primary address to '${newAddress}' for account '${userId}'`,
+      `Set primary address to '${addressRecord.id}' for account '${userId}'`,
     );
   }
 
