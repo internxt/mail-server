@@ -25,6 +25,7 @@ import {
   AddressRepository,
   type ProviderAccountBucketContext,
 } from './repositories/address.repository.js';
+import { DeletedAddressRepository } from './repositories/deleted-address.repository.js';
 import { DomainRepository } from './repositories/domain.repository.js';
 import { MailAddressKeysRepository } from './repositories/mail-address-keys.repository.js';
 
@@ -50,6 +51,7 @@ export class AccountService {
     private readonly provider: AccountProvider,
     private readonly accounts: AccountRepository,
     private readonly addresses: AddressRepository,
+    private readonly deletedAddresses: DeletedAddressRepository,
     private readonly domains: DomainRepository,
     private readonly keys: MailAddressKeysRepository,
     private readonly bridge: BridgeClient,
@@ -173,14 +175,24 @@ export class AccountService {
     displayName: string;
     keys: MailAddressKeyBundle;
   }): Promise<MailAccount> {
-    const [tier, usage, domainRecord, existingAddress, existingAccount] =
-      await Promise.all([
-        this.payments.getUserTier(params.userId),
-        this.bridge.getUserUsage(params.userId),
-        this.domains.findByDomain(params.domain),
-        this.addresses.findByAddress(params.address),
-        this.accounts.findByUserId(params.userId),
-      ]);
+    const [
+      tier,
+      usage,
+      domainRecord,
+      existingAddress,
+      existingAccount,
+      givenUp,
+    ] = await Promise.all([
+      this.payments.getUserTier(params.userId),
+      this.bridge.getUserUsage(params.userId),
+      this.domains.findByDomain(params.domain),
+      this.addresses.findByAddress(params.address),
+      this.accounts.findByUserId(params.userId),
+      this.deletedAddresses.findClaimedByOthers(
+        [params.address],
+        params.userId,
+      ),
+    ]);
 
     if (!tier.featuresPerService.mail?.enabled) {
       throw new ForbiddenException(
@@ -193,7 +205,7 @@ export class AccountService {
     if (existingAccount) {
       throw new ConflictException('User already has a mail account');
     }
-    if (existingAddress) {
+    if (existingAddress || givenUp.has(params.address)) {
       throw new ConflictException(
         `Address '${params.address}' is already in use`,
       );
@@ -288,6 +300,14 @@ export class AccountService {
         this.releaseNetworkBucket(driveUserUuid, a.networkBucketId),
       ),
     );
+
+    await this.deletedAddresses.record(
+      account.addresses.map((a) => ({
+        address: a.address,
+        userId: driveUserUuid,
+      })),
+    );
+
     await this.accounts.delete(account.id, { force: true });
 
     this.logger.log(`Deleted account for user '${driveUserUuid}'`);
@@ -300,11 +320,12 @@ export class AccountService {
     password: string,
     displayName?: string,
   ): Promise<void> {
-    const [usage, account, domain, existing] = await Promise.all([
+    const [usage, account, domain, existing, givenUp] = await Promise.all([
       this.bridge.getUserUsage(userId),
       this.accounts.findByUserId(userId),
       this.domains.findByDomain(domainName),
       this.addresses.findByAddress(address),
+      this.deletedAddresses.findClaimedByOthers([address], userId),
     ]);
 
     if (!account) {
@@ -313,7 +334,7 @@ export class AccountService {
     if (!domain) {
       throw new NotFoundException(`Domain '${domainName}' not found`);
     }
-    if (existing) {
+    if (existing || givenUp.has(address)) {
       throw new ConflictException(`Address '${address}' already exists`);
     }
 
@@ -378,6 +399,7 @@ export class AccountService {
     }
 
     await this.provider.deleteAccount(addressRecord.providerExternalId);
+    await this.deletedAddresses.record([{ address, userId }]);
     await Promise.all([
       this.addresses.deleteProviderLink(addressRecord.id),
       this.addresses.delete(addressRecord.id),
@@ -411,6 +433,7 @@ export class AccountService {
   async checkAddressAvailability(
     username: string,
     domain: string,
+    userId: string,
   ): Promise<{ available: boolean; suggestion: string | null }> {
     const activeMailDomains = await this.domains.findAllActive();
     const activeDomains = activeMailDomains.map((m) => m.domain);
@@ -438,8 +461,13 @@ export class AccountService {
       );
     }
 
-    const taken = await this.addresses.findByAddresses(possibleAddresses);
-    const suggestion = possibleAddresses.find((a) => !taken.has(a));
+    const [taken, givenUp] = await Promise.all([
+      this.addresses.findByAddresses(possibleAddresses),
+      this.deletedAddresses.findClaimedByOthers(possibleAddresses, userId),
+    ]);
+    const suggestion = possibleAddresses.find(
+      (a) => !taken.has(a) && !givenUp.has(a),
+    );
 
     if (suggestion === requestedAddress) {
       return { available: true, suggestion: null };
