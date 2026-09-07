@@ -9,7 +9,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import dayjs from 'dayjs';
-import { BridgeClient } from '../infrastructure/bridge/bridge.service.js';
+import {
+  BridgeClient,
+  isBridgeNotFound,
+} from '../infrastructure/bridge/bridge.service.js';
 import { PaymentsService } from '../infrastructure/payments/payments.service.js';
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
@@ -275,27 +278,18 @@ export class AccountService {
     const account = await this.getAccountOrFail(driveUserUuid);
 
     await Promise.all(
-      account.addresses.map(async (a) => {
-        await this.provider.deleteAccount(a.providerExternalId);
-        await this.addresses.deleteProviderLink(a.id);
-        await this.deleteNetworkBucket(driveUserUuid, a);
-      }),
+      account.addresses.map((a) =>
+        this.provider.deleteAccount(a.providerExternalId),
+      ),
     );
 
-    if (account.networkBucketId) {
-      try {
-        await this.bridge.deleteMailBucket(
-          driveUserUuid,
-          account.networkBucketId,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Failed to delete network bucket '${account.networkBucketId}' for '${driveUserUuid}': ${(error as Error).message}`,
-        );
-      }
-    }
+    await Promise.all(
+      account.addresses.map((a) =>
+        this.releaseNetworkBucket(driveUserUuid, a.networkBucketId),
+      ),
+    );
+    await this.accounts.delete(account.id, { force: true });
 
-    await this.accounts.delete(account.id);
     this.logger.log(`Deleted account for user '${driveUserUuid}'`);
   }
 
@@ -496,17 +490,61 @@ export class AccountService {
     await this.addresses.setNetworkBucketId(addressId, bucket.id);
   }
 
+  /**
+   * Deletes a network bucket and the quota it holds.
+   *
+   * A 404 means the bucket, or the user behind it, is already gone — nothing
+   * left to release, so that counts as done. Anything else is left to the
+   * caller: giving up here would drop the rows carrying the bucket id and
+   * strand the charge with no way to find it again.
+   */
+  private async releaseNetworkBucket(
+    userUuid: string,
+    networkBucketId: string | null,
+  ): Promise<void> {
+    if (!networkBucketId) return;
+
+    try {
+      const { totalUsedSpaceBytes } = await this.bridge.deleteMailBucket(
+        userUuid,
+        networkBucketId,
+      );
+      this.logger.log(
+        `Deleted network bucket '${networkBucketId}' for '${userUuid}', user now at ${totalUsedSpaceBytes} bytes`,
+      );
+    } catch (error) {
+      if (isBridgeNotFound(error)) {
+        this.logger.log(
+          `Network bucket '${networkBucketId}' for '${userUuid}' was already gone`,
+        );
+        return;
+      }
+      throw error;
+    }
+  }
+
   private async deleteNetworkBucket(
     userUuid: string,
     address: MailAddress,
   ): Promise<void> {
-    if (!address.networkBucketId) return;
-
     try {
-      await this.bridge.deleteMailBucket(userUuid, address.networkBucketId);
+      await this.releaseNetworkBucket(userUuid, address.networkBucketId);
     } catch (error) {
       this.logger.warn(
         `Failed to delete network bucket '${address.networkBucketId}' for '${userUuid}': ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Once an account has been claimed for deletion its mailboxes are already
+   * being torn down, so there is nothing coherent left to suspend or bring
+   * back. The caller has to provision a new account instead.
+   */
+  private assertNotBeingDeleted(account: MailAccount): void {
+    if (account.isBeingDeleted) {
+      throw new ConflictException(
+        `Account for user '${account.userId}' is being deleted`,
       );
     }
   }
@@ -521,6 +559,7 @@ export class AccountService {
 
   async suspendAccount(userId: string): Promise<void> {
     const account = await this.getAccountOrFail(userId);
+    this.assertNotBeingDeleted(account);
     if (account.isSuspended) {
       this.logger.log(`Account for user '${userId}' is already suspended`);
       return;
@@ -539,6 +578,7 @@ export class AccountService {
 
   async reactivateAccount(userId: string): Promise<void> {
     const account = await this.getAccountOrFail(userId);
+    this.assertNotBeingDeleted(account);
     if (!account.isSuspended) {
       this.logger.log(`Account for user '${userId}' is already active`);
       return;

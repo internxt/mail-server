@@ -52,8 +52,13 @@ export class StalwartAccountProvider extends AccountProvider {
   }
 
   async deleteAccount(email: string): Promise<void> {
-    await this.stalwart.deleteAccountByEmail(email);
-    this.logger.log(`Deleted account '${email}'`);
+    const deleted = await this.stalwart.deleteAccountByEmail(email);
+
+    this.logger.log(
+      deleted
+        ? `Deleted account '${email}'`
+        : `Account '${email}' was already gone`,
+    );
   }
 
   async suspendAccount(email: string): Promise<void> {

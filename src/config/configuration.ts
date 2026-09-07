@@ -1,4 +1,5 @@
 export default () => ({
+  executeCronjobs: process.env.EXECUTE_JOBS === 'true',
   port: Number.parseInt(process.env.PORT ?? '3100', 10),
   environment: process.env.NODE_ENV ?? 'development',
   isDevelopment: process.env.NODE_ENV === 'development',
@@ -30,6 +31,14 @@ export default () => ({
   accounts: {
     suspendedRetentionDays: Number.parseInt(
       process.env.SUSPENDED_ACCOUNT_RETENTION_DAYS ?? '30',
+      10,
+    ),
+    purgeBatchSize: Number.parseInt(
+      process.env.ACCOUNT_PURGE_BATCH_SIZE ?? '100',
+      10,
+    ),
+    purgeStalledAfterMinutes: Number.parseInt(
+      process.env.ACCOUNT_PURGE_STALLED_AFTER_MINUTES ?? '60',
       10,
     ),
   },
