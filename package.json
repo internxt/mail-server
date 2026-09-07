@@ -44,7 +44,7 @@
     "cross-env": "^10.1.0",
     "dayjs": "^1.11.20",
     "helmet": "^8.1.0",
-    "html-to-text": "^10.0.0",
+    "html-to-text": "^10.0.1",
     "internxt-crypto": "^1.6.0",
     "nanoid": "^5.1.16",
     "nestjs-pino": "^4.6.0",
