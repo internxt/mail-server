@@ -335,6 +335,93 @@ describe('HttpGlobalExceptionFilter', () => {
       expect(filter.isExceptionObject(undefined)).toBe(false);
     });
   });
+  describe('PII redaction', () => {
+    it('when an unexpected error is logged, then the request body is reduced to its keys', () => {
+      const mockHost = createMockArgumentsHost(
+        '/email/send',
+        'POST',
+        newUserPayload(),
+        { subject: 'Q3 layoffs', text: 'we need to talk', to: ['a@inxt.me'] },
+      );
+
+      filter.catch(new Error('send failed'), mockHost);
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bodyKeys: ['subject', 'text', 'to'],
+        }),
+        'UNEXPECTED_ERROR',
+        'HttpGlobalExceptionFilter',
+      );
+      expect(JSON.stringify(loggerMock.error.mock.calls)).not.toContain(
+        'Q3 layoffs',
+      );
+    });
+
+    it('when the request is authenticated, then the user is identified by uuid only', () => {
+      const user = newUserPayload();
+      const mockHost = createMockArgumentsHost('/email/send', 'POST', user);
+
+      filter.catch(new Error('send failed'), mockHost);
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: { uuid: user.uuid },
+        }),
+        'UNEXPECTED_ERROR',
+        'HttpGlobalExceptionFilter',
+      );
+      expect(JSON.stringify(loggerMock.error.mock.calls)).not.toContain(
+        user.email,
+      );
+    });
+
+    it('when the url carries an address or a query string, then the logged path is sanitized', () => {
+      const mockHost = createMockArgumentsHost(
+        '/gateway/addresses/jane@inxt.me?include=usage',
+        'GET',
+      );
+
+      filter.catch(new Error('lookup failed'), mockHost);
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: '/gateway/addresses/[email]?[redacted]',
+        }),
+        'UNEXPECTED_ERROR',
+        'HttpGlobalExceptionFilter',
+      );
+    });
+
+    it('when an error message embeds an address, then the address is masked', () => {
+      const mockHost = createMockArgumentsHost('/email/send', 'POST');
+
+      filter.catch(new Error('no mailbox for jane@inxt.me'), mockHost);
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.objectContaining({
+            message: 'no mailbox for [email]',
+          }) as unknown,
+        }),
+        'UNEXPECTED_ERROR',
+        'HttpGlobalExceptionFilter',
+      );
+    });
+
+    it('when upstream details carry message content, then the content is redacted', () => {
+      const mockException = Object.assign(new Error('JMAP method error'), {
+        details: '{"subject":"Q3 layoffs","from":"jane@inxt.me"}',
+      });
+      const mockHost = createMockArgumentsHost('/email', 'POST');
+
+      filter.catch(mockException, mockHost);
+
+      const logged = JSON.stringify(loggerMock.error.mock.calls);
+      expect(logged).not.toContain('Q3 layoffs');
+      expect(logged).not.toContain('jane@inxt.me');
+    });
+  });
 });
 
 function createMockArgumentsHost(

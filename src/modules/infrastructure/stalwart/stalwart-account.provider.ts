@@ -11,6 +11,7 @@ import {
   StalwartService,
   splitEmail,
 } from './stalwart.service.js';
+import { emailDomain } from '../../../common/logging/pii.js';
 
 @Injectable()
 export class StalwartAccountProvider extends AccountProvider {
@@ -42,7 +43,7 @@ export class StalwartAccountProvider extends AccountProvider {
     const internalId = decodeStalwartId(id);
 
     this.logger.log(
-      `Created account '${params.primaryAddress}' (stalwart id ${internalId})`,
+      `Created account ${internalId} for address '${params.accountId}' on domain '${domain}'`,
     );
     return {
       provider: 'stalwart',
@@ -53,17 +54,17 @@ export class StalwartAccountProvider extends AccountProvider {
 
   async deleteAccount(email: string): Promise<void> {
     await this.stalwart.deleteAccountByEmail(email);
-    this.logger.log(`Deleted account '${email}'`);
+    this.logger.log(`Deleted account on domain '${emailDomain(email)}'`);
   }
 
   async suspendAccount(email: string): Promise<void> {
     await this.stalwart.suspendAccountByEmail(email);
-    this.logger.log(`Suspended account '${email}'`);
+    this.logger.log(`Suspended account on domain '${emailDomain(email)}'`);
   }
 
   async reactivateAccount(email: string): Promise<void> {
     await this.stalwart.reactivateAccountByEmail(email);
-    this.logger.log(`Reactivated account '${email}'`);
+    this.logger.log(`Reactivated account on domain '${emailDomain(email)}'`);
   }
 
   async getAccount(email: string): Promise<AccountInfo | null> {

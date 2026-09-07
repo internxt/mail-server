@@ -85,7 +85,7 @@ export class UserController {
     });
 
     this.logger.log(
-      `Provisioned mail account for '${user.uuid}' at '${fullAddress}'`,
+      `Provisioned mail account '${account.id}' for user '${user.uuid}' on domain '${dto.domain}'`,
     );
 
     return {

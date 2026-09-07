@@ -4,6 +4,7 @@ import { createTransport } from 'nodemailer';
 import type { EmailAddress } from '../../email/email.types.js';
 import { SendRateLimitedError } from '../../email/mail-provider.port.js';
 import Mail from 'nodemailer/lib/mailer/index.js';
+import { emailDomain, scrubPii } from '../../../common/logging/pii.js';
 
 export interface SmtpAttachment {
   filename: string;
@@ -68,14 +69,18 @@ export class StalwartSmtpService {
         inReplyTo: payload.inReplyTo,
         references: payload.references,
       });
-      this.logger.debug(`SMTP sent for ${payload.userEmail}: ${messageId}`);
+      this.logger.debug(
+        `SMTP sent from domain '${emailDomain(payload.userEmail)}': ${messageId}`,
+      );
       return { messageId };
     } catch (error) {
       const limitDetail = rateLimitDetail(error);
 
       if (limitDetail) {
         this.logger.warn(
-          `SMTP rate limit hit for ${payload.userEmail}: ${limitDetail}`,
+          `SMTP rate limit hit on domain '${emailDomain(
+            payload.userEmail,
+          )}': ${scrubPii(limitDetail)}`,
         );
         throw new SendRateLimitedError(limitDetail);
       }
