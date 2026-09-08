@@ -1,19 +1,30 @@
 {{- if .Values.ingress.enabled }}
-{{- $mtaStsHosts := .Values.ingress.mtaStsHosts | default list }}
+{{- $mainHost := .Values.ingress.host | lower }}
+{{- $seen := dict }}
+{{- range .Values.ingress.mtaStsHosts | default list }}
+{{- $host := . | lower }}
+{{- $slug := $host | replace "." "-" }}
+{{- if eq $host $mainHost }}
+{{- fail (printf "ingress.mtaStsHosts must not contain ingress.host (%s): that would publish a rule for it with no ipAllowList middleware" $mainHost) }}
+{{- end }}
+{{- if hasKey $seen $slug }}
+{{- fail (printf "ingress.mtaStsHosts contains a duplicate entry for %s" $host) }}
+{{- end }}
+{{- $_ := set $seen $slug true }}
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: stalwart-ingress
+  name: {{ printf "stalwart-%s" $slug | quote }}
   labels:
     app: stalwart
     owner: internxt
   annotations:
-    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
+    cert-manager.io/cluster-issuer: {{ $.Values.ingress.clusterIssuer }}
 spec:
-  ingressClassName: {{ .Values.ingress.className }}
+  ingressClassName: {{ $.Values.ingress.className }}
   rules:
-    {{- range $mtaStsHosts }}
-    - host: {{ . }}
+    - host: {{ $host | quote }}
       http:
         paths:
           - path: /.well-known/mta-sts.txt
@@ -23,12 +34,9 @@ spec:
                 name: stalwart
                 port:
                   number: {{ $.Values.service.port }}
-    {{- end }}
   tls:
     - hosts:
-        - {{ .Values.ingress.host }}
-        {{- range $mtaStsHosts }}
-        - {{ . }}
-        {{- end }}
-      secretName: {{ .Values.ingress.tlsSecretName }}
+        - {{ $host | quote }}
+      secretName: {{ printf "%s-tls" $slug | quote }}
+{{- end }}
 {{- end }}
