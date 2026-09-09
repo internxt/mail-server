@@ -7,7 +7,6 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import dayjs from 'dayjs';
 import {
   BridgeClient,
@@ -17,6 +16,7 @@ import { PaymentsService } from '../infrastructure/payments/payments.service.js'
 import { MailNotSetupException } from '../provisioning/mail-not-setup.exception.js';
 import { AccountProvider } from './account-provider.port.js';
 import type { CreateAccountResult } from './account.types.js';
+import { SUSPENDED_RETENTION_DAYS } from './constants.js';
 import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
 import { MailAddress } from './domain/mail-address.domain.js';
 import { MailDomain } from './domain/mail-domain.domain.js';
@@ -54,7 +54,6 @@ export class AccountService {
     private readonly keys: MailAddressKeysRepository,
     private readonly bridge: BridgeClient,
     private readonly payments: PaymentsService,
-    private readonly config: ConfigService,
   ) {}
 
   async getAccount(userId: string): Promise<MailAccount> {
@@ -75,8 +74,7 @@ export class AccountService {
 
   private computeDeletionAt(suspendedAt: Date | null): Date | null {
     if (!suspendedAt) return null;
-    const days = this.config.get<number>('accounts.suspendedRetentionDays')!;
-    return dayjs(suspendedAt).add(days, 'day').toDate();
+    return dayjs(suspendedAt).add(SUSPENDED_RETENTION_DAYS, 'day').toDate();
   }
 
   async listActiveDomains(): Promise<MailDomain[]> {

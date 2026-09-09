@@ -7,7 +7,6 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { AccountService } from './account.service.js';
 import { AccountProvider } from './account-provider.port.js';
 import { MailAccount, MailAccountState } from './domain/mail-account.domain.js';
@@ -54,7 +53,6 @@ describe('AccountService', () => {
   let keys: DeepMocked<MailAddressKeysRepository>;
   let bridge: DeepMocked<BridgeClient>;
   let payments: DeepMocked<PaymentsService>;
-  let config: DeepMocked<ConfigService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -71,7 +69,6 @@ describe('AccountService', () => {
     keys = module.get(MailAddressKeysRepository);
     bridge = module.get(BridgeClient);
     payments = module.get(PaymentsService);
-    config = module.get(ConfigService);
 
     bridge.deleteMailBucket.mockResolvedValue({
       maxSpaceBytes: 1000,
@@ -116,20 +113,15 @@ describe('AccountService', () => {
       });
     });
 
-    it('when account is suspended, then computes deletionAt from retention config', async () => {
+    it('when account is suspended, then computes deletionAt from the retention window', async () => {
       const suspendedAt = new Date('2026-01-01T00:00:00.000Z');
       const attrs = newMailAccountAttributes({
         status: MailAccountState.Suspended,
         suspendedAt,
       });
       accounts.findByUserId.mockResolvedValue(MailAccount.build(attrs));
-      config.get.mockReturnValue(30);
-
       const result = await service.getAccountStatus(attrs.userId);
 
-      expect(config.get).toHaveBeenCalledWith(
-        'accounts.suspendedRetentionDays',
-      );
       expect(result.status).toBe(MailAccountState.Suspended);
       expect(result.suspendedAt).toEqual(suspendedAt);
       expect(result.deletionAt).toEqual(new Date('2026-01-31T00:00:00.000Z'));

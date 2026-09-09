@@ -43,7 +43,7 @@ mta:
 webhook:
   username: REPLACE_ME
 
-executeCronjobs: false
+executeCronjobs: true
 
 secretName: mail-server-secrets
 

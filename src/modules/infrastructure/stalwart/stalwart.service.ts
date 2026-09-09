@@ -156,7 +156,7 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     const domainId = await this.resolveDomainId(domain);
     if (!domainId) {
       throw new StalwartApiError(
-        `Cannot delete account '${email}': domain '${domain}' is not configured in Stalwart`,
+        `Cannot delete account: domain '${domain}' is not configured in Stalwart`,
         { domain },
       );
     }
@@ -188,7 +188,7 @@ export class StalwartService implements OnModuleInit, OnModuleDestroy {
     const failed = set.notDestroyed?.[targetId];
     if (failed) {
       throw new StalwartApiError(
-        `Failed to delete account '${email}': ${failed.type} ${failed.description}`,
+        `Failed to delete account ${targetId}: ${failed.type} ${failed.description}`,
         failed,
       );
     }

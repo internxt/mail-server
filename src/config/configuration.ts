@@ -28,21 +28,6 @@ export default () => ({
     serverPrivateKey: process.env.SERVER_PRIVATE_KEY ?? '',
   },
 
-  accounts: {
-    suspendedRetentionDays: Number.parseInt(
-      process.env.SUSPENDED_ACCOUNT_RETENTION_DAYS ?? '30',
-      10,
-    ),
-    purgeBatchSize: Number.parseInt(
-      process.env.ACCOUNT_PURGE_BATCH_SIZE ?? '100',
-      10,
-    ),
-    purgeStalledAfterMinutes: Number.parseInt(
-      process.env.ACCOUNT_PURGE_STALLED_AFTER_MINUTES ?? '60',
-      10,
-    ),
-  },
-
   secrets: {
     jwt: process.env.JWT_SECRET,
     drivePublicGateway: process.env.GATEWAY_PUBLIC_SECRET,

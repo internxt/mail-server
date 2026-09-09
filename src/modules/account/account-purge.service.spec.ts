@@ -1,21 +1,19 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
-import { ConfigService } from '@nestjs/config';
 import { AccountPurgeService } from './account-purge.service.js';
 import { AccountService } from './account.service.js';
+import { PURGE_BATCH_SIZE, PURGE_STALLED_RECLAIM_LIMIT } from './constants.js';
 import { AccountRepository } from './repositories/account.repository.js';
 
 const NOW = new Date('2026-08-21T12:00:00.000Z');
-const RETENTION_DAYS = 30;
-const BATCH_SIZE = 100;
-const STALLED_AFTER_MINUTES = 60;
+const RETENTION_THRESHOLD = new Date('2026-07-22T12:00:00.000Z');
+const STALLED_THRESHOLD = new Date('2026-08-21T11:00:00.000Z');
 
 describe('AccountPurgeService', () => {
   let service: AccountPurgeService;
   let accounts: DeepMocked<AccountRepository>;
   let accountService: DeepMocked<AccountService>;
-  let config: DeepMocked<ConfigService>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -30,16 +28,6 @@ describe('AccountPurgeService', () => {
     service = module.get(AccountPurgeService);
     accounts = module.get(AccountRepository);
     accountService = module.get(AccountService);
-    config = module.get(ConfigService);
-
-    config.get.mockImplementation((key: string) => {
-      const values: Record<string, number> = {
-        'accounts.suspendedRetentionDays': RETENTION_DAYS,
-        'accounts.purgeBatchSize': BATCH_SIZE,
-        'accounts.purgeStalledAfterMinutes': STALLED_AFTER_MINUTES,
-      };
-      return values[key] as never;
-    });
 
     accounts.claimStalledDeletions.mockResolvedValue([]);
     accounts.claimExpiredSuspended.mockResolvedValue([]);
@@ -58,8 +46,8 @@ describe('AccountPurgeService', () => {
     const summary = await service.purgeExpiredAccounts();
 
     expect(accounts.claimExpiredSuspended).toHaveBeenCalledWith({
-      suspendedBefore: new Date('2026-07-22T12:00:00.000Z'),
-      limit: BATCH_SIZE,
+      suspendedBefore: RETENTION_THRESHOLD,
+      limit: PURGE_BATCH_SIZE,
     });
     expect(accountService.deleteAccount).toHaveBeenCalledWith('user-1');
     expect(accountService.deleteAccount).toHaveBeenCalledWith('user-2');
@@ -78,30 +66,32 @@ describe('AccountPurgeService', () => {
       { id: 'acc-stuck', userId: 'user-stuck' },
     ]);
 
-    await service.purgeExpiredAccounts({ batchSize: 3 });
+    await service.purgeExpiredAccounts();
 
     expect(accounts.claimStalledDeletions).toHaveBeenCalledWith({
-      updatedBefore: new Date('2026-08-21T11:00:00.000Z'),
-      limit: 3,
+      updatedBefore: STALLED_THRESHOLD,
+      limit: PURGE_STALLED_RECLAIM_LIMIT,
     });
     expect(accounts.claimExpiredSuspended).toHaveBeenCalledWith({
-      suspendedBefore: new Date('2026-07-22T12:00:00.000Z'),
-      limit: 2,
+      suspendedBefore: RETENTION_THRESHOLD,
+      limit: PURGE_BATCH_SIZE - 1,
     });
     expect(accountService.deleteAccount).toHaveBeenCalledWith('user-stuck');
   });
 
-  it('when stalled claims fill the batch, then no new accounts are claimed', async () => {
-    accounts.claimStalledDeletions.mockResolvedValue([
-      { id: 'acc-1', userId: 'user-1' },
-      { id: 'acc-2', userId: 'user-2' },
-    ]);
+  it('when stalled claims take their whole share, then newly expired accounts keep the rest of the batch', async () => {
+    accounts.claimStalledDeletions.mockResolvedValue(
+      Array.from({ length: PURGE_STALLED_RECLAIM_LIMIT }, (_, i) => ({
+        id: `acc-${i}`,
+        userId: `user-${i}`,
+      })),
+    );
 
-    await service.purgeExpiredAccounts({ batchSize: 2 });
+    await service.purgeExpiredAccounts();
 
     expect(accounts.claimExpiredSuspended).toHaveBeenCalledWith({
-      suspendedBefore: new Date('2026-07-22T12:00:00.000Z'),
-      limit: 0,
+      suspendedBefore: RETENTION_THRESHOLD,
+      limit: PURGE_BATCH_SIZE - PURGE_STALLED_RECLAIM_LIMIT,
     });
   });
 
@@ -121,13 +111,5 @@ describe('AccountPurgeService', () => {
 
     expect(accountService.deleteAccount).toHaveBeenCalledWith('user-3');
     expect(summary).toEqual({ claimed: 3, purged: 2, failed: 1 });
-  });
-
-  it('when the batch size is zero, then nothing is claimed at all', async () => {
-    const summary = await service.purgeExpiredAccounts({ batchSize: 0 });
-
-    expect(accounts.claimStalledDeletions).not.toHaveBeenCalled();
-    expect(accounts.claimExpiredSuspended).not.toHaveBeenCalled();
-    expect(summary).toEqual({ claimed: 0, purged: 0, failed: 0 });
   });
 });

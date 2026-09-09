@@ -1,15 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import dayjs from 'dayjs';
 import { AccountService } from './account.service.js';
+import {
+  PURGE_BATCH_SIZE,
+  PURGE_STALLED_AFTER_MINUTES,
+  PURGE_STALLED_RECLAIM_LIMIT,
+  SUSPENDED_RETENTION_DAYS,
+} from './constants.js';
 import {
   AccountRepository,
   type ClaimedAccount,
 } from './repositories/account.repository.js';
-
-export interface PurgeOptions {
-  batchSize?: number;
-}
 
 export interface PurgeSummary {
   claimed: number;
@@ -24,15 +25,10 @@ export class AccountPurgeService {
   constructor(
     private readonly accounts: AccountRepository,
     private readonly accountService: AccountService,
-    private readonly config: ConfigService,
   ) {}
 
-  async purgeExpiredAccounts(
-    options: PurgeOptions = {},
-  ): Promise<PurgeSummary> {
-    const batchSize =
-      options.batchSize ?? this.config.get<number>('accounts.purgeBatchSize')!;
-    const claimed = await this.claimBatch(batchSize);
+  async purgeExpiredAccounts(): Promise<PurgeSummary> {
+    const claimed = await this.claimBatch();
 
     if (claimed.length === 0) {
       return { claimed: 0, purged: 0, failed: 0 };
@@ -61,27 +57,19 @@ export class AccountPurgeService {
     return { claimed: claimed.length, purged, failed };
   }
 
-  private async claimBatch(batchSize: number): Promise<ClaimedAccount[]> {
-    if (batchSize <= 0) return [];
-
+  private async claimBatch(): Promise<ClaimedAccount[]> {
     const stalled = await this.accounts.claimStalledDeletions({
       updatedBefore: dayjs()
-        .subtract(
-          this.config.get<number>('accounts.purgeStalledAfterMinutes')!,
-          'minute',
-        )
+        .subtract(PURGE_STALLED_AFTER_MINUTES, 'minute')
         .toDate(),
-      limit: batchSize,
+      limit: PURGE_STALLED_RECLAIM_LIMIT,
     });
 
     const expired = await this.accounts.claimExpiredSuspended({
       suspendedBefore: dayjs()
-        .subtract(
-          this.config.get<number>('accounts.suspendedRetentionDays')!,
-          'day',
-        )
+        .subtract(SUSPENDED_RETENTION_DAYS, 'day')
         .toDate(),
-      limit: batchSize - stalled.length,
+      limit: PURGE_BATCH_SIZE - stalled.length,
     });
 
     return [...stalled, ...expired];
