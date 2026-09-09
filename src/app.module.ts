@@ -16,6 +16,9 @@ import { HttpGlobalExceptionFilter } from './common/filters/http-global-exceptio
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { StalwartEventsModule } from './modules/stalwart-events/stalwart-events.module';
 import { MtaHooksModule } from './modules/mta-hooks/mta-hooks.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+
+const executeCronjobs = process.env.EXECUTE_JOBS === 'true';
 
 @Module({
   imports: [
@@ -101,6 +104,7 @@ import { MtaHooksModule } from './modules/mta-hooks/mta-hooks.module';
       }),
     }),
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
+    ...(executeCronjobs ? [JobsModule] : []),
     HealthModule,
     JmapModule,
     EmailModule,
