@@ -19,6 +19,7 @@ import type {
   UploadAttachmentPayload,
   UploadAttachmentResponse,
 } from './jmap.types.js';
+import { emailDomain } from '../../../common/logging/pii.js';
 
 const JMAP_CAPABILITY_CORE = 'urn:ietf:params:jmap:core';
 const JMAP_CAPABILITY_MAIL = 'urn:ietf:params:jmap:mail';
@@ -35,6 +36,9 @@ export const JMAP_QUOTA_CAPABILITIES = [
   JMAP_CAPABILITY_CORE,
   JMAP_CAPABILITY_QUOTA,
 ] as const;
+
+const elapsedMs = (startedAt: number): number =>
+  Math.round(performance.now() - startedAt);
 
 export type JmapRequestOptions = {
   using?: readonly string[];
@@ -179,9 +183,21 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     userEmail,
     blob,
   }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
+    const { name, buffer, mimeType } = blob;
+    const logContext = {
+      domain: emailDomain(userEmail),
+      size: buffer.length,
+      mimeType,
+    };
+
+    const sessionStartedAt = performance.now();
     const session = await this.getSession(userEmail);
     const accountId = this.requireMailAccountId(session);
-    const { name, buffer, mimeType } = blob;
+    this.logger.log(
+      { ...logContext, durationMs: elapsedMs(sessionStartedAt) },
+      'Attachment upload: JMAP session resolved',
+    );
+
     const fileName = name ?? 'attachment';
 
     const uploadUrl = session.uploadUrl
@@ -189,6 +205,9 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       .replace('{name}', fileName);
 
     const uploadPath = new URL(uploadUrl).pathname;
+
+    this.logger.log(logContext, 'Attachment upload: sending blob to Stalwart');
+    const uploadStartedAt = performance.now();
 
     const { statusCode, body } = await this.blobClient.request({
       method: 'POST',
@@ -204,7 +223,13 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
 
     const text = await body.text();
 
+    const uploadDurationMs = elapsedMs(uploadStartedAt);
+
     if (statusCode !== 200 && statusCode !== 201) {
+      this.logger.warn(
+        { ...logContext, statusCode, durationMs: uploadDurationMs },
+        'Attachment upload: Stalwart rejected blob',
+      );
       throw new JmapError(
         `Blob upload failed: HTTP ${statusCode}`,
         text,
@@ -217,6 +242,11 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       type: string;
       size: number;
     };
+
+    this.logger.log(
+      { ...logContext, statusCode, durationMs: uploadDurationMs },
+      'Attachment upload: blob stored',
+    );
 
     return {
       blobId: data.blobId,
