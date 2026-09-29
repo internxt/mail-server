@@ -61,7 +61,7 @@ import {
   type DecryptedEnvelope,
 } from './server-crypto.js';
 import type { Readable } from 'node:stream';
-import { scrubPii } from '../../common/logging/pii.js';
+import { emailDomain, scrubPii } from '../../common/logging/pii.js';
 
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -497,6 +497,15 @@ export class EmailService {
   async uploadAttachment(
     payload: UploadAttachmentPayload,
   ): Promise<UploadAttachmentResponse> {
+    this.logger.log(
+      {
+        domain: emailDomain(payload.userEmail),
+        size: payload.blob.buffer.length,
+        mimeType: payload.blob.mimeType,
+      },
+      'Attachment upload received',
+    );
+
     try {
       return await this.mail.uploadAttachment(payload);
     } catch (error) {
