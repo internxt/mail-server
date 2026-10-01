@@ -10,6 +10,7 @@ import {
   newMailbox,
   newEmailSummary,
   newMailDomainAttributes,
+  newMultipartRequest,
   newUserPayload,
 } from '../../../test/fixtures.js';
 import type { EmailListResponse } from './email.types.js';
@@ -403,47 +404,47 @@ describe('EmailController', () => {
   });
 
   describe('Uploading an attachment', () => {
-    const file = {
-      originalname: 'photo.jpg',
-      mimetype: 'image/jpeg',
-      buffer: Buffer.from('binary'),
-      size: 6,
-    } as Express.Multer.File;
     const signal = new AbortController().signal;
 
-    test('when a user attaches a file, then the file is stored and its details are returned along with the original filename', async () => {
+    test('when a user attaches a file, then it is streamed to storage and its details are returned along with the original filename', async () => {
       emailService.uploadAttachment.mockResolvedValue({
         blobId: 'blob-1',
-        size: file.size,
-        type: file.mimetype,
+        size: 6,
+        type: 'image/jpeg',
       });
+      const req = newMultipartRequest([
+        {
+          field: 'attachments',
+          filename: 'photo.jpg',
+          type: 'image/jpeg',
+          content: 'binary',
+        },
+      ]);
 
-      const result = await controller.uploadAttachment(
-        [file],
-        userEmail,
-        signal,
-      );
+      const result = await controller.uploadAttachment(req, userEmail, signal);
 
       expect(emailService.uploadAttachment).toHaveBeenCalledWith({
         userEmail,
         blob: {
-          name: file.originalname,
-          buffer: file.buffer,
-          mimeType: file.mimetype,
+          name: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          stream: expect.any(Readable) as Readable,
         },
         signal,
       });
       expect(result).toEqual({
         blobId: 'blob-1',
-        size: file.size,
-        type: file.mimetype,
-        name: file.originalname,
+        size: 6,
+        type: 'image/jpeg',
+        name: 'photo.jpg',
       });
     });
 
     test('when the request does not include any file, then the upload is rejected', async () => {
+      const req = newMultipartRequest([{ field: 'note', content: 'hello' }]);
+
       await expect(
-        controller.uploadAttachment([], userEmail, signal),
+        controller.uploadAttachment(req, userEmail, signal),
       ).rejects.toThrow('No files uploaded');
       expect(emailService.uploadAttachment).not.toHaveBeenCalled();
     });

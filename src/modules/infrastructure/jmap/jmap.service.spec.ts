@@ -83,7 +83,7 @@ describe('JMAP service', () => {
         userEmail,
         blob: {
           name: 'image.jpg',
-          buffer: Buffer.from('binary'),
+          stream: Readable.from(Buffer.from('binary')),
           mimeType: 'image/jpeg',
         },
       });
@@ -95,29 +95,24 @@ describe('JMAP service', () => {
       });
     });
 
-    test('when an attachment is uploaded, then the file is sent on behalf of the user with its original bytes and content type', async () => {
-      const buffer = Buffer.from('hello world');
+    test('when an attachment is uploaded, then the file is streamed on behalf of the user with its content type', async () => {
+      const stream = Readable.from(Buffer.from('hello world'));
       mockRequest.mockResolvedValueOnce(
-        httpResponse(200, {
-          blobId: 'blob-1',
-          type: 'text/plain',
-          size: buffer.length,
-        }),
+        httpResponse(200, { blobId: 'blob-1', type: 'text/plain', size: 11 }),
       );
 
       await service.uploadAttachment({
         userEmail,
-        blob: { name: 'hello.txt', buffer, mimeType: 'text/plain' },
+        blob: { name: 'hello.txt', stream, mimeType: 'text/plain' },
       });
 
       expect(mockRequest).toHaveBeenLastCalledWith(
         expect.objectContaining({
           method: 'POST',
           path: '/jmap/upload/acc-1/',
-          body: buffer,
+          body: stream,
           headers: expect.objectContaining({
             'content-type': 'text/plain',
-            'content-length': String(buffer.length),
             authorization: expect.stringMatching(/^Basic /) as string,
           }) as Record<string, string>,
         }),
@@ -137,7 +132,7 @@ describe('JMAP service', () => {
         userEmail,
         blob: {
           name: 'hello.pdf',
-          buffer: Buffer.from('x'),
+          stream: Readable.from(Buffer.from('x')),
           mimeType: 'application/pdf',
         },
       });
@@ -153,7 +148,7 @@ describe('JMAP service', () => {
           userEmail,
           blob: {
             name: 'hello.pdf',
-            buffer: Buffer.from('x'),
+            stream: Readable.from(Buffer.from('x')),
             mimeType: 'image/png',
           },
         }),
@@ -175,7 +170,7 @@ describe('JMAP service', () => {
           userEmail,
           blob: {
             name: 'hello.pdf',
-            buffer: Buffer.from('x'),
+            stream: Readable.from(Buffer.from('x')),
             mimeType: 'image/png',
           },
         }),
@@ -200,7 +195,7 @@ describe('JMAP service', () => {
           userEmail,
           blob: {
             name: 'hello.pdf',
-            buffer: Buffer.from('x'),
+            stream: Readable.from(Buffer.from('x')),
             mimeType: 'image/png',
           },
         }),

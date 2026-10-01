@@ -74,14 +74,6 @@ function toProviderError(error: unknown): unknown {
   return error;
 }
 
-const withDeadline = (
-  deadlineMs: number,
-  signal: AbortSignal | undefined,
-): AbortSignal => {
-  const deadline = AbortSignal.timeout(deadlineMs);
-  return signal ? AbortSignal.any([signal, deadline]) : deadline;
-};
-
 export type StalwartHttpOptions = {
   connectTimeoutMs: number;
   apiTimeoutMs: number;
@@ -141,6 +133,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     };
     this.uploadPool = new Pool(this.stalwartUrl, {
       ...blobPoolOptions,
+      headersTimeout: 0,
       connections: options.uploadConnections,
     });
     this.downloadPool = new Pool(this.stalwartUrl, {
@@ -285,19 +278,11 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     blob,
     signal,
   }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
-    const { name, buffer, mimeType } = blob;
-    const uploadSignal = withDeadline(
-      this.httpOptions.uploadDeadlineMs,
-      signal,
-    );
-    const logContext = {
-      domain: emailDomain(userEmail),
-      size: buffer.length,
-      mimeType,
-    };
+    const { name, stream, mimeType } = blob;
+    const logContext = { domain: emailDomain(userEmail), mimeType };
 
     const sessionStartedAt = performance.now();
-    const session = await this.getSession(userEmail, uploadSignal);
+    const session = await this.getSession(userEmail, signal);
     const accountId = this.requireMailAccountId(session);
     this.logger.log(
       { ...logContext, durationMs: elapsedMs(sessionStartedAt) },
@@ -312,6 +297,21 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
 
     const uploadPath = new URL(uploadUrl).pathname;
 
+    const deadline = new AbortController();
+    let deadlineTimer: NodeJS.Timeout | undefined;
+    stream.once('end', () => {
+      deadlineTimer = setTimeout(
+        () =>
+          deadline.abort(
+            new DOMException('Upload deadline exceeded', 'TimeoutError'),
+          ),
+        this.httpOptions.uploadDeadlineMs,
+      );
+    });
+    const uploadSignal = signal
+      ? AbortSignal.any([signal, deadline.signal])
+      : deadline.signal;
+
     this.logger.log(logContext, 'Attachment upload: sending blob to Stalwart');
     const uploadStartedAt = performance.now();
 
@@ -321,12 +321,11 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       headers: {
         authorization: this.buildAuthHeader(userEmail),
         'content-type': mimeType,
-        'content-length': String(buffer.length),
         accept: 'application/json',
       },
-      body: buffer,
+      body: stream,
       signal: uploadSignal,
-    });
+    }).finally(() => clearTimeout(deadlineTimer));
 
     const uploadDurationMs = elapsedMs(uploadStartedAt);
 
@@ -349,7 +348,12 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     };
 
     this.logger.log(
-      { ...logContext, statusCode, durationMs: uploadDurationMs },
+      {
+        ...logContext,
+        size: data.size,
+        statusCode,
+        durationMs: uploadDurationMs,
+      },
       'Attachment upload: blob stored',
     );
 

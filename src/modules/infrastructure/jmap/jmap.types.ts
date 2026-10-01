@@ -189,7 +189,7 @@ export interface UploadAttachmentPayload {
   userEmail: string;
   blob: {
     name: string;
-    buffer: Buffer;
+    stream: Readable;
     mimeType: string;
   };
   signal?: AbortSignal;

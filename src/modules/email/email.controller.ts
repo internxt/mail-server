@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,23 +9,24 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   StreamableFile,
-  UploadedFiles,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
+  ApiConsumes,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiPayloadTooLargeResponse,
   ApiQuery,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -52,14 +52,13 @@ import {
 import type { MailboxType } from './email.types.js';
 import { AccountService } from '../account/account.service.js';
 import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.decorator.js';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { RequestSignal } from '../../common/decorators/request-signal.decorator.js';
 import {
   buildContentDisposition,
   sanitizeFilename,
   sanitizeMimeType,
 } from './attachment-headers.js';
+import { receiveFile } from './attachment-upload.js';
 
 export const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 
@@ -336,15 +335,14 @@ export class EmailController {
     description:
       'Uploads an attachment and get the info to attach it to an user email.',
   })
-  @UseInterceptors(
-    FilesInterceptor('attachments', 1, {
-      storage: memoryStorage(), // NOSONAR — 25MB matches Gmail's attachment cap; enforced by Multer
-      limits: {
-        fileSize: MAX_TOTAL_BYTES,
-        fieldSize: MAX_TOTAL_BYTES,
-      },
-    }),
-  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['attachments'],
+      properties: { attachments: { type: 'string', format: 'binary' } },
+    },
+  })
   @ApiOkResponse({
     type: UploadAttachmentResponseDto,
     description: 'Upload attachment successfully',
@@ -353,25 +351,24 @@ export class EmailController {
     description:
       'Upload allowance for the account is exhausted, retry in a few minutes',
   })
+  @ApiPayloadTooLargeResponse({ description: 'Attachment exceeds 25MB' })
   async uploadAttachment(
-    @UploadedFiles() files: Express.Multer.File[],
+    @Req() req: Request,
     @MailAddress('address') email: string,
     @RequestSignal() signal: AbortSignal,
   ): Promise<UploadAttachmentResponseDto> {
-    const [file] = files;
-    if (!file) throw new BadRequestException('No files uploaded');
+    const file = await receiveFile(req, {
+      field: 'attachments',
+      maxBytes: MAX_TOTAL_BYTES,
+    });
 
     const result = await this.emailService.uploadAttachment({
       userEmail: email,
-      blob: {
-        name: file.originalname,
-        buffer: file.buffer,
-        mimeType: file.mimetype,
-      },
+      blob: file,
       signal,
     });
 
-    return { ...result, name: file.originalname };
+    return { ...result, name: file.name };
   }
 
   @Get(':id/attachment/:blobId')

@@ -514,7 +514,6 @@ export class EmailService {
     this.logger.log(
       {
         domain: emailDomain(payload.userEmail),
-        size: payload.blob.buffer.length,
         mimeType: payload.blob.mimeType,
       },
       'Attachment upload received',

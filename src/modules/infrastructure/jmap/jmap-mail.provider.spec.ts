@@ -1106,7 +1106,7 @@ describe('JmapMailProvider', () => {
       userEmail: 'user@test.com',
       blob: {
         name: 'image.jpg',
-        buffer: Buffer.from('binary'),
+        stream: Readable.from(Buffer.from('binary')),
         mimeType: 'image/jpeg',
       },
     };
