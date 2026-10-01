@@ -5,8 +5,8 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Client } from 'undici';
-import type { Readable } from 'node:stream';
+import { type Dispatcher, Pool } from 'undici';
+import { PassThrough, type Readable } from 'node:stream';
 import type {
   DownloadAttachmentPayload,
   DownloadAttachmentResponse,
@@ -20,6 +20,10 @@ import type {
   UploadAttachmentResponse,
 } from './jmap.types.js';
 import { emailDomain } from '../../../common/logging/pii.js';
+import {
+  MailProviderTimeoutError,
+  MailProviderUnavailableError,
+} from '../../email/mail-provider.port.js';
 
 const JMAP_CAPABILITY_CORE = 'urn:ietf:params:jmap:core';
 const JMAP_CAPABILITY_MAIL = 'urn:ietf:params:jmap:mail';
@@ -40,6 +44,53 @@ export const JMAP_QUOTA_CAPABILITIES = [
 const elapsedMs = (startedAt: number): number =>
   Math.round(performance.now() - startedAt);
 
+const TIMEOUT_ERROR_CODES = new Set([
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+]);
+
+const UNAVAILABLE_ERROR_CODES = new Set([
+  'UND_ERR_SOCKET',
+  'UND_ERR_CLOSED',
+  'UND_ERR_DESTROYED',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EPIPE',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+]);
+
+function toProviderError(error: unknown): unknown {
+  if (!(error instanceof Error)) return error;
+  if (error.name === 'TimeoutError') return new MailProviderTimeoutError();
+
+  const code = (error as { code?: unknown }).code;
+  if (typeof code !== 'string') return error;
+  if (TIMEOUT_ERROR_CODES.has(code)) return new MailProviderTimeoutError();
+  if (UNAVAILABLE_ERROR_CODES.has(code))
+    return new MailProviderUnavailableError();
+  return error;
+}
+
+const withDeadline = (
+  deadlineMs: number,
+  signal: AbortSignal | undefined,
+): AbortSignal => {
+  const deadline = AbortSignal.timeout(deadlineMs);
+  return signal ? AbortSignal.any([signal, deadline]) : deadline;
+};
+
+export type StalwartHttpOptions = {
+  connectTimeoutMs: number;
+  apiTimeoutMs: number;
+  blobTimeoutMs: number;
+  uploadDeadlineMs: number;
+  uploadConnections: number;
+  downloadConnections: number;
+};
+
 export type JmapRequestOptions = {
   using?: readonly string[];
   session?: JmapSession;
@@ -51,8 +102,10 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   private readonly stalwartUrl: string;
   private readonly masterUser: string;
   private readonly masterPassword: string;
-  private httpClient!: Client;
-  private blobClient!: Client;
+  private readonly httpOptions: StalwartHttpOptions;
+  private apiPool!: Pool;
+  private uploadPool!: Pool;
+  private downloadPool!: Pool;
 
   constructor(private readonly configService: ConfigService) {
     this.stalwartUrl = this.configService.getOrThrow<string>('stalwart.url');
@@ -62,26 +115,74 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     this.masterPassword = this.configService.getOrThrow<string>(
       'stalwart.masterPassword',
     );
+    this.httpOptions =
+      this.configService.getOrThrow<StalwartHttpOptions>('stalwart.http');
   }
 
   onModuleInit() {
-    this.httpClient = new Client(this.stalwartUrl, {
+    const options = this.httpOptions;
+    const connectTimeout = options.connectTimeoutMs;
+
+    this.apiPool = new Pool(this.stalwartUrl, {
       allowH2: true,
+      connections: 16,
       keepAliveTimeout: 30_000,
-      pipelining: 1,
+      connectTimeout,
+      headersTimeout: options.apiTimeoutMs,
+      bodyTimeout: options.apiTimeoutMs,
     });
-    this.blobClient = new Client(this.stalwartUrl, {
+    const blobPoolOptions = {
       allowH2: false,
-      keepAliveTimeout: 60_000,
       pipelining: 1,
-      bodyTimeout: 60_000,
-      headersTimeout: 60_000,
+      keepAliveTimeout: 60_000,
+      connectTimeout,
+      headersTimeout: options.blobTimeoutMs,
+      bodyTimeout: options.blobTimeoutMs,
+    };
+    this.uploadPool = new Pool(this.stalwartUrl, {
+      ...blobPoolOptions,
+      connections: options.uploadConnections,
+    });
+    this.downloadPool = new Pool(this.stalwartUrl, {
+      ...blobPoolOptions,
+      connections: options.downloadConnections,
     });
     this.logger.log(`JMAP client initialized targeting ${this.stalwartUrl}`);
   }
 
   async onModuleDestroy() {
-    await Promise.all([this.httpClient.close(), this.blobClient.close()]);
+    await Promise.all([
+      this.apiPool.close(),
+      this.uploadPool.close(),
+      this.downloadPool.close(),
+    ]);
+  }
+
+  private async withProviderErrors<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      throw toProviderError(error);
+    }
+  }
+
+  private requestText(
+    pool: Pool,
+    options: Dispatcher.RequestOptions,
+  ): Promise<{ statusCode: number; text: string }> {
+    return this.withProviderErrors(async () => {
+      const { statusCode, body } = await pool.request(options);
+      return { statusCode, text: await body.text() };
+    });
+  }
+
+  private toProviderStream(body: Readable): Readable {
+    const stream = new PassThrough();
+    body.once('error', (error) =>
+      stream.destroy(toProviderError(error) as Error),
+    );
+    stream.once('close', () => body.destroy());
+    return body.pipe(stream);
   }
 
   private buildAuthHeader(userEmail: string): string {
@@ -101,21 +202,23 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     return accountId;
   }
 
-  async getSession(userEmail: string): Promise<JmapSession> {
+  async getSession(
+    userEmail: string,
+    signal?: AbortSignal,
+  ): Promise<JmapSession> {
     this.logger.debug(
       `JMAP session request: url=${this.stalwartUrl}/jmap/session user=${userEmail}%${this.masterUser}`,
     );
 
-    const { statusCode, body } = await this.httpClient.request({
+    const { statusCode, text } = await this.requestText(this.apiPool, {
       method: 'GET',
       path: '/jmap/session',
       headers: {
         authorization: this.buildAuthHeader(userEmail),
         accept: 'application/json',
       },
+      signal,
     });
-
-    const text = await body.text();
 
     if (statusCode !== 200) {
       throw new JmapError(
@@ -141,7 +244,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
 
     const apiPath = new URL(jmapSession.apiUrl).pathname;
 
-    const { statusCode, body } = await this.httpClient.request({
+    const { statusCode, text } = await this.requestText(this.apiPool, {
       method: 'POST',
       path: apiPath,
       headers: {
@@ -151,8 +254,6 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       },
       body: JSON.stringify(requestBody),
     });
-
-    const text = await body.text();
 
     if (statusCode !== 200) {
       throw new JmapError(`JMAP request failed: HTTP ${statusCode}`, text);
@@ -182,8 +283,13 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
   async uploadAttachment({
     userEmail,
     blob,
+    signal,
   }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
     const { name, buffer, mimeType } = blob;
+    const uploadSignal = withDeadline(
+      this.httpOptions.uploadDeadlineMs,
+      signal,
+    );
     const logContext = {
       domain: emailDomain(userEmail),
       size: buffer.length,
@@ -191,7 +297,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     };
 
     const sessionStartedAt = performance.now();
-    const session = await this.getSession(userEmail);
+    const session = await this.getSession(userEmail, uploadSignal);
     const accountId = this.requireMailAccountId(session);
     this.logger.log(
       { ...logContext, durationMs: elapsedMs(sessionStartedAt) },
@@ -209,7 +315,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(logContext, 'Attachment upload: sending blob to Stalwart');
     const uploadStartedAt = performance.now();
 
-    const { statusCode, body } = await this.blobClient.request({
+    const { statusCode, text } = await this.requestText(this.uploadPool, {
       method: 'POST',
       path: uploadPath,
       headers: {
@@ -219,9 +325,8 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
         accept: 'application/json',
       },
       body: buffer,
+      signal: uploadSignal,
     });
-
-    const text = await body.text();
 
     const uploadDurationMs = elapsedMs(uploadStartedAt);
 
@@ -260,22 +365,28 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
     blobId,
     name,
     type,
+    signal,
   }: DownloadAttachmentPayload): Promise<DownloadAttachmentResponse> {
-    const accountId = await this.getPrimaryAccountId(userEmail);
+    const accountId = this.requireMailAccountId(
+      await this.getSession(userEmail, signal),
+    );
 
     const namePart = encodeURIComponent(name ?? 'attachment');
     const acceptQuery = type ? `?accept=${encodeURIComponent(type)}` : '';
 
-    const { statusCode, headers, body } = await this.blobClient.request({
-      method: 'GET',
-      path: `/jmap/download/${encodeURIComponent(accountId)}/${encodeURIComponent(blobId)}/${namePart}${acceptQuery}`,
-      headers: {
-        authorization: this.buildAuthHeader(userEmail),
-      },
-    });
+    const { statusCode, headers, body } = await this.withProviderErrors(() =>
+      this.downloadPool.request({
+        method: 'GET',
+        path: `/jmap/download/${encodeURIComponent(accountId)}/${encodeURIComponent(blobId)}/${namePart}${acceptQuery}`,
+        headers: {
+          authorization: this.buildAuthHeader(userEmail),
+        },
+        signal,
+      }),
+    );
 
     if (statusCode !== 200) {
-      const text = await body.text();
+      const text = await this.withProviderErrors(() => body.text());
       throw new JmapError(`Blob download failed: HTTP ${statusCode}`, text);
     }
 
@@ -288,7 +399,7 @@ export class JmapService implements OnModuleInit, OnModuleDestroy {
       : undefined;
 
     return {
-      stream: body as unknown as Readable,
+      stream: this.toProviderStream(body),
       contentType,
       contentLength: Number.isFinite(contentLength) ? contentLength : undefined,
     };

@@ -1,3 +1,6 @@
+const intEnv = (name: string, fallback: number): number =>
+  Number.parseInt(process.env[name] ?? String(fallback), 10);
+
 export default () => ({
   port: Number.parseInt(process.env.PORT ?? '3100', 10),
   environment: process.env.NODE_ENV ?? 'development',
@@ -21,6 +24,14 @@ export default () => ({
     masterPassword: process.env.STALWART_MASTER_PASSWORD ?? '',
     smtpHost: process.env.STALWART_SMTP_HOST ?? 'localhost',
     smtpPort: Number.parseInt(process.env.STALWART_SMTP_PORT ?? '465', 10),
+    http: {
+      connectTimeoutMs: intEnv('STALWART_CONNECT_TIMEOUT_MS', 10_000),
+      apiTimeoutMs: intEnv('STALWART_API_TIMEOUT_MS', 45_000),
+      blobTimeoutMs: intEnv('STALWART_BLOB_TIMEOUT_MS', 30_000),
+      uploadDeadlineMs: intEnv('STALWART_UPLOAD_DEADLINE_MS', 80_000),
+      uploadConnections: intEnv('STALWART_UPLOAD_CONNECTIONS', 8),
+      downloadConnections: intEnv('STALWART_DOWNLOAD_CONNECTIONS', 16),
+    },
   },
 
   crypto: {

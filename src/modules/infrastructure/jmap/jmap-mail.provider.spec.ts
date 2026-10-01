@@ -1191,6 +1191,7 @@ describe('JmapMailProvider', () => {
         blobId: 'blob-1',
         name: 'photo.jpg',
         type: 'image/jpeg',
+        signal: new AbortController().signal,
       };
       const stored = {
         stream: Readable.from(Buffer.from('binary')),

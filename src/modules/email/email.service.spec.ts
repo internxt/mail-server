@@ -683,6 +683,37 @@ describe('EmailService', () => {
       expect(result).toEqual({ id: 'msg-2' });
     });
 
+    it('when one attachment cannot be fetched for an external send, then the other fetches are cancelled and nothing is sent', async () => {
+      const dto = newSendEmailDto({
+        attachments: [
+          { blobId: 'b1', name: 'a.pdf', type: 'application/pdf', size: 1 },
+          { blobId: 'b2', name: 'b.pdf', type: 'application/pdf', size: 1 },
+        ],
+        encryption: newEncryptionBlock(),
+      });
+      configService.getOrThrow.mockReturnValue(
+        Buffer.from('server-priv-key').toString('base64'),
+      );
+      mockedDecryptEnvelope.mockResolvedValue({
+        body: 'plain body text',
+        attachmentsSessionKey: new Uint8Array([1, 2, 3, 4]),
+      });
+      const fetchFailure = new Error('blob gone');
+      let pendingFetchSignal: AbortSignal | undefined;
+      provider.downloadAttachment.mockImplementation(({ blobId, signal }) => {
+        if (blobId === 'b1') return Promise.reject(fetchFailure);
+        pendingFetchSignal = signal;
+        return new Promise(() => undefined);
+      });
+
+      await expect(service.sendExternalEmail(userEmail, dto)).rejects.toBe(
+        fetchFailure,
+      );
+
+      expect(pendingFetchSignal?.aborted).toBe(true);
+      expect(smtp.sendRaw).not.toHaveBeenCalled();
+    });
+
     it('when the decrypted body is HTML, then it is delivered as the HTML part with a plain-text alternative', async () => {
       const dto = newSendEmailDto({
         attachments: undefined,

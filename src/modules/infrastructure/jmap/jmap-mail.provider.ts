@@ -1037,6 +1037,7 @@ export class JmapMailProvider extends MailProvider {
   async uploadAttachment({
     userEmail,
     blob,
+    signal,
   }: UploadAttachmentPayload): Promise<UploadAttachmentResponse> {
     try {
       return await this.jmap.uploadAttachment({
@@ -1046,6 +1047,7 @@ export class JmapMailProvider extends MailProvider {
           buffer: blob.buffer,
           mimeType: blob.mimeType,
         },
+        signal,
       });
     } catch (error) {
       const limitDetail = uploadLimitDetail(error);
