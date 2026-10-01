@@ -30,26 +30,26 @@
   },
   "dependencies": {
     "@nestjs/cli": "^11.0.16",
-    "@nestjs/common": "^11.1.15",
+    "@nestjs/common": "^11.2.7",
     "@nestjs/config": "^4.0.3",
-    "@nestjs/core": "^11.1.15",
+    "@nestjs/core": "^11.2.7",
     "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
-    "@nestjs/platform-express": "^11.1.15",
+    "@nestjs/platform-express": "^11.2.7",
     "@nestjs/sequelize": "^11.0.1",
-    "@nestjs/swagger": "^11.4.6",
+    "@nestjs/swagger": "^11.4.7",
     "busboy": "^1.6.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "cross-env": "^10.1.0",
     "dayjs": "^1.11.20",
     "helmet": "^8.1.0",
-    "html-to-text": "^10.0.0",
+    "html-to-text": "^10.0.1",
     "internxt-crypto": "^1.6.0",
     "nanoid": "^5.1.16",
     "nestjs-pino": "^4.6.0",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.0.13",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
@@ -61,14 +61,14 @@
     "sequelize": "^6.37.8",
     "sequelize-cli": "^6.6.5",
     "swagger-ui-express": "^5.0.1",
-    "undici": "^7.29.0"
+    "undici": "^7.30.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
     "@golevelup/ts-vitest": "^3.0.0",
     "@internxt/eslint-config-internxt": "2.0.1",
     "@nestjs/schematics": "^11.0.9",
-    "@nestjs/testing": "^11.1.15",
+    "@nestjs/testing": "^11.2.7",
     "@swc/core": "^1.15.18",
     "@types/busboy": "^1.5.4",
     "@types/chance": "^1.1.7",
@@ -76,7 +76,7 @@
     "@types/html-to-text": "^9.0.4",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.15.0",
-    "@types/nodemailer": "^8.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/passport-jwt": "^4.0.1",
     "@vitest/coverage-v8": "^4.1.8",
     "chance": "^1.1.13",
@@ -100,6 +100,8 @@
   },
   "overrides": {
     "uuid": "^11.1.1",
-    "multer": "^2.4.0"
+    "@nestjs/swagger": {
+      "js-yaml": "^5.4.2"
+    }
   }
 }
