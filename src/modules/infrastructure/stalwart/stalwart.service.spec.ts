@@ -106,6 +106,11 @@ const DOMAIN_BATCH_HIT = jmapResponse([
   getResp('x:Domain/get', [{ id: 'dom1', name: 'test.com' }]),
 ]);
 
+const DOMAIN_BATCH_MISS = jmapResponse([
+  queryResp('x:Domain/query', []),
+  getResp('x:Domain/get', []),
+]);
+
 describe('StalwartService', () => {
   let service: StalwartService;
 
@@ -288,7 +293,7 @@ describe('StalwartService', () => {
 
       await expect(
         service.deleteAccountByEmail('alice@test.com'),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe(true);
 
       expect(mockRequest).toHaveBeenCalledTimes(2);
       const setCall = bodyOf(1).methodCalls[1]!;
@@ -301,7 +306,7 @@ describe('StalwartService', () => {
       });
     });
 
-    it('when account not found, then throws StalwartApiError', async () => {
+    it('when account not found, then reports nothing was destroyed', async () => {
       mockRequest
         .mockResolvedValueOnce(DOMAIN_BATCH_HIT)
         .mockResolvedValueOnce(
@@ -313,6 +318,14 @@ describe('StalwartService', () => {
 
       await expect(
         service.deleteAccountByEmail('ghost@test.com'),
+      ).resolves.toBe(false);
+    });
+
+    it('when the domain is unknown, then throws StalwartApiError', async () => {
+      mockRequest.mockResolvedValueOnce(DOMAIN_BATCH_MISS);
+
+      await expect(
+        service.deleteAccountByEmail('ghost@unknown.com'),
       ).rejects.toThrow(StalwartApiError);
     });
 

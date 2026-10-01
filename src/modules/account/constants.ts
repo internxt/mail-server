@@ -1,0 +1,4 @@
+export const SUSPENDED_RETENTION_DAYS = 30;
+export const PURGE_BATCH_SIZE = 100;
+export const PURGE_STALLED_AFTER_MINUTES = 60;
+export const PURGE_STALLED_RECLAIM_LIMIT = 25;
