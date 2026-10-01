@@ -1,4 +1,8 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import {
+  GatewayTimeoutException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import {
   type DownloadAttachmentPayload,
   type DownloadAttachmentResponse,
@@ -74,6 +78,32 @@ export class MissingMessageIdError extends UnprocessableEntityException {
     this.name = 'MissingMessageIdError';
 
     Object.setPrototypeOf(this, MissingMessageIdError.prototype);
+  }
+}
+
+/**
+ * The provider did not answer within its deadline. Transient: the caller may
+ * retry the same request.
+ */
+export class MailProviderTimeoutError extends GatewayTimeoutException {
+  constructor() {
+    super('Mail server did not respond in time, please try again');
+    this.name = 'MailProviderTimeoutError';
+
+    Object.setPrototypeOf(this, MailProviderTimeoutError.prototype);
+  }
+}
+
+/**
+ * The provider could not be reached or dropped the connection. Transient: the
+ * caller may retry the same request.
+ */
+export class MailProviderUnavailableError extends ServiceUnavailableException {
+  constructor() {
+    super('Mail server is temporarily unavailable, please try again');
+    this.name = 'MailProviderUnavailableError';
+
+    Object.setPrototypeOf(this, MailProviderUnavailableError.prototype);
   }
 }
 

@@ -63,6 +63,8 @@ import {
 import type { Readable } from 'node:stream';
 import { emailDomain, scrubPii } from '../../common/logging/pii.js';
 
+const ATTACHMENT_FETCH_DEADLINE_MS = 60_000;
+
 async function streamToBuffer(stream: Readable): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
@@ -369,21 +371,33 @@ export class EmailService {
       );
     }
 
-    return Promise.all(
-      dto.attachments.map(async (a) => {
-        const { stream } = await this.mail.downloadAttachment({
-          userEmail,
-          blobId: a.blobId,
-        });
-        const ciphertext = await streamToBuffer(stream);
-        const plaintext = await decryptAttachment(ciphertext, attachmentKey);
-        return {
-          filename: a.name,
-          content: Buffer.from(plaintext),
-          contentType: a.type,
-        };
-      }),
-    );
+    const cancel = new AbortController();
+    const signal = AbortSignal.any([
+      cancel.signal,
+      AbortSignal.timeout(ATTACHMENT_FETCH_DEADLINE_MS),
+    ]);
+
+    try {
+      return await Promise.all(
+        dto.attachments.map(async (a) => {
+          const { stream } = await this.mail.downloadAttachment({
+            userEmail,
+            blobId: a.blobId,
+            signal,
+          });
+          const ciphertext = await streamToBuffer(stream);
+          const plaintext = await decryptAttachment(ciphertext, attachmentKey);
+          return {
+            filename: a.name,
+            content: Buffer.from(plaintext),
+            contentType: a.type,
+          };
+        }),
+      );
+    } catch (error) {
+      cancel.abort();
+      throw error;
+    }
   }
 
   saveDraft(userEmail: string, dto: DraftEmailDto): Promise<Email> {

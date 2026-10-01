@@ -409,6 +409,7 @@ describe('EmailController', () => {
       buffer: Buffer.from('binary'),
       size: 6,
     } as Express.Multer.File;
+    const signal = new AbortController().signal;
 
     test('when a user attaches a file, then the file is stored and its details are returned along with the original filename', async () => {
       emailService.uploadAttachment.mockResolvedValue({
@@ -417,7 +418,11 @@ describe('EmailController', () => {
         type: file.mimetype,
       });
 
-      const result = await controller.uploadAttachment([file], userEmail);
+      const result = await controller.uploadAttachment(
+        [file],
+        userEmail,
+        signal,
+      );
 
       expect(emailService.uploadAttachment).toHaveBeenCalledWith({
         userEmail,
@@ -426,6 +431,7 @@ describe('EmailController', () => {
           buffer: file.buffer,
           mimeType: file.mimetype,
         },
+        signal,
       });
       expect(result).toEqual({
         blobId: 'blob-1',
@@ -436,14 +442,16 @@ describe('EmailController', () => {
     });
 
     test('when the request does not include any file, then the upload is rejected', async () => {
-      await expect(controller.uploadAttachment([], userEmail)).rejects.toThrow(
-        'No files uploaded',
-      );
+      await expect(
+        controller.uploadAttachment([], userEmail, signal),
+      ).rejects.toThrow('No files uploaded');
       expect(emailService.uploadAttachment).not.toHaveBeenCalled();
     });
   });
 
   describe('Downloading an attachment', () => {
+    const signal = new AbortController().signal;
+
     test('when a user downloads an attachment, then the response carries the file bytes with the right content type, length and filename', async () => {
       const stream = Readable.from(Buffer.from('binary'));
       emailService.downloadAttachment.mockResolvedValue({
@@ -460,6 +468,7 @@ describe('EmailController', () => {
         'photo.jpg',
         'image/jpeg',
         res,
+        signal,
       );
 
       expect(emailService.downloadAttachment).toHaveBeenCalledWith({
@@ -467,6 +476,7 @@ describe('EmailController', () => {
         blobId: 'blob-1',
         name: 'photo.jpg',
         type: 'image/jpeg',
+        signal,
       });
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/jpeg');
       expect(res.setHeader).toHaveBeenCalledWith('Content-Length', 1234);
@@ -491,6 +501,7 @@ describe('EmailController', () => {
         'doc.pdf',
         undefined,
         res,
+        signal,
       );
 
       expect(res.setHeader).toHaveBeenCalledWith(
@@ -513,6 +524,7 @@ describe('EmailController', () => {
         undefined,
         undefined,
         res,
+        signal,
       );
 
       expect(res.setHeader).not.toHaveBeenCalledWith(
@@ -535,6 +547,7 @@ describe('EmailController', () => {
         'photo.png',
         'not a mime',
         res,
+        signal,
       );
 
       expect(emailService.downloadAttachment).toHaveBeenCalledWith({
@@ -542,6 +555,7 @@ describe('EmailController', () => {
         blobId: 'blob-1',
         name: 'photo.png',
         type: undefined,
+        signal,
       });
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/png');
     });

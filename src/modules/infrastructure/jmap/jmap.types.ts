@@ -192,6 +192,7 @@ export interface UploadAttachmentPayload {
     buffer: Buffer;
     mimeType: string;
   };
+  signal?: AbortSignal;
 }
 
 export interface DownloadAttachmentPayload {
@@ -199,6 +200,7 @@ export interface DownloadAttachmentPayload {
   blobId: string;
   name?: string;
   type?: string;
+  signal: AbortSignal;
 }
 
 export interface DownloadAttachmentResponse {

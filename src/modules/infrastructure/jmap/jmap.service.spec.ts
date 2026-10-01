@@ -1,19 +1,28 @@
 import { describe, it, expect, beforeEach, vi, test } from 'vitest';
+import { Readable } from 'node:stream';
 import { type ConfigService } from '@nestjs/config';
 import { JmapService, JmapError } from './jmap.service.js';
 
 const mockRequest = vi.fn();
 vi.mock('undici', () => ({
-  Client: vi.fn().mockImplementation(function () {
+  Pool: vi.fn().mockImplementation(function () {
     return { request: mockRequest, close: vi.fn() };
   }),
 }));
 
 function createConfigService(): ConfigService {
-  const config: Record<string, string> = {
+  const config: Record<string, unknown> = {
     'stalwart.url': 'http://localhost:8080',
     'stalwart.masterUser': 'master',
     'stalwart.masterPassword': 'secret',
+    'stalwart.http': {
+      connectTimeoutMs: 1000,
+      apiTimeoutMs: 1000,
+      blobTimeoutMs: 1000,
+      uploadDeadlineMs: 1000,
+      uploadConnections: 1,
+      downloadConnections: 1,
+    },
   };
   return {
     getOrThrow: vi.fn((key: string) => {
@@ -201,6 +210,7 @@ describe('JMAP service', () => {
 
   describe('Downloading attachments', () => {
     const userEmail = 'user@test.com';
+    const signal = new AbortController().signal;
 
     beforeEach(() => {
       mockRequest.mockResolvedValueOnce(httpResponse(200, sessionPayload));
@@ -209,15 +219,13 @@ describe('JMAP service', () => {
     function downloadResponse(
       statusCode: number,
       headers: Record<string, string>,
-      body: NodeJS.ReadableStream,
+      body: Readable,
     ) {
       return { statusCode, headers, body };
     }
 
     test('when an attachment is downloaded, then its bytes are returned with the stored content type and size', async () => {
-      const fakeStream = {
-        on: vi.fn(),
-      } as unknown as NodeJS.ReadableStream;
+      const fakeStream = Readable.from([Buffer.from('bytes')]);
       mockRequest.mockResolvedValueOnce(
         downloadResponse(
           200,
@@ -228,24 +236,26 @@ describe('JMAP service', () => {
 
       const result = await service.downloadAttachment({
         userEmail,
+        signal,
         blobId: 'blob-1',
       });
 
       expect(result.contentType).toBe('image/jpeg');
       expect(result.contentLength).toBe(1234);
-      expect(result.stream).toBe(fakeStream);
+      await expect(result.stream.toArray()).resolves.toEqual([
+        Buffer.from('bytes'),
+      ]);
     });
 
     test('when an attachment is requested with a desired name and type, then those are forwarded to the storage', async () => {
-      const fakeStream = {
-        on: vi.fn(),
-      } as unknown as NodeJS.ReadableStream;
+      const fakeStream = Readable.from([Buffer.from('bytes')]);
       mockRequest.mockResolvedValueOnce(
         downloadResponse(200, { 'content-type': 'image/jpeg' }, fakeStream),
       );
 
       await service.downloadAttachment({
         userEmail,
+        signal,
         blobId: 'blob-1',
         name: 'photo.jpg',
         type: 'image/jpeg',
@@ -263,13 +273,12 @@ describe('JMAP service', () => {
     });
 
     test('when the response does not include a content type, then a safe default is used', async () => {
-      const fakeStream = {
-        on: vi.fn(),
-      } as unknown as NodeJS.ReadableStream;
+      const fakeStream = Readable.from([Buffer.from('bytes')]);
       mockRequest.mockResolvedValueOnce(downloadResponse(200, {}, fakeStream));
 
       const result = await service.downloadAttachment({
         userEmail,
+        signal,
         blobId: 'blob-1',
       });
 
@@ -287,6 +296,7 @@ describe('JMAP service', () => {
       await expect(
         service.downloadAttachment({
           userEmail,
+          signal,
           blobId: 'missing',
         }),
       ).rejects.toBeInstanceOf(JmapError);
@@ -304,6 +314,7 @@ describe('JMAP service', () => {
       await expect(
         service.downloadAttachment({
           userEmail,
+          signal,
           blobId: 'blob-1',
         }),
       ).rejects.toBeInstanceOf(JmapError);

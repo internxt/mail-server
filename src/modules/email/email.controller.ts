@@ -54,6 +54,7 @@ import { AccountService } from '../account/account.service.js';
 import { SkipMailAccountCheck } from '../provisioning/skip-mail-account-check.decorator.js';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { RequestSignal } from '../../common/decorators/request-signal.decorator.js';
 import {
   buildContentDisposition,
   sanitizeFilename,
@@ -355,6 +356,7 @@ export class EmailController {
   async uploadAttachment(
     @UploadedFiles() files: Express.Multer.File[],
     @MailAddress('address') email: string,
+    @RequestSignal() signal: AbortSignal,
   ): Promise<UploadAttachmentResponseDto> {
     const [file] = files;
     if (!file) throw new BadRequestException('No files uploaded');
@@ -366,6 +368,7 @@ export class EmailController {
         buffer: file.buffer,
         mimeType: file.mimetype,
       },
+      signal,
     });
 
     return { ...result, name: file.originalname };
@@ -389,6 +392,7 @@ export class EmailController {
     @Query('name') name: string | undefined,
     @Query('type') type: string | undefined,
     @Res({ passthrough: true }) res: Response,
+    @RequestSignal() signal: AbortSignal,
   ): Promise<StreamableFile> {
     const safeType = sanitizeMimeType(type);
 
@@ -404,6 +408,7 @@ export class EmailController {
       blobId,
       name: resolvedName,
       type: safeType ?? undefined,
+      signal,
     });
 
     const resolvedType = safeType ?? result.contentType;
