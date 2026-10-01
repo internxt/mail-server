@@ -1110,7 +1110,7 @@ describe('EmailService', () => {
       userEmail,
       blob: {
         name: 'image.jpg',
-        buffer: Buffer.from('binary'),
+        stream: Readable.from(Buffer.from('binary')),
         mimeType: 'image/jpeg',
       },
     };

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { ConfigService } from '@nestjs/config';
+import { PayloadTooLargeException } from '@nestjs/common';
 import { JmapService, type StalwartHttpOptions } from './jmap.service.js';
 import {
   MailProviderTimeoutError,
@@ -120,7 +121,11 @@ async function readAll(stream: Readable): Promise<Buffer> {
 const uploadSmallBlob = (service: JmapService, signal?: AbortSignal) =>
   service.uploadAttachment({
     userEmail,
-    blob: { name: 'a.txt', buffer: smallBlob, mimeType: 'text/plain' },
+    blob: {
+      name: 'a.txt',
+      stream: Readable.from([smallBlob]),
+      mimeType: 'text/plain',
+    },
     signal,
   });
 
@@ -205,27 +210,53 @@ describe('JMAP service connections', () => {
     await expect(upload).rejects.toBe(clientGone);
   });
 
-  it.each([
-    [
-      'the upload deadline passes',
-      { uploadDeadlineMs: 200, blobTimeoutMs: 10_000 },
-    ],
-    [
-      'response headers stop arriving',
-      { uploadDeadlineMs: 10_000, blobTimeoutMs: 200 },
-    ],
-  ])(
-    'when the mail server never answers an upload and %s, then it fails with a retryable timeout',
-    async (_, http) => {
-      await service.onModuleDestroy();
-      service = createService(fake.baseUrl, http);
-      fake.hangUploads = true;
+  it('when the mail server never answers a fully sent upload, then it fails with a retryable timeout once the deadline passes', async () => {
+    await service.onModuleDestroy();
+    service = createService(fake.baseUrl, { uploadDeadlineMs: 200 });
+    fake.hangUploads = true;
 
-      await expect(uploadSmallBlob(service)).rejects.toBeInstanceOf(
-        MailProviderTimeoutError,
-      );
-    },
-  );
+    await expect(uploadSmallBlob(service)).rejects.toBeInstanceOf(
+      MailProviderTimeoutError,
+    );
+  });
+
+  it('when the client streams an upload slower than the upstream timeouts, then it still completes', async () => {
+    await service.onModuleDestroy();
+    service = createService(fake.baseUrl, {
+      blobTimeoutMs: 100,
+      uploadDeadlineMs: 100,
+    });
+    const chunks = ['slow', '-', 'client'];
+    const slowBody = new Readable({
+      read() {
+        setTimeout(() => this.push(chunks.shift() ?? null), 80);
+      },
+    });
+
+    await expect(
+      service.uploadAttachment({
+        userEmail,
+        blob: { name: 'a.txt', stream: slowBody, mimeType: 'text/plain' },
+      }),
+    ).resolves.toMatchObject({ blobId: 'blob-1', size: 'slow-client'.length });
+  });
+
+  it('when the incoming file fails partway through, then the upload fails with that error', async () => {
+    const tooLarge = new PayloadTooLargeException();
+    const failingBody = new Readable({
+      read() {
+        this.push('partial');
+        this.destroy(tooLarge);
+      },
+    });
+
+    await expect(
+      service.uploadAttachment({
+        userEmail,
+        blob: { name: 'a.txt', stream: failingBody, mimeType: 'text/plain' },
+      }),
+    ).rejects.toBe(tooLarge);
+  });
 
   it('when the mail server cannot be reached, then the call fails as temporarily unavailable', async () => {
     const closed = createServer();

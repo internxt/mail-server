@@ -1,4 +1,6 @@
 import Chance from 'chance';
+import { Readable } from 'node:stream';
+import type { Request } from 'express';
 import type {
   Mailbox,
   EmailAddress,
@@ -462,4 +464,42 @@ export function newUpdateDraftResult(
     deletedEntryKey: null,
     ...attrs,
   };
+}
+
+export interface MultipartPart {
+  field: string;
+  filename?: string;
+  type?: string;
+  content: Buffer | string;
+}
+
+/** An Express request carrying a multipart/form-data body built from parts. */
+export function newMultipartRequest(
+  parts: MultipartPart[],
+  { declareLength = true }: { declareLength?: boolean } = {},
+): Request {
+  const boundary = 'test-boundary';
+  const body = Buffer.concat([
+    ...parts.flatMap(({ field, filename, type, content }) => {
+      const disposition = filename
+        ? `form-data; name="${field}"; filename="${filename}"`
+        : `form-data; name="${field}"`;
+      const contentType = type ? `\r\nContent-Type: ${type}` : '';
+      return [
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: ${disposition}${contentType}\r\n\r\n`,
+        ),
+        Buffer.from(content),
+        Buffer.from('\r\n'),
+      ];
+    }),
+    Buffer.from(`--${boundary}--\r\n`),
+  ]);
+
+  return Object.assign(Readable.from([body]), {
+    headers: {
+      'content-type': `multipart/form-data; boundary=${boundary}`,
+      ...(declareLength ? { 'content-length': String(body.length) } : {}),
+    },
+  }) as unknown as Request;
 }

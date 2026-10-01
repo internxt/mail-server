@@ -1044,7 +1044,7 @@ export class JmapMailProvider extends MailProvider {
         userEmail,
         blob: {
           name: blob.name,
-          buffer: blob.buffer,
+          stream: blob.stream,
           mimeType: blob.mimeType,
         },
         signal,
