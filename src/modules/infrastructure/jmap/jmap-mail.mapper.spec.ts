@@ -356,17 +356,19 @@ describe('Mapper for JMAP', () => {
           name: 'invoice.pdf',
           type: 'application/pdf',
           size: 12345,
+          cid: null,
         },
         {
           blobId: 'blob-2',
           name: 'photo.jpg',
           type: 'image/jpeg',
           size: 67890,
+          cid: null,
         },
       ]);
     });
 
-    test('when an email has inline images, then they are not reported as attached files', () => {
+    test('when an email has inline images, then they are returned with the content id the body references them by', () => {
       const jmapEmail = newJmapEmail({
         attachments: [
           {
@@ -375,13 +377,47 @@ describe('Mapper for JMAP', () => {
             type: 'image/png',
             size: 100,
             disposition: 'inline',
+            cid: 'logo@example.com',
           },
         ],
       });
 
       const result = mapJmapEmailToDetail(jmapEmail);
 
-      expect(result.attachments).toEqual([]);
+      expect(result.attachments).toEqual([
+        {
+          blobId: 'blob-inline',
+          name: 'logo.png',
+          type: 'image/png',
+          size: 100,
+          cid: 'logo@example.com',
+        },
+      ]);
+    });
+
+    test('when a part has no disposition, then it is still returned so the user can access it', () => {
+      const jmapEmail = newJmapEmail({
+        attachments: [
+          {
+            blobId: 'blob-invite',
+            name: 'invite.ics',
+            type: 'text/calendar',
+            size: 200,
+          },
+        ],
+      });
+
+      const result = mapJmapEmailToDetail(jmapEmail);
+
+      expect(result.attachments).toEqual([
+        {
+          blobId: 'blob-invite',
+          name: 'invite.ics',
+          type: 'text/calendar',
+          size: 200,
+          cid: null,
+        },
+      ]);
     });
 
     test('when an attached file has missing details, then they are filled in with safe defaults', () => {
@@ -402,6 +438,7 @@ describe('Mapper for JMAP', () => {
           name: '',
           type: 'application/octet-stream',
           size: 0,
+          cid: null,
         },
       ]);
     });

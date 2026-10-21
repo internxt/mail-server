@@ -253,6 +253,36 @@ describe('EmailService', () => {
     });
   });
 
+  describe('Getting an attachment', () => {
+    it('when the part is an inline image of the email, then it is returned so it can be downloaded', async () => {
+      const inlineImage = {
+        blobId: 'blob-inline',
+        name: 'logo.png',
+        type: 'image/png',
+        size: 100,
+        cid: 'logo@example.com',
+      };
+      const email = newEmail({ attachments: [inlineImage] });
+      provider.getEmail.mockResolvedValue(email);
+
+      const result = await service.getAttachment(
+        userEmail,
+        email.id,
+        'blob-inline',
+      );
+
+      expect(result).toEqual(inlineImage);
+    });
+
+    it('when the blob does not belong to the email, then the user is told it was not found', async () => {
+      provider.getEmail.mockResolvedValue(newEmail({ attachments: [] }));
+
+      await expect(
+        service.getAttachment(userEmail, 'email-1', 'foreign-blob'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('getThread', () => {
     it('when opening a conversation with several emails, then all messages in the conversation are returned', async () => {
       const emails = [newEmail(), newEmail(), newEmail()];

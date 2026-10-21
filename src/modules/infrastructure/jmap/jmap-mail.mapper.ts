@@ -2,6 +2,7 @@ import type {
   Email as DomainEmail,
   EmailAddress,
   EmailAttachment,
+  EmailAttachmentPart,
   EmailSummary,
   Mailbox as DomainMailbox,
   MailboxType,
@@ -77,15 +78,16 @@ export function mapJmapEmailToSummary(e: JmapEmail): EmailSummary {
   };
 }
 
-function mapJmapAttachments(parts?: EmailBodyPart[]): EmailAttachment[] {
+function mapJmapAttachments(parts?: EmailBodyPart[]): EmailAttachmentPart[] {
   if (!parts) return [];
   return parts
-    .filter((p) => p.blobId && p.disposition === 'attachment')
+    .filter((p) => p.blobId)
     .map((p) => ({
       blobId: p.blobId!,
       name: p.name ?? '',
       type: p.type ?? 'application/octet-stream',
       size: p.size ?? 0,
+      cid: p.cid ?? null,
     }));
 }
 

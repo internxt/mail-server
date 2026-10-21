@@ -70,6 +70,10 @@ export interface EmailAttachment {
   size: number;
 }
 
+export interface EmailAttachmentPart extends EmailAttachment {
+  cid: string | null;
+}
+
 export interface Email extends EmailSummary {
   cc: EmailAddress[];
   bcc: EmailAddress[];
@@ -77,7 +81,7 @@ export interface Email extends EmailSummary {
   sentAt: string | null;
   textBody: string | null;
   htmlBody: string | null;
-  attachments: EmailAttachment[];
+  attachments: EmailAttachmentPart[];
 }
 
 export interface ListEmails {

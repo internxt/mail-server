@@ -376,6 +376,15 @@ export class EmailAttachmentDto {
 
   @ApiProperty({ example: 4096, description: 'Size in bytes' })
   size!: number;
+
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    example: 'logo@example.com',
+    description:
+      'Content-ID without angle brackets; the HTML body references the part as cid:<value>',
+  })
+  cid!: string | null;
 }
 
 export class EmailResponseDto extends EmailSummaryResponseDto {
