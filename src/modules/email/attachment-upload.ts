@@ -60,7 +60,7 @@ export function receiveFile(
       stream.once('close', () => file.resume());
 
       resolve({
-        name: info.filename,
+        name: info.filename ?? '',
         mimeType: info.mimeType,
         stream: file.pipe(stream),
       });
