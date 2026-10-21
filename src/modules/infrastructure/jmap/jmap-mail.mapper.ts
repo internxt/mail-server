@@ -60,6 +60,12 @@ export function mapJmapMailbox(m: JmapMailbox): DomainMailbox {
   };
 }
 
+const IMAGE_PLACEHOLDER = /\s*\[(?:image|cid):[^\]]*(?:\]|$)/gi;
+
+function cleanPreview(preview?: string | null): string {
+  return (preview ?? '').replace(IMAGE_PLACEHOLDER, '').trim();
+}
+
 export function mapJmapEmailToSummary(e: JmapEmail): EmailSummary {
   return {
     id: e.id,
@@ -69,7 +75,7 @@ export function mapJmapEmailToSummary(e: JmapEmail): EmailSummary {
     to: e.to ?? [],
     subject: e.subject ?? '',
     receivedAt: e.receivedAt,
-    preview: e.preview ?? '',
+    preview: cleanPreview(e.preview),
     isRead: !!e.keywords?.['$seen'],
     isFlagged: !!e.keywords?.['$flagged'],
     isDraft: !!e.keywords?.['$draft'],
