@@ -193,6 +193,37 @@ describe('Mapper for JMAP', () => {
       expect(result.hasAttachment).toBe(jmapEmail.hasAttachment);
     });
 
+    test('when the preview has the image markers Gmail and Outlook add for inline images, then they are removed', () => {
+      const jmapEmail = newJmapEmail({
+        preview:
+          'Hi team [image: logo.png] see the report [cid:image001.png@01DA1F2B.3C4D5E60] attached',
+      });
+
+      const result = mapJmapEmailToSummary(jmapEmail);
+
+      expect(result.preview).toBe('Hi team see the report attached');
+    });
+
+    test('when the preview is cut off in the middle of an image marker, then the partial marker is removed', () => {
+      const jmapEmail = newJmapEmail({
+        preview: 'Testing the email ? [image: 68747470733a2f2f66696c6573',
+      });
+
+      const result = mapJmapEmailToSummary(jmapEmail);
+
+      expect(result.preview).toBe('Testing the email ?');
+    });
+
+    test('when the preview has regular text in brackets, then it is kept', () => {
+      const jmapEmail = newJmapEmail({
+        preview: '[Action required] Renew [your plan]',
+      });
+
+      const result = mapJmapEmailToSummary(jmapEmail);
+
+      expect(result.preview).toBe('[Action required] Renew [your plan]');
+    });
+
     test('when email has no from/to, then returns empty arrays', () => {
       const jmapEmail = newJmapEmail({ from: undefined, to: undefined });
 
