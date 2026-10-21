@@ -78,10 +78,6 @@ export function mapJmapEmailToSummary(e: JmapEmail): EmailSummary {
   };
 }
 
-/**
- * Returns every non-body part, inline ones included: the client resolves the
- * `cid:` references of the HTML body against them and lists the rest as files.
- */
 function mapJmapAttachments(parts?: EmailBodyPart[]): EmailAttachmentPart[] {
   if (!parts) return [];
   return parts
