@@ -1,4 +1,4 @@
-FROM node:24.18 AS builder
+FROM node:24.22.1-alpine AS builder
 LABEL author="internxt"
 
 WORKDIR /usr/app
@@ -15,7 +15,7 @@ COPY --chmod=755 src ./src
 COPY --chmod=755 migrations ./migrations
 RUN npm run build && chmod -R 755 dist/
 
-FROM node:24.18
+FROM node:24.22.1-alpine
 LABEL author="internxt"
 
 WORKDIR /usr/app
